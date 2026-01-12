@@ -1,0 +1,11 @@
+// A flower made of circles
+let cx = 100;
+let cy = 100;
+
+// Center
+circle(cx, cy, 15)
+
+// Petals around the center
+for (i in 0..6) {
+  circle(calc(cx + cos(i * 1.047) * 35), calc(cy + sin(i * 1.047) * 35), 20)
+}

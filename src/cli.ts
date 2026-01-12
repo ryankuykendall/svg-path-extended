@@ -1,0 +1,208 @@
+import { compile } from './index';
+import { readFileSync, writeFileSync } from 'fs';
+
+interface CliOptions {
+  svgOutput?: string;
+  viewBox?: string;
+  width?: string;
+  height?: string;
+  stroke?: string;
+  fill?: string;
+  strokeWidth?: string;
+}
+
+function printUsage() {
+  console.log(`
+svg-path-extended - Extended SVG path syntax compiler
+
+Usage:
+  svg-path-extended <file>       Compile a file
+  svg-path-extended -            Read from stdin
+  svg-path-extended -e <code>    Compile inline code
+  svg-path-extended --src=<file> Compile a file (explicit flag)
+
+Options:
+  -h, --help                     Show this help message
+  -v, --version                  Show version
+  --src=<file>                   Input source file
+  -o, --output <file>            Write path output to file
+  --output-svg-file=<file>       Output as complete SVG file
+  --viewBox=<box>                SVG viewBox (default: "0 0 200 200")
+  --width=<w>                    SVG width (default: "200")
+  --height=<h>                   SVG height (default: "200")
+  --stroke=<color>               Path stroke color (default: "#000")
+  --fill=<color>                 Path fill color (default: "none")
+  --stroke-width=<w>             Path stroke width (default: "2")
+
+Examples:
+  svg-path-extended input.svgx
+  svg-path-extended --src=input.svgx --output-svg-file=./output.svg
+  echo 'let x = 10; M x 0' | svg-path-extended -
+  svg-path-extended -e 'M 0 0 L calc(10 + 5) 20'
+  svg-path-extended -e 'circle(100, 100, 50)' --output-svg-file=./circle.svg
+`);
+}
+
+function generateSvg(pathData: string, options: CliOptions): string {
+  const viewBox = options.viewBox || '0 0 200 200';
+  const width = options.width || '200';
+  const height = options.height || '200';
+  const stroke = options.stroke || '#000';
+  const fill = options.fill || 'none';
+  const strokeWidth = options.strokeWidth || '2';
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
+  <rect width="100%" height="100%" fill="#f5f5f5"/>
+  <path d="${pathData}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>
+</svg>`;
+}
+
+function parseArgs(args: string[]): { source: string; options: CliOptions; outputFile?: string } {
+  const options: CliOptions = {};
+  let source: string | null = null;
+  let outputFile: string | undefined;
+  let i = 0;
+
+  while (i < args.length) {
+    const arg = args[i];
+
+    if (arg === '-h' || arg === '--help') {
+      printUsage();
+      process.exit(0);
+    }
+
+    if (arg === '-v' || arg === '--version') {
+      console.log('0.1.0');
+      process.exit(0);
+    }
+
+    if (arg === '-e') {
+      if (!args[i + 1]) {
+        console.error('Error: -e requires an argument');
+        process.exit(1);
+      }
+      source = args[i + 1];
+      i += 2;
+      continue;
+    }
+
+    if (arg === '-o' || arg === '--output') {
+      outputFile = args[i + 1];
+      i += 2;
+      continue;
+    }
+
+    if (arg.startsWith('--src=')) {
+      const srcFile = arg.split('=')[1];
+      try {
+        source = readFileSync(srcFile, 'utf-8');
+      } catch (err) {
+        console.error(`Error: Could not read file '${srcFile}'`);
+        process.exit(1);
+      }
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith('--output-svg-file=')) {
+      options.svgOutput = arg.split('=')[1];
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith('--viewBox=')) {
+      options.viewBox = arg.split('=')[1];
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith('--width=')) {
+      options.width = arg.split('=')[1];
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith('--height=')) {
+      options.height = arg.split('=')[1];
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith('--stroke=')) {
+      options.stroke = arg.split('=')[1];
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith('--fill=')) {
+      options.fill = arg.split('=')[1];
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith('--stroke-width=')) {
+      options.strokeWidth = arg.split('=')[1];
+      i++;
+      continue;
+    }
+
+    // If not a flag, treat as input file or stdin
+    if (arg === '-') {
+      source = readFileSync(0, 'utf-8');
+    } else if (!arg.startsWith('-')) {
+      try {
+        source = readFileSync(arg, 'utf-8');
+      } catch (err) {
+        console.error(`Error: Could not read file '${arg}'`);
+        process.exit(1);
+      }
+    }
+    i++;
+  }
+
+  if (source === null) {
+    printUsage();
+    process.exit(1);
+  }
+
+  return { source, options, outputFile };
+}
+
+function main() {
+  const args = process.argv.slice(2);
+
+  if (args.length === 0) {
+    printUsage();
+    process.exit(0);
+  }
+
+  const { source, options, outputFile } = parseArgs(args);
+
+  try {
+    const pathData = compile(source);
+
+    // Output as SVG file
+    if (options.svgOutput) {
+      const svg = generateSvg(pathData, options);
+      writeFileSync(options.svgOutput, svg);
+      console.log(`SVG written to: ${options.svgOutput}`);
+      console.log(`Path data: ${pathData}`);
+      return;
+    }
+
+    // Output path to file
+    if (outputFile) {
+      writeFileSync(outputFile, pathData);
+      console.log(`Path written to: ${outputFile}`);
+      return;
+    }
+
+    // Output to stdout
+    console.log(pathData);
+  } catch (err) {
+    console.error(`Error: ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+
+main();
