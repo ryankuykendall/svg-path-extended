@@ -1,162 +1,161 @@
 # svg-path-extended - Project Plan
 
-This document captures the original design decisions and implementation plan for svg-path-extended.
+This document captures the design decisions and implementation plan for svg-path-extended.
 
 ## Overview
 
-Create a TypeScript module that extends SVG path syntax with variables, expressions, control flow, and functions. The module should work both as a CLI tool and as a browser-compatible library.
+A TypeScript module that extends SVG path syntax with variables, expressions, control flow, and functions. Works as both a CLI tool and a browser-compatible library.
 
 ## Project Structure
 
 ```
 svg-path-extended/
 ├── src/
-│   ├── parser/          # Parsimmon-based parser + AST
+│   ├── parser/
 │   │   ├── ast.ts       # AST node type definitions
-│   │   └── index.ts     # Parser combinators
-│   ├── evaluator/       # Execute AST → SVG path string
-│   │   └── index.ts
-│   ├── stdlib/          # Standard library functions
+│   │   └── index.ts     # Parsimmon-based parser
+│   ├── evaluator/
+│   │   └── index.ts     # AST evaluator → SVG path string
+│   ├── stdlib/
 │   │   ├── math.ts      # sin, cos, lerp, clamp, etc.
-│   │   ├── path.ts      # arc, circle, polygon, star
-│   │   └── index.ts
+│   │   ├── path.ts      # circle, rect, polygon, star
+│   │   └── index.ts     # Stdlib exports
 │   ├── cli.ts           # CLI entry point
 │   └── index.ts         # Library entry point (compile function)
 ├── tests/
-│   ├── parser.test.ts
-│   ├── evaluator.test.ts
-│   └── integration.test.ts
+│   ├── parser.test.ts   # Parser unit tests
+│   └── evaluator.test.ts # Evaluator/integration tests
+├── docs/
+│   ├── syntax.md        # Language syntax reference
+│   ├── stdlib.md        # Standard library reference
+│   ├── cli.md           # CLI usage reference
+│   ├── examples.md      # Practical examples
+│   └── PLAN.md          # This file
 ├── examples/
-│   └── basic.svgx       # Example extended SVG path file
+│   ├── output/          # Generated SVG files
+│   └── *.svgx           # Example source files
 ├── package.json
 ├── tsconfig.json
-└── tsup.config.ts
+├── tsup.config.ts
+├── vitest.config.ts
+├── .claude.md           # Development context
+└── README.md
 ```
 
-## Technology Choices
+## Design Decisions
 
-### Parser Approach
-
-**Parser combinator library: `parsimmon`**
-- Well-documented and battle-tested
+### Parser: Parsimmon
+- Well-documented parser combinator library
 - TypeScript types included
 - Small bundle size (~8KB minified)
 - Works in browser
 - Declarative grammar definition
 
-*Alternatives considered:*
-- `chevrotain` - faster but larger, more complex API
-- `arcsecond` - modern but less documentation
-- `ts-parsec` - TypeScript-native but smaller community
-
-### Expression Syntax
-
-**Function-call style: `calc()` for math, plain identifiers for variables**
+### Expression Syntax: `calc()` for math
 - Inspired by CSS `calc()` - familiar and readable
 - Plain variable names: `M x y` (no wrapper needed)
 - Math expressions: `L calc(x + 10) calc(y * 2)`
 - Simplifies parsing: extensions are clearly delimited by parentheses
-- Path commands remain standard SVG syntax outside of calc()
 
-### Build & Bundle
-
-- **TypeScript** for type safety
-- **tsup** for bundling (fast, produces ESM + CJS + browser bundle)
-- **Vitest** for testing (fast, TypeScript-native)
+### Build Tooling
+- **tsup** for bundling (ESM + CJS + browser IIFE)
+- **Vitest** for testing
 - **tsx** for running CLI during development
 
-## Syntax Design
+### Other Decisions
+- Path commands are case-sensitive (M = absolute, m = relative) to match SVG spec
+- Error handling: fail fast with clear error messages
+- Comments: `//` line comments supported
+
+## Syntax Summary
 
 ```
 // Variables
 let radius = 50;
-let cx = 100;
-let cy = 100;
 
-// Plain variables in path commands (no wrapper needed)
+// Plain variables in path commands
 M cx cy
 
 // Math expressions require calc()
-A radius radius 0 1 1 calc(cx + radius * 2) cy
+L calc(cx + 10) calc(cy * 2)
 
-// Control flow
+// For loops
 for (i in 0..5) {
   L calc(i * 20) calc(sin(i) * 30)
 }
 
-// Function definitions
-fn star(cx, cy, r, points) {
-  // returns path segment
-}
+// Conditionals
+if (x > 0) { M 10 10 } else { M 0 0 }
 
-// Function calls (always use parens, like calc)
-M 0 0 star(50, 50, 30, 5)
+// User functions
+fn myShape(x, y) { rect(x, y, 50, 50) }
 
-// Stdlib functions work inside calc()
-L calc(cos(angle) * r) calc(sin(angle) * r)
+// Stdlib functions
+circle(cx, cy, r)
+polygon(cx, cy, radius, sides)
+star(cx, cy, outerR, innerR, points)
 ```
 
-**Parsing rules:**
-- Numbers and identifiers are parsed as path command arguments
-- `calc(...)` triggers expression parsing with full math support
-- `name(...)` is a function call (stdlib or user-defined)
-- Path commands (M, L, C, A, etc.) follow standard SVG syntax
+## Implementation Status
 
-## Implementation Phases
+### Phase 1: Project Setup ✅
+- [x] Initialize npm project with TypeScript
+- [x] Install dependencies: parsimmon, tsup, vitest, tsx
+- [x] Configure tsup for ESM + CJS + browser builds
+- [x] Set up test infrastructure
 
-### Phase 1: Project Setup
-1. Create `svg-path-extended/` directory
-2. Initialize npm project with TypeScript config
-3. Install dependencies: `parsimmon`, `tsup`, `vitest`, `tsx`
-4. Configure tsup for ESM + CJS + browser builds
-5. Set up basic test infrastructure
+### Phase 2: Parser Foundation ✅
+- [x] Define AST node types
+- [x] Parse numbers and identifiers
+- [x] Parse path commands (M, L, C, A, Z, etc.)
+- [x] Parse `calc(expr)` with arithmetic expressions
+- [x] Parse function calls
+- [x] Support `//` line comments
 
-### Phase 2: Parser Foundation (using parsimmon)
-1. Define AST node types in `src/parser/ast.ts`
-2. Parse literal values: numbers
-3. Parse identifiers (variable references)
-4. Parse path commands (M, L, C, A, Z, etc.) with arguments
-5. Parse `calc(expr)` with arithmetic expressions (+, -, *, /, %, parentheses)
-6. Parse function calls: `name(arg1, arg2, ...)`
+### Phase 3: Variables & Control Flow ✅
+- [x] Parse `let` variable declarations
+- [x] Implement variable scoping in evaluator
+- [x] Parse `for` loops with range syntax
+- [x] Parse `if/else` conditionals
+- [x] Implement control flow in evaluator
 
-### Phase 3: Variables & Control Flow
-1. Parse `let` variable declarations
-2. Implement variable scoping in evaluator
-3. Parse `for` loops with range syntax (`for (i in 0..n)`)
-4. Parse `if/else` conditionals
-5. Implement control flow in evaluator
+### Phase 4: Functions ✅
+- [x] Parse function definitions (`fn name(args) { ... }`)
+- [x] Implement function evaluation with local scope
+- [x] Add stdlib math functions
+- [x] Add stdlib path helpers
 
-### Phase 4: Functions
-1. Parse function definitions (`fn name(args) { ... }`)
-2. Parse function calls in expressions
-3. Implement function evaluation with local scope
-4. Add stdlib: math functions (sin, cos, sqrt, lerp, clamp, etc.)
-5. Add stdlib: path helpers (arc, circle, polygon, star)
+### Phase 5: CLI & Integration ✅
+- [x] CLI with argument parsing
+- [x] Support `--src=<file>` input
+- [x] Support `-e <code>` inline code
+- [x] Support stdin input
+- [x] Add `--output-svg-file` for complete SVG output
+- [x] SVG styling options (stroke, fill, viewBox, etc.)
 
-### Phase 5: CLI & Integration
-1. Create CLI entry point with argument parsing
-2. Support file input and stdin
-3. Add `--output` flag for file output
-4. Add `--watch` mode for development
-5. Create example files in `examples/`
+### Phase 6: Documentation ✅
+- [x] README.md
+- [x] docs/syntax.md
+- [x] docs/stdlib.md
+- [x] docs/cli.md
+- [x] docs/examples.md
+- [x] .claude.md development context
 
-### Phase 6: Browser & Polish
-1. Verify browser bundle works (test in HTML page)
-2. Improve error messages with line/column info
-3. Create minimal web playground example
-4. Write README with usage examples
+### Future Enhancements
+- [ ] Watch mode for development
+- [ ] Browser playground example
+- [ ] Improved error messages with line/column info
+- [ ] Source maps
 
 ## Verification
 
-1. **Unit tests**: Test parser and evaluator independently with Vitest
-2. **Integration tests**: Full source → SVG path output
-3. **CLI smoke test**: `echo 'let x = 10; M x 0 L calc(x + 5) 10' | npx svg-path-extended`
-4. **Browser test**: Import in simple HTML page, call `compile()`, verify SVG path output
+```bash
+# Run tests
+npm test
 
-## Design Decisions
+# CLI smoke test
+echo 'let x = 10; M x 0 L calc(x + 5) 10' | npx tsx src/cli.ts -
 
-- **Syntax**: `calc()` for math expressions, plain identifiers for variables
-- **Parser**: `parsimmon` combinator library
-- **Name**: `svg-path-extended`
-- **Path commands**: Case-sensitive to match SVG spec (M = absolute, m = relative)
-- **Error handling**: Fail fast with clear error messages
+# Generate SVG
+npx tsx src/cli.ts -e 'circle(100, 100, 50)' --output-svg-file=test.svg
+```
