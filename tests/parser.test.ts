@@ -52,6 +52,66 @@ describe('Parser', () => {
       expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'm' });
       expect(ast.body[1]).toMatchObject({ type: 'PathCommand', command: 'l' });
     });
+
+    it('parses H (horizontal line)', () => {
+      const ast = parse('H 50');
+      expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'H' });
+    });
+
+    it('parses V (vertical line)', () => {
+      const ast = parse('V 50');
+      expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'V' });
+    });
+
+    it('parses C (cubic bezier)', () => {
+      const ast = parse('C 10 20 30 40 50 60');
+      expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'C' });
+      expect(ast.body[0].type === 'PathCommand' && ast.body[0].args).toHaveLength(6);
+    });
+
+    it('parses S (smooth cubic)', () => {
+      const ast = parse('S 30 40 50 60');
+      expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'S' });
+    });
+
+    it('parses Q (quadratic bezier)', () => {
+      const ast = parse('Q 25 50 50 0');
+      expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'Q' });
+    });
+
+    it('parses T (smooth quadratic)', () => {
+      const ast = parse('T 50 0');
+      expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'T' });
+    });
+
+    it('parses A (arc)', () => {
+      const ast = parse('A 25 25 0 1 1 50 50');
+      expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'A' });
+      expect(ast.body[0].type === 'PathCommand' && ast.body[0].args).toHaveLength(7);
+    });
+  });
+
+  describe('comments', () => {
+    it('parses code with line comments', () => {
+      const ast = parse('// This is a comment\nM 10 20');
+      expect(ast.body).toHaveLength(1);
+      expect(ast.body[0]).toMatchObject({ type: 'PathCommand', command: 'M' });
+    });
+
+    it('parses code with inline comments', () => {
+      const ast = parse('M 10 20 // move to 10,20\nL 30 40');
+      expect(ast.body).toHaveLength(2);
+    });
+
+    it('parses code with multiple comments', () => {
+      const ast = parse(`
+        // First comment
+        let x = 10; // inline
+        // Another comment
+        M x 0
+      `);
+      expect(ast.body).toHaveLength(2);
+    });
   });
 
   describe('let declarations', () => {
@@ -111,6 +171,63 @@ describe('Parser', () => {
           type: 'FunctionCall',
           name: 'max',
         },
+      });
+    });
+
+    it('parses comparison operators', () => {
+      const ops = ['<', '>', '<=', '>=', '==', '!='];
+      for (const op of ops) {
+        const ast = parse(`let x = 1 ${op} 2;`);
+        expect(ast.body[0]).toMatchObject({
+          type: 'LetDeclaration',
+          value: { type: 'BinaryExpression', operator: op },
+        });
+      }
+    });
+
+    it('parses logical and operator', () => {
+      const ast = parse('let x = 1 && 2;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: { type: 'BinaryExpression', operator: '&&' },
+      });
+    });
+
+    it('parses logical or operator', () => {
+      const ast = parse('let x = 1 || 2;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: { type: 'BinaryExpression', operator: '||' },
+      });
+    });
+
+    it('parses unary minus', () => {
+      const ast = parse('let x = -5;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: { type: 'UnaryExpression', operator: '-' },
+      });
+    });
+
+    it('parses unary not', () => {
+      const ast = parse('let x = !1;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: { type: 'UnaryExpression', operator: '!' },
+      });
+    });
+
+    it('parses division and modulo', () => {
+      const ast = parse('let x = 10 / 3;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: { type: 'BinaryExpression', operator: '/' },
+      });
+
+      const ast2 = parse('let x = 10 % 3;');
+      expect(ast2.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: { type: 'BinaryExpression', operator: '%' },
       });
     });
   });
