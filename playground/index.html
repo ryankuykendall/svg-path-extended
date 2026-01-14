@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>svg-path-extended Playground</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f5f5f5;
+      --bg-tertiary: #e8e8e8;
+      --text-primary: #1a1a1a;
+      --text-secondary: #666666;
+      --border-color: #ddd;
+      --accent-color: #0066cc;
+      --error-bg: #fee;
+      --error-text: #c00;
+      --success-color: #28a745;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    h1 code {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      background: var(--bg-secondary);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    select, input, button {
+      font-family: inherit;
+      font-size: 0.875rem;
+    }
+
+    select {
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      cursor: pointer;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      min-height: 0;
+    }
+
+    @media (max-width: 800px) {
+      main {
+        flex-direction: column;
+      }
+    }
+
+    #editor-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-right: 1px solid var(--border-color);
+    }
+
+    @media (max-width: 800px) {
+      #editor-pane {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        min-height: 300px;
+      }
+    }
+
+    #editor-container {
+      flex: 1;
+      overflow: auto;
+    }
+
+    .cm-editor {
+      height: 100%;
+      font-size: 14px;
+    }
+
+    .cm-editor .cm-scroller {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', monospace;
+    }
+
+    .cm-editor.cm-focused {
+      outline: none;
+    }
+
+    #preview-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: var(--bg-primary);
+      min-width: 0;
+      overflow: auto;
+    }
+
+    #preview-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #preview {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    #error-panel {
+      background: var(--error-bg);
+      color: var(--error-text);
+      padding: 12px 20px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.875rem;
+      border-top: 1px solid #fcc;
+      display: none;
+    }
+
+    #error-panel.visible {
+      display: block;
+    }
+
+    footer {
+      background: var(--bg-primary);
+      border-top: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    input[type="number"] {
+      width: 70px;
+      padding: 6px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+    }
+
+    input[type="color"] {
+      width: 36px;
+      height: 30px;
+      padding: 2px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .control-group select {
+      min-width: 60px;
+    }
+
+    button {
+      padding: 6px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover {
+      background: var(--bg-secondary);
+    }
+
+    button.primary {
+      background: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
+    }
+
+    button.primary:hover {
+      background: #0052a3;
+    }
+
+    #copy-feedback {
+      font-size: 0.8125rem;
+      color: var(--success-color);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    #copy-feedback.visible {
+      opacity: 1;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    .links {
+      font-size: 0.8125rem;
+    }
+
+    .links a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><code>svg-path-extended</code> Playground</h1>
+    <div class="header-controls">
+      <label for="examples">Examples:</label>
+      <select id="examples">
+        <option value="">-- Select --</option>
+        <option value="circle">Circle</option>
+        <option value="star">Star</option>
+        <option value="grid">Grid of Dots</option>
+        <option value="spiral">Spiral</option>
+        <option value="flower">Flower</option>
+        <option value="sineWave">Sine Wave</option>
+        <option value="gear">Gear</option>
+        <option value="customFunction">Custom Function</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <div id="editor-pane">
+      <div id="editor-container"></div>
+    </div>
+    <div id="preview-pane">
+      <div id="preview-container">
+        <svg id="preview" xmlns="http://www.w3.org/2000/svg">
+          <rect id="preview-bg" width="100%" height="100%"></rect>
+          <path id="preview-path" fill="none"></path>
+        </svg>
+      </div>
+    </div>
+  </main>
+
+  <div id="error-panel"></div>
+
+  <footer>
+    <div class="control-group">
+      <label for="width">Width:</label>
+      <input type="number" id="width" value="200" min="50" max="1000">
+    </div>
+    <div class="control-group">
+      <label for="height">Height:</label>
+      <input type="number" id="height" value="200" min="50" max="1000">
+    </div>
+    <div class="control-group">
+      <label for="stroke">Stroke:</label>
+      <input type="color" id="stroke" value="#000000">
+    </div>
+    <div class="control-group">
+      <label for="fill-enabled">Fill:</label>
+      <input type="checkbox" id="fill-enabled">
+      <input type="color" id="fill" value="#3498db" disabled>
+    </div>
+    <div class="control-group">
+      <label for="bg">Background:</label>
+      <input type="color" id="bg" value="#f5f5f5">
+    </div>
+    <div class="control-group">
+      <label for="stroke-width">Stroke:</label>
+      <select id="stroke-width">
+        <option value="1">1px</option>
+        <option value="2" selected>2px</option>
+        <option value="3">3px</option>
+        <option value="4">4px</option>
+        <option value="5">5px</option>
+        <option value="6">6px</option>
+        <option value="8">8px</option>
+        <option value="10">10px</option>
+      </select>
+    </div>
+    <div class="spacer"></div>
+    <button id="copy-url" class="primary">Copy URL</button>
+    <span id="copy-feedback">Copied!</span>
+    <div class="links">
+      <a href="https://github.com/anthropics/svg-path-extended" target="_blank">Docs</a>
+    </div>
+  </footer>
+
+  <!-- CodeMirror 6 from CDN -->
+  <script type="module">
+    import { EditorState } from 'https://esm.sh/@codemirror/state@6';
+    import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, rectangularSelection, highlightActiveLine } from 'https://esm.sh/@codemirror/view@6';
+    import { defaultKeymap, history, historyKeymap, indentWithTab } from 'https://esm.sh/@codemirror/commands@6';
+    import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from 'https://esm.sh/@codemirror/language@6';
+    import { javascript } from 'https://esm.sh/@codemirror/lang-javascript@6';
+
+    // Examples
+    const examples = {
+      circle: `// Simple circle
+circle(100, 100, 50)`,
+
+      star: `// 5-pointed star
+let cx = 100;
+let cy = 100;
+let outerR = 60;
+let innerR = 25;
+let points = 5;
+
+star(cx, cy, outerR, innerR, points)`,
+
+      grid: `// Grid of dots using nested loops
+for (row in 0..5) {
+  for (col in 0..5) {
+    circle(calc(20 + col * 40), calc(20 + row * 40), 5)
+  }
+}`,
+
+      spiral: `// Spiral using trigonometry
+M 100 100
+for (i in 1..100) {
+  let angle = calc(i * 0.2);
+  let r = calc(i * 0.8);
+  L calc(100 + cos(angle) * r) calc(100 + sin(angle) * r)
+}`,
+
+      flower: `// Flower with petals
+let cx = 100;
+let cy = 100;
+let petalCount = 6;
+let petalRadius = 25;
+let centerRadius = 15;
+
+// Petals
+for (i in 0..petalCount) {
+  let angle = calc(i / petalCount * TAU());
+  let px = calc(cx + cos(angle) * 35);
+  let py = calc(cy + sin(angle) * 35);
+  circle(px, py, petalRadius)
+}
+
+// Center
+circle(cx, cy, centerRadius)`,
+
+      sineWave: `// Sine wave
+M 0 100
+for (i in 1..40) {
+  let x = calc(i * 5);
+  let y = calc(100 + sin(i * 0.3) * 30);
+  L x y
+}`,
+
+      gear: `// Gear shape
+let cx = 100;
+let cy = 100;
+let innerR = 30;
+let outerR = 50;
+let teeth = 12;
+
+M calc(cx + outerR) cy
+
+for (i in 0..teeth) {
+  let a1 = calc(i / teeth * TAU());
+  let a2 = calc((i + 0.3) / teeth * TAU());
+  let a3 = calc((i + 0.5) / teeth * TAU());
+  let a4 = calc((i + 0.8) / teeth * TAU());
+
+  L calc(cx + cos(a1) * outerR) calc(cy + sin(a1) * outerR)
+  L calc(cx + cos(a2) * outerR) calc(cy + sin(a2) * outerR)
+  L calc(cx + cos(a3) * innerR) calc(cy + sin(a3) * innerR)
+  L calc(cx + cos(a4) * innerR) calc(cy + sin(a4) * innerR)
+}
+
+Z
+
+// Center hole
+circle(cx, cy, 10)`,
+
+      customFunction: `// Custom function: diamond shape
+fn diamond(cx, cy, size) {
+  M cx calc(cy - size)
+  L calc(cx + size) cy
+  L cx calc(cy + size)
+  L calc(cx - size) cy
+  Z
+}
+
+// Draw diamonds in a row
+for (i in 0..4) {
+  diamond(calc(40 + i * 45), 100, 20)
+}`
+    };
+
+    // Default code
+    const defaultCode = `// Welcome to svg-path-extended!
+// Try editing this code or select an example above.
+
+let cx = 100;
+let cy = 100;
+
+// Draw a circle
+circle(cx, cy, 40)
+
+// Draw points around it
+for (i in 0..8) {
+  let angle = calc(i / 8 * TAU());
+  let x = calc(cx + cos(angle) * 70);
+  let y = calc(cy + sin(angle) * 70);
+  circle(x, y, 8)
+}`;
+
+    // DOM elements
+    const editorContainer = document.getElementById('editor-container');
+    const preview = document.getElementById('preview');
+    const previewPath = document.getElementById('preview-path');
+    const previewBg = document.getElementById('preview-bg');
+    const errorPanel = document.getElementById('error-panel');
+    const examplesSelect = document.getElementById('examples');
+    const widthInput = document.getElementById('width');
+    const heightInput = document.getElementById('height');
+    const strokeInput = document.getElementById('stroke');
+    const fillEnabledInput = document.getElementById('fill-enabled');
+    const fillInput = document.getElementById('fill');
+    const bgInput = document.getElementById('bg');
+    const strokeWidthSelect = document.getElementById('stroke-width');
+    const copyUrlBtn = document.getElementById('copy-url');
+    const copyFeedback = document.getElementById('copy-feedback');
+
+    // State
+    let debounceTimer = null;
+    let editor = null;
+
+    // Initialize editor
+    function createEditor(initialCode) {
+      const updateExtension = EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          debouncedUpdate();
+        }
+      });
+
+      const state = EditorState.create({
+        doc: initialCode,
+        extensions: [
+          lineNumbers(),
+          highlightActiveLineGutter(),
+          highlightSpecialChars(),
+          history(),
+          drawSelection(),
+          rectangularSelection(),
+          highlightActiveLine(),
+          indentOnInput(),
+          bracketMatching(),
+          syntaxHighlighting(defaultHighlightStyle),
+          javascript(),
+          keymap.of([
+            ...defaultKeymap,
+            ...historyKeymap,
+            indentWithTab,
+          ]),
+          updateExtension,
+          EditorView.lineWrapping,
+        ],
+      });
+
+      return new EditorView({
+        state,
+        parent: editorContainer,
+      });
+    }
+
+    // Update preview
+    function updatePreview() {
+      const code = editor.state.doc.toString();
+
+      try {
+        const pathData = window.SvgPathExtended.compile(code);
+        previewPath.setAttribute('d', pathData);
+        hideError();
+      } catch (e) {
+        showError(e.message);
+      }
+
+      updateSvgStyles();
+    }
+
+    function debouncedUpdate() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(updatePreview, 150);
+    }
+
+    // Update SVG styles
+    function updateSvgStyles() {
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      preview.setAttribute('width', width);
+      preview.setAttribute('height', height);
+      preview.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      previewPath.setAttribute('stroke', strokeInput.value);
+      previewPath.setAttribute('stroke-width', strokeWidthSelect.value);
+
+      if (fillEnabledInput.checked) {
+        previewPath.setAttribute('fill', fillInput.value);
+      } else {
+        previewPath.setAttribute('fill', 'none');
+      }
+
+      previewBg.setAttribute('fill', bgInput.value);
+    }
+
+    // Error handling
+    function showError(message) {
+      errorPanel.textContent = message;
+      errorPanel.classList.add('visible');
+    }
+
+    function hideError() {
+      errorPanel.classList.remove('visible');
+    }
+
+    // URL state management
+    function encodeState() {
+      const state = {
+        code: editor.state.doc.toString(),
+        w: parseInt(widthInput.value),
+        h: parseInt(heightInput.value),
+        s: strokeInput.value,
+        f: fillEnabledInput.checked ? fillInput.value : null,
+        bg: bgInput.value,
+        sw: strokeWidthSelect.value,
+      };
+      return btoa(encodeURIComponent(JSON.stringify(state)));
+    }
+
+    function decodeState(hash) {
+      try {
+        const json = decodeURIComponent(atob(hash));
+        return JSON.parse(json);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function loadFromURL() {
+      const hash = location.hash.slice(1);
+      if (!hash) return null;
+
+      const state = decodeState(hash);
+      if (!state) return null;
+
+      if (state.w) widthInput.value = state.w;
+      if (state.h) heightInput.value = state.h;
+      if (state.s) strokeInput.value = state.s;
+      if (state.f) {
+        fillEnabledInput.checked = true;
+        fillInput.value = state.f;
+        fillInput.disabled = false;
+      }
+      if (state.bg) bgInput.value = state.bg;
+      if (state.sw) strokeWidthSelect.value = state.sw;
+
+      return state.code || null;
+    }
+
+    // Copy URL
+    function copyURL() {
+      const url = location.origin + location.pathname + '#' + encodeState();
+      navigator.clipboard.writeText(url).then(() => {
+        copyFeedback.classList.add('visible');
+        setTimeout(() => copyFeedback.classList.remove('visible'), 2000);
+      });
+    }
+
+    // Load example
+    function loadExample(name) {
+      if (examples[name]) {
+        editor.dispatch({
+          changes: {
+            from: 0,
+            to: editor.state.doc.length,
+            insert: examples[name],
+          },
+        });
+        updatePreview();
+      }
+    }
+
+    // Event listeners
+    examplesSelect.addEventListener('change', (e) => {
+      if (e.target.value) {
+        loadExample(e.target.value);
+        e.target.value = '';
+      }
+    });
+
+    widthInput.addEventListener('input', updateSvgStyles);
+    heightInput.addEventListener('input', updateSvgStyles);
+    strokeInput.addEventListener('input', updateSvgStyles);
+    fillEnabledInput.addEventListener('change', (e) => {
+      fillInput.disabled = !e.target.checked;
+      updateSvgStyles();
+    });
+    fillInput.addEventListener('input', updateSvgStyles);
+    bgInput.addEventListener('input', updateSvgStyles);
+    strokeWidthSelect.addEventListener('change', updateSvgStyles);
+    copyUrlBtn.addEventListener('click', copyURL);
+
+    // Wait for library to load, then initialize
+    function waitForLibrary(callback, maxWait = 5000) {
+      const start = Date.now();
+      function check() {
+        if (window.SvgPathExtended) {
+          callback();
+        } else if (Date.now() - start < maxWait) {
+          setTimeout(check, 50);
+        } else {
+          showError('Failed to load svg-path-extended library');
+        }
+      }
+      check();
+    }
+
+    // Initialize
+    waitForLibrary(() => {
+      const initialCode = loadFromURL() || defaultCode;
+      editor = createEditor(initialCode);
+      updatePreview();
+    });
+  </script>
+
+  <!-- svg-path-extended library -->
+  <script src="../dist/index.global.js"></script>
+</body>
+</html>
