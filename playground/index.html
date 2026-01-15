@@ -58,6 +58,28 @@
       font-size: 1rem;
     }
 
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .secondary-btn {
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .secondary-btn:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
     .header-controls {
       display: flex;
       align-items: center;
@@ -263,7 +285,7 @@
     }
 
     #copy-feedback {
-      font-size: 0.8125rem;
+      font-size: 0.75rem;
       color: var(--success-color);
       opacity: 0;
       transition: opacity 0.2s;
@@ -454,7 +476,11 @@
 </head>
 <body>
   <header>
-    <h1><code>svg-path-extended</code> Playground</h1>
+    <div class="header-left">
+      <h1><code>svg-path-extended</code> Playground</h1>
+      <button id="copy-url" class="secondary-btn">Copy URL</button>
+      <span id="copy-feedback">Copied!</span>
+    </div>
     <div class="header-controls">
       <label for="examples">Examples:</label>
       <select id="examples">
@@ -683,8 +709,6 @@ for (i in 0..8) {
       </select>
     </div>
     <div class="spacer"></div>
-    <button id="copy-url" class="primary">Copy URL</button>
-    <span id="copy-feedback">Copied!</span>
     <button id="docs-btn">Docs</button>
   </footer>
 
