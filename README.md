@@ -11,11 +11,11 @@ A TypeScript library that extends SVG path syntax with variables, expressions, c
 - **Standard library** - Built-in math functions and shape helpers
 - **CLI** - Compile from command line or integrate into build tools
 - **Browser compatible** - Works in Node.js and browsers
-- **[Interactive Playground](playground/)** - Try it in your browser
+- **[Interactive Playground](https://ryankuykendall.github.io/svg-path-extended/)** - Try it in your browser
 
 ## Try It
 
-**[Open the Playground](playground/)** to experiment with the syntax interactively. Features live preview, built-in examples, and shareable URLs.
+**[Open the Playground](https://ryankuykendall.github.io/svg-path-extended/)** to experiment with the syntax interactively. Features live preview, built-in examples, and shareable URLs.
 
 ## Installation
 
