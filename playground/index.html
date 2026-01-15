@@ -96,6 +96,7 @@
       flex-direction: column;
       min-width: 0;
       border-right: 1px solid var(--border-color);
+      position: relative;
     }
 
     @media (max-width: 800px) {
@@ -109,6 +110,33 @@
     #editor-container {
       flex: 1;
       overflow: auto;
+    }
+
+    .pane-copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 10;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+
+    .pane-copy-btn:hover {
+      opacity: 1;
+      background: var(--bg-secondary);
+    }
+
+    .pane-copy-btn.copied {
+      background: var(--success-color);
+      border-color: var(--success-color);
+      color: white;
+      opacity: 1;
     }
 
     .cm-editor {
@@ -134,6 +162,7 @@
       background: var(--bg-primary);
       min-width: 0;
       overflow: auto;
+      position: relative;
     }
 
     #preview-container {
@@ -444,9 +473,11 @@
 
   <main>
     <div id="editor-pane">
+      <button id="copy-code" class="pane-copy-btn">Copy Code</button>
       <div id="editor-container"></div>
     </div>
     <div id="preview-pane">
+      <button id="copy-svg" class="pane-copy-btn">Copy SVG</button>
       <div id="preview-container">
         <svg id="preview" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -806,6 +837,8 @@ for (i in 0..8) {
     const docsClose = document.getElementById('docs-close');
     const docsTabs = document.querySelectorAll('.docs-tab');
     const docSections = document.querySelectorAll('.doc-section');
+    const copyCodeBtn = document.getElementById('copy-code');
+    const copySvgBtn = document.getElementById('copy-svg');
 
     // State
     let debounceTimer = null;
@@ -1030,6 +1063,26 @@ for (i in 0..8) {
       if (e.key === 'Escape' && docsPanel.classList.contains('open')) {
         docsPanel.classList.remove('open');
       }
+    });
+
+    // Copy buttons
+    function showCopied(btn) {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = btn === copyCodeBtn ? 'Copy Code' : 'Copy SVG';
+        btn.classList.remove('copied');
+      }, 1500);
+    }
+
+    copyCodeBtn.addEventListener('click', () => {
+      const code = editor.state.doc.toString();
+      navigator.clipboard.writeText(code).then(() => showCopied(copyCodeBtn));
+    });
+
+    copySvgBtn.addEventListener('click', () => {
+      const svgContent = preview.outerHTML;
+      navigator.clipboard.writeText(svgContent).then(() => showCopied(copySvgBtn));
     });
 
     // Wait for library to load, then initialize
