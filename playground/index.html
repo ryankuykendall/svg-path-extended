@@ -1026,6 +1026,12 @@ for (i in 0..8) {
       });
     });
 
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && docsPanel.classList.contains('open')) {
+        docsPanel.classList.remove('open');
+      }
+    });
+
     // Wait for library to load, then initialize
     function waitForLibrary(callback, maxWait = 5000) {
       const start = Date.now();
