@@ -260,6 +260,167 @@
     .links a:hover {
       text-decoration: underline;
     }
+
+    /* Docs Panel */
+    #docs-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 420px;
+      max-width: 100vw;
+      height: 100vh;
+      background: var(--bg-primary);
+      border-left: 1px solid var(--border-color);
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #docs-panel.open {
+      transform: translateX(0);
+    }
+
+    #docs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+    }
+
+    #docs-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    #docs-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      color: var(--text-secondary);
+      line-height: 1;
+    }
+
+    #docs-close:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    #docs-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .docs-tab {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      background: var(--bg-secondary);
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .docs-tab:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .docs-tab.active {
+      background: var(--bg-primary);
+      color: var(--accent-color);
+      border-bottom-color: var(--accent-color);
+    }
+
+    #docs-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    #docs-content h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 20px 0 10px 0;
+      color: var(--text-primary);
+    }
+
+    #docs-content h3:first-child {
+      margin-top: 0;
+    }
+
+    #docs-content h4 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin: 16px 0 8px 0;
+      color: var(--text-primary);
+    }
+
+    #docs-content p {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      margin: 8px 0;
+    }
+
+    #docs-content code {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.75rem;
+      background: var(--bg-secondary);
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+
+    #docs-content pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      margin: 10px 0;
+    }
+
+    #docs-content pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    #docs-content table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+      margin: 10px 0;
+    }
+
+    #docs-content th, #docs-content td {
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    #docs-content th {
+      background: var(--bg-secondary);
+      font-weight: 600;
+    }
+
+    .doc-section {
+      display: none;
+    }
+
+    .doc-section.active {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -302,6 +463,146 @@
   </main>
 
   <div id="error-panel"></div>
+
+  <!-- Documentation Panel -->
+  <div id="docs-panel">
+    <div id="docs-header">
+      <h2>Documentation</h2>
+      <button id="docs-close">&times;</button>
+    </div>
+    <div id="docs-tabs">
+      <button class="docs-tab active" data-tab="syntax">Syntax</button>
+      <button class="docs-tab" data-tab="stdlib">Stdlib</button>
+    </div>
+    <div id="docs-content">
+      <!-- Syntax Tab -->
+      <div class="doc-section active" id="doc-syntax">
+        <h3>Path Commands</h3>
+        <table>
+          <tr><th>Command</th><th>Name</th><th>Parameters</th></tr>
+          <tr><td><code>M</code> / <code>m</code></td><td>Move to</td><td>x y</td></tr>
+          <tr><td><code>L</code> / <code>l</code></td><td>Line to</td><td>x y</td></tr>
+          <tr><td><code>H</code> / <code>h</code></td><td>Horizontal line</td><td>x</td></tr>
+          <tr><td><code>V</code> / <code>v</code></td><td>Vertical line</td><td>y</td></tr>
+          <tr><td><code>C</code> / <code>c</code></td><td>Cubic bezier</td><td>x1 y1 x2 y2 x y</td></tr>
+          <tr><td><code>Q</code> / <code>q</code></td><td>Quadratic bezier</td><td>x1 y1 x y</td></tr>
+          <tr><td><code>A</code> / <code>a</code></td><td>Arc</td><td>rx ry rot large sweep x y</td></tr>
+          <tr><td><code>Z</code> / <code>z</code></td><td>Close path</td><td>(none)</td></tr>
+        </table>
+
+        <h3>Variables</h3>
+        <p>Declare variables with <code>let</code>:</p>
+        <pre><code>let width = 200;
+let centerX = 100;
+M centerX 50</code></pre>
+
+        <h3>Expressions with calc()</h3>
+        <p>Use <code>calc()</code> for math expressions:</p>
+        <pre><code>let r = 50;
+M calc(100 - r) 100
+L calc(100 + r) 100</code></pre>
+
+        <h4>Operators</h4>
+        <table>
+          <tr><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td>Arithmetic</td></tr>
+          <tr><td><code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code> <code>==</code> <code>!=</code></td><td>Comparison</td></tr>
+          <tr><td><code>&&</code> <code>||</code> <code>!</code></td><td>Logical</td></tr>
+        </table>
+
+        <h3>For Loops</h3>
+        <pre><code>for (i in 0..10) {
+  L calc(i * 20) calc(i * 10)
+}</code></pre>
+        <p>Range <code>0..10</code> includes 0-9 (exclusive end).</p>
+
+        <h3>Conditionals</h3>
+        <pre><code>if (size > 50) {
+  circle(100, 100, size)
+} else {
+  rect(50, 50, 100, 100)
+}</code></pre>
+
+        <h3>Functions</h3>
+        <pre><code>fn square(x, y, size) {
+  rect(x, y, size, size)
+}
+
+square(10, 10, 50)</code></pre>
+
+        <h3>Comments</h3>
+        <pre><code>// This is a comment
+let x = 50;  // inline comment</code></pre>
+      </div>
+
+      <!-- Stdlib Tab -->
+      <div class="doc-section" id="doc-stdlib">
+        <h3>Math Functions</h3>
+
+        <h4>Trigonometry</h4>
+        <p><code>sin(x)</code> <code>cos(x)</code> <code>tan(x)</code> <code>asin(x)</code> <code>acos(x)</code> <code>atan(x)</code> <code>atan2(y, x)</code></p>
+
+        <h4>Angle Conversion</h4>
+        <p><code>rad(degrees)</code> <code>deg(radians)</code></p>
+
+        <h4>Exponential</h4>
+        <p><code>exp(x)</code> <code>log(x)</code> <code>log10(x)</code> <code>pow(x, y)</code> <code>sqrt(x)</code> <code>cbrt(x)</code></p>
+
+        <h4>Rounding</h4>
+        <p><code>floor(x)</code> <code>ceil(x)</code> <code>round(x)</code> <code>trunc(x)</code></p>
+
+        <h4>Utility</h4>
+        <p><code>abs(x)</code> <code>sign(x)</code> <code>min(a, b)</code> <code>max(a, b)</code></p>
+
+        <h4>Interpolation</h4>
+        <table>
+          <tr><td><code>lerp(a, b, t)</code></td><td>Linear interpolation</td></tr>
+          <tr><td><code>clamp(val, min, max)</code></td><td>Constrain to range</td></tr>
+          <tr><td><code>map(val, inMin, inMax, outMin, outMax)</code></td><td>Map between ranges</td></tr>
+        </table>
+
+        <h4>Constants</h4>
+        <p><code>PI()</code> <code>E()</code> <code>TAU()</code></p>
+
+        <h4>Random</h4>
+        <p><code>random()</code> <code>randomRange(min, max)</code></p>
+
+        <h3>Path Functions</h3>
+
+        <h4>Shapes</h4>
+        <table>
+          <tr><td><code>circle(cx, cy, r)</code></td><td>Circle</td></tr>
+          <tr><td><code>rect(x, y, w, h)</code></td><td>Rectangle</td></tr>
+          <tr><td><code>roundRect(x, y, w, h, r)</code></td><td>Rounded rectangle</td></tr>
+          <tr><td><code>polygon(cx, cy, r, sides)</code></td><td>Regular polygon</td></tr>
+          <tr><td><code>star(cx, cy, outer, inner, points)</code></td><td>Star shape</td></tr>
+        </table>
+
+        <h4>Curves</h4>
+        <table>
+          <tr><td><code>line(x1, y1, x2, y2)</code></td><td>Line segment</td></tr>
+          <tr><td><code>arc(rx, ry, rot, lg, sw, x, y)</code></td><td>Arc</td></tr>
+          <tr><td><code>quadratic(x1, y1, cx, cy, x2, y2)</code></td><td>Quadratic bezier</td></tr>
+          <tr><td><code>cubic(x1, y1, c1x, c1y, c2x, c2y, x2, y2)</code></td><td>Cubic bezier</td></tr>
+        </table>
+
+        <h4>Commands</h4>
+        <p><code>moveTo(x, y)</code> <code>lineTo(x, y)</code> <code>closePath()</code></p>
+
+        <h3>Example</h3>
+        <pre><code>// Points around a circle
+let cx = 100;
+let cy = 100;
+let r = 60;
+
+for (i in 0..8) {
+  let angle = calc(i / 8 * TAU());
+  let x = calc(cx + cos(angle) * r);
+  let y = calc(cy + sin(angle) * r);
+  circle(x, y, 5)
+}</code></pre>
+      </div>
+    </div>
+  </div>
 
   <footer>
     <div class="control-group">
@@ -353,9 +654,7 @@
     <div class="spacer"></div>
     <button id="copy-url" class="primary">Copy URL</button>
     <span id="copy-feedback">Copied!</span>
-    <div class="links">
-      <a href="https://github.com/anthropics/svg-path-extended" target="_blank">Docs</a>
-    </div>
+    <button id="docs-btn">Docs</button>
   </footer>
 
   <!-- CodeMirror 6 from CDN -->
@@ -502,6 +801,11 @@ for (i in 0..8) {
     const strokeWidthSelect = document.getElementById('stroke-width');
     const copyUrlBtn = document.getElementById('copy-url');
     const copyFeedback = document.getElementById('copy-feedback');
+    const docsBtn = document.getElementById('docs-btn');
+    const docsPanel = document.getElementById('docs-panel');
+    const docsClose = document.getElementById('docs-close');
+    const docsTabs = document.querySelectorAll('.docs-tab');
+    const docSections = document.querySelectorAll('.doc-section');
 
     // State
     let debounceTimer = null;
@@ -702,6 +1006,25 @@ for (i in 0..8) {
     gridSizeSelect.addEventListener('change', updateSvgStyles);
     strokeWidthSelect.addEventListener('change', updateSvgStyles);
     copyUrlBtn.addEventListener('click', copyURL);
+
+    // Docs panel
+    docsBtn.addEventListener('click', () => {
+      docsPanel.classList.add('open');
+    });
+
+    docsClose.addEventListener('click', () => {
+      docsPanel.classList.remove('open');
+    });
+
+    docsTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        docsTabs.forEach(t => t.classList.remove('active'));
+        docSections.forEach(s => s.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`doc-${tabName}`).classList.add('active');
+      });
+    });
 
     // Wait for library to load, then initialize
     function waitForLibrary(callback, maxWait = 5000) {
