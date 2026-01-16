@@ -496,6 +496,25 @@ describe('Evaluator', () => {
       const result = compile('for (i in 0..2) { for (j in 0..2) { M i j } }');
       expect(result).toBe('M 0 0 M 0 1 M 1 0 M 1 1');
     });
+
+    it('throws error for infinite loop range (Infinity)', () => {
+      expect(() => compile('let n = calc(1/0); for (i in 0..n) { M i 0 }')).toThrow('finite');
+    });
+
+    it('throws error for NaN loop range', () => {
+      expect(() => compile('let n = calc(0/0); for (i in 0..n) { M i 0 }')).toThrow('finite');
+    });
+
+    it('throws error for excessive iterations', () => {
+      expect(() => compile('for (i in 0..20000) { M i 0 }')).toThrow('max');
+    });
+
+    it('allows reasonable iteration count', () => {
+      // 100 iterations should be fine
+      const result = compile('for (i in 0..100) { M i 0 }');
+      expect(result).toContain('M 0 0');
+      expect(result).toContain('M 99 0');
+    });
   });
 
   describe('if statements', () => {

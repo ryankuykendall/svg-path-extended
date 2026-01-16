@@ -212,6 +212,17 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
         throw new Error('for loop range must be numeric');
       }
 
+      // Guard against infinite loops
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        throw new Error('for loop range must be finite (got Infinity or NaN)');
+      }
+
+      const MAX_ITERATIONS = 10000;
+      const iterations = Math.max(0, end - start);
+      if (iterations > MAX_ITERATIONS) {
+        throw new Error(`for loop would run ${iterations} iterations (max ${MAX_ITERATIONS})`);
+      }
+
       const results: string[] = [];
       for (let i = start; i < end; i++) {
         const loopScope = createScope(scope);
