@@ -277,3 +277,7 @@ export function evaluate(program: Program): string {
   const scope = createScope();
   return evaluateStatements(program.body, scope);
 }
+
+// Re-export annotated evaluator and formatter
+export { evaluateAnnotated, type AnnotatedOutput, type AnnotatedLine } from './annotated';
+export { formatAnnotated, type FormatOptions } from './formatter';

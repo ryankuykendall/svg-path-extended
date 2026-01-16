@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parse } from '../src/parser';
+import { parse, extractComments, parseWithComments } from '../src/parser';
 
 describe('Parser', () => {
   describe('path commands', () => {
@@ -302,6 +302,102 @@ describe('Parser', () => {
         type: 'FunctionDefinition',
         params: ['a', 'b', 'c'],
       });
+    });
+  });
+
+  describe('source locations', () => {
+    it('captures location for for loops', () => {
+      const ast = parse('for (i in 0..5) { M i 0 }');
+      const forLoop = ast.body[0];
+      expect(forLoop.type).toBe('ForLoop');
+      if (forLoop.type === 'ForLoop') {
+        expect(forLoop.loc).toBeDefined();
+        expect(forLoop.loc?.line).toBe(1);
+        expect(forLoop.loc?.column).toBe(1);
+      }
+    });
+
+    it('captures location for for loops on later lines', () => {
+      const ast = parse('M 0 0\nfor (i in 0..5) { M i 0 }');
+      const forLoop = ast.body[1];
+      expect(forLoop.type).toBe('ForLoop');
+      if (forLoop.type === 'ForLoop') {
+        expect(forLoop.loc?.line).toBe(2);
+        expect(forLoop.loc?.column).toBe(1);
+      }
+    });
+
+    it('captures location for path commands', () => {
+      const ast = parse('M 10 20');
+      const cmd = ast.body[0];
+      expect(cmd.type).toBe('PathCommand');
+      if (cmd.type === 'PathCommand') {
+        expect(cmd.loc).toBeDefined();
+        expect(cmd.loc?.line).toBe(1);
+      }
+    });
+
+    it('captures location for function calls at statement level', () => {
+      const ast = parse('circle(50, 50, 25)');
+      const cmd = ast.body[0];
+      expect(cmd.type).toBe('PathCommand');
+      if (cmd.type === 'PathCommand') {
+        expect(cmd.loc).toBeDefined();
+        expect(cmd.loc?.line).toBe(1);
+      }
+    });
+
+    it('captures location for function calls in path arguments', () => {
+      const ast = parse('M sin(0) cos(0)');
+      const cmd = ast.body[0];
+      if (cmd.type === 'PathCommand') {
+        const arg0 = cmd.args[0];
+        if (arg0.type === 'FunctionCall') {
+          expect(arg0.loc).toBeDefined();
+          expect(arg0.loc?.line).toBe(1);
+        }
+      }
+    });
+  });
+
+  describe('comment extraction', () => {
+    it('extracts single line comment', () => {
+      const comments = extractComments('// Hello world');
+      expect(comments).toHaveLength(1);
+      expect(comments[0].text).toBe('// Hello world');
+      expect(comments[0].loc.line).toBe(1);
+    });
+
+    it('extracts multiple comments', () => {
+      const input = `// First comment
+M 0 0
+// Second comment
+L 10 20`;
+      const comments = extractComments(input);
+      expect(comments).toHaveLength(2);
+      expect(comments[0].text).toBe('// First comment');
+      expect(comments[0].loc.line).toBe(1);
+      expect(comments[1].text).toBe('// Second comment');
+      expect(comments[1].loc.line).toBe(3);
+    });
+
+    it('extracts inline comments', () => {
+      const input = 'M 0 0 // move to origin';
+      const comments = extractComments(input);
+      expect(comments).toHaveLength(1);
+      expect(comments[0].text).toBe('// move to origin');
+      expect(comments[0].loc.column).toBe(7);
+    });
+
+    it('parseWithComments returns both AST and comments', () => {
+      const input = `// Draw a line
+M 0 0
+L 10 20 // end point`;
+      const result = parseWithComments(input);
+      expect(result.program.body).toHaveLength(2);
+      expect(result.comments).toHaveLength(2);
+      expect(result.comments[0].text).toBe('// Draw a line');
+      expect(result.comments[1].text).toBe('// end point');
     });
   });
 });

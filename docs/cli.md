@@ -63,6 +63,101 @@ svg-path-extended --src=input.svgx --output-svg-file=output.svg
 
 This creates a ready-to-use SVG file that can be opened in any browser or image viewer.
 
+## Annotated Output
+
+Use `--annotated` to get a human-readable debug output that shows:
+- Original comments preserved in place
+- Loop iterations with line numbers
+- Function call annotations with expanded output
+- Each path command on its own line
+
+This is useful for debugging complex path generation or understanding how your code produces its output.
+
+### Basic Usage
+
+```bash
+svg-path-extended -e 'for (i in 0..3) { M i 0 }' --annotated
+```
+
+Output:
+```
+//--- for (i in 0..3) from line 1
+  //--- iteration 0
+  M 0 0
+  //--- iteration 1
+  M 1 0
+  //--- iteration 2
+  M 2 0
+```
+
+### With Comments
+
+```bash
+svg-path-extended -e '// Draw points
+for (i in 0..3) { M i 0 }' --annotated
+```
+
+Output:
+```
+// Draw points
+
+//--- for (i in 0..3) from line 2
+  //--- iteration 0
+  M 0 0
+  //--- iteration 1
+  M 1 0
+  //--- iteration 2
+  M 2 0
+```
+
+### Loop Truncation
+
+Long loops (>10 iterations) are automatically truncated to show the first 3 and last 3 iterations:
+
+```bash
+svg-path-extended -e 'for (i in 0..100) { M i 0 }' --annotated
+```
+
+Output:
+```
+//--- for (i in 0..100) from line 1
+  //--- iteration 0
+  M 0 0
+  //--- iteration 1
+  M 1 0
+  //--- iteration 2
+  M 2 0
+  ... 94 more iterations ...
+  //--- iteration 97
+  M 97 0
+  //--- iteration 98
+  M 98 0
+  //--- iteration 99
+  M 99 0
+```
+
+### Function Call Annotations
+
+Function calls show their name, arguments, and expanded output:
+
+```bash
+svg-path-extended -e 'circle(50, 50, 25)' --annotated
+```
+
+Output:
+```
+//--- circle(50, 50, 25) called from line 1
+  M 25 50
+  A 25 25 0 1 1 75 50
+  A 25 25 0 1 1 25 50
+```
+
+### Save to File
+
+```bash
+svg-path-extended --src=complex.svgx --annotated -o debug-output.txt
+```
+
 ## SVG Styling Options
 
 When using `--output-svg-file`, you can customize the appearance:

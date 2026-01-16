@@ -15,9 +15,20 @@ import type {
   ForLoop,
   IfStatement,
   FunctionDefinition,
+  SourceLocation,
+  Comment,
 } from './ast';
 
 const P = Parsimmon;
+
+// Helper to convert Parsimmon Index to SourceLocation
+function indexToLoc(index: Parsimmon.Index): SourceLocation {
+  return {
+    line: index.line,
+    column: index.column,
+    offset: index.offset,
+  };
+}
 
 // Path command letters (cannot be used as identifiers in path context)
 const PATH_COMMANDS = 'MLHVCSQTAZmlhvcsqtaz';
@@ -207,14 +218,16 @@ const unaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
 
 // Function call: name(arg1, arg2, ...)
 const functionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
+  P.index,
   token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)),
   P.string('(').skip(optWhitespace),
   P.sepBy(P.lazy(() => expression), word(',')),
   word(')'),
-  (name, _open, args, _close) => ({
+  (startIndex, name, _open, args, _close) => ({
     type: 'FunctionCall' as const,
     name,
     args,
+    loc: indexToLoc(startIndex),
   })
 );
 
@@ -243,6 +256,7 @@ const calcExpression: Parsimmon.Parser<CalcExpression> = P.seqMap(
 
 // Function call for path arguments (must check it's not a path command or reserved word)
 const pathFunctionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
+  P.index,
   token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)).chain((name) => {
     // Reject reserved words (they start statements, not function calls in path context)
     if (reservedWords.includes(name)) {
@@ -253,10 +267,11 @@ const pathFunctionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
   P.string('(').skip(optWhitespace),
   P.sepBy(P.lazy(() => expression), word(',')),
   word(')'),
-  (name, _open, args, _close) => ({
+  (startIndex, name, _open, args, _close) => ({
     type: 'FunctionCall' as const,
     name,
     args,
+    loc: indexToLoc(startIndex),
   })
 );
 
@@ -271,12 +286,14 @@ const pathArg: Parsimmon.Parser<PathArg> = P.alt(
 // Path command: M, L, C, A, Z, etc. followed by arguments
 // Arguments stop when we see another path command letter or end of input
 const pathCommand: Parsimmon.Parser<PathCommand> = P.seqMap(
+  P.index,
   token(P.regexp(/[MLHVCSQTAZmlhvcsqtaz]/)),
   pathArg.many(),
-  (command, args) => ({
+  (startIndex, command, args) => ({
     type: 'PathCommand' as const,
     command,
     args,
+    loc: indexToLoc(startIndex),
   })
 );
 
@@ -307,6 +324,7 @@ const rangeValue: Parsimmon.Parser<Expression> = P.alt(
 
 // for loop: for (i in 0..10) { ... }
 const forLoop: Parsimmon.Parser<ForLoop> = P.seqMap(
+  P.index,
   keyword('for'),
   word('('),
   nonReservedIdentifier,
@@ -316,12 +334,13 @@ const forLoop: Parsimmon.Parser<ForLoop> = P.seqMap(
   rangeValue,
   word(')'),
   block,
-  (_for, _lp, id, _in, start, _dots, end, _rp, body) => ({
+  (startIndex, _for, _lp, id, _in, start, _dots, end, _rp, body) => ({
     type: 'ForLoop' as const,
     variable: id.name,
     start,
     end,
     body,
+    loc: indexToLoc(startIndex),
   })
 );
 
@@ -367,6 +386,7 @@ const functionCallStatement: Parsimmon.Parser<PathCommand> = functionCall.map((c
   type: 'PathCommand' as const,
   command: '',  // Empty command means it's a function call at statement level
   args: [call],
+  loc: call.loc,
 }));
 
 // Statement
@@ -402,6 +422,50 @@ export function parse(input: string): Program {
       `Parse error at line ${line}, column ${column}: expected ${expected.join(' or ')}`
     );
   }
+}
+
+// Extract comments from source code
+// Returns array of Comment nodes with their positions
+export function extractComments(input: string): Comment[] {
+  const comments: Comment[] = [];
+  const lines = input.split('\n');
+
+  let offset = 0;
+  for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+    const line = lines[lineNum];
+    const commentMatch = line.match(/\/\/(.*)$/);
+
+    if (commentMatch) {
+      const commentStart = line.indexOf('//');
+      comments.push({
+        type: 'Comment',
+        text: '//' + commentMatch[1],
+        loc: {
+          line: lineNum + 1, // 1-indexed
+          column: commentStart + 1, // 1-indexed
+          offset: offset + commentStart,
+        },
+      });
+    }
+
+    offset += line.length + 1; // +1 for newline
+  }
+
+  return comments;
+}
+
+// Parse result that includes both AST and comments
+export interface ParseResultWithComments {
+  program: Program;
+  comments: Comment[];
+}
+
+// Parse input and extract comments separately
+export function parseWithComments(input: string): ParseResultWithComments {
+  return {
+    program: parse(input),
+    comments: extractComments(input),
+  };
 }
 
 export { program, expression, pathCommand, statement };

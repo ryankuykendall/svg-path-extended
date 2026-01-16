@@ -275,4 +275,44 @@ describe('CLI', () => {
       expect(result.stdout).toContain('M 10 10');
     });
   });
+
+  describe('annotated output', () => {
+    it('outputs annotated format with --annotated flag', () => {
+      const result = runCli(['-e', 'for (i in 0..3) { M i 0 }', '--annotated']);
+      expect(result.stdout).toContain('//--- for (i in 0..3)');
+      expect(result.stdout).toContain('//--- iteration 0');
+      expect(result.stdout).toContain('//--- iteration 1');
+    });
+
+    it('preserves comments in annotated output', () => {
+      const result = runCli(['-e', '// Test comment\nM 0 0', '--annotated']);
+      expect(result.stdout).toContain('// Test comment');
+      expect(result.stdout).toContain('M 0 0');
+    });
+
+    it('shows function call annotations', () => {
+      const result = runCli(['-e', 'circle(50, 50, 25)', '--annotated']);
+      expect(result.stdout).toContain('//--- circle(50, 50, 25)');
+    });
+
+    it('truncates long loops in annotated output', () => {
+      const result = runCli(['-e', 'for (i in 0..20) { M i 0 }', '--annotated']);
+      expect(result.stdout).toContain('//--- iteration 0');
+      expect(result.stdout).toContain('more iterations');
+      expect(result.stdout).toContain('//--- iteration 19');
+    });
+
+    it('writes annotated output to file with -o', () => {
+      const outputFile = join(TMP_DIR, 'annotated-output.txt');
+      if (existsSync(outputFile)) unlinkSync(outputFile);
+
+      runCli(['-e', 'for (i in 0..3) { M i 0 }', '--annotated', '-o', outputFile]);
+      expect(existsSync(outputFile)).toBe(true);
+
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toContain('//--- for (i in 0..3)');
+
+      unlinkSync(outputFile);
+    });
+  });
 });

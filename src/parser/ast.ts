@@ -1,7 +1,22 @@
 // AST Node Types for svg-path-extended
 
+// Source location for annotated output
+export interface SourceLocation {
+  line: number;
+  column: number;
+  offset: number;
+}
+
+// Comment node for preserving comments in annotated output
+export interface Comment {
+  type: 'Comment';
+  text: string;
+  loc: SourceLocation;
+}
+
 export type Node =
   | Program
+  | Comment
   | LetDeclaration
   | ForLoop
   | IfStatement
@@ -20,6 +35,7 @@ export interface Program {
 }
 
 export type Statement =
+  | Comment
   | LetDeclaration
   | ForLoop
   | IfStatement
@@ -40,6 +56,7 @@ export interface ForLoop {
   start: Expression;
   end: Expression;
   body: Statement[];
+  loc?: SourceLocation;
 }
 
 // if (condition) { ... } else { ... }
@@ -63,6 +80,7 @@ export interface PathCommand {
   type: 'PathCommand';
   command: string; // M, m, L, l, H, h, V, v, C, c, S, s, Q, q, T, t, A, a, Z, z
   args: PathArg[];
+  loc?: SourceLocation;
 }
 
 export type PathArg = NumberLiteral | Identifier | CalcExpression | FunctionCall;
@@ -78,6 +96,7 @@ export interface FunctionCall {
   type: 'FunctionCall';
   name: string;
   args: Expression[];
+  loc?: SourceLocation;
 }
 
 // x + y, x * 2, etc.

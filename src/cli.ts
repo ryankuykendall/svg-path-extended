@@ -1,4 +1,4 @@
-import { compile } from './index';
+import { compile, compileAnnotated } from './index';
 import { readFileSync, writeFileSync } from 'fs';
 
 interface CliOptions {
@@ -9,6 +9,7 @@ interface CliOptions {
   stroke?: string;
   fill?: string;
   strokeWidth?: string;
+  annotated?: boolean;
 }
 
 function printUsage() {
@@ -27,6 +28,7 @@ Options:
   --src=<file>                   Input source file
   -o, --output <file>            Write path output to file
   --output-svg-file=<file>       Output as complete SVG file
+  --annotated                    Output annotated/debug format with comments
   --viewBox=<box>                SVG viewBox (default: "0 0 200 200")
   --width=<w>                    SVG width (default: "200")
   --height=<h>                   SVG height (default: "200")
@@ -146,6 +148,12 @@ function parseArgs(args: string[]): { source: string; options: CliOptions; outpu
       continue;
     }
 
+    if (arg === '--annotated') {
+      options.annotated = true;
+      i++;
+      continue;
+    }
+
     // If not a flag, treat as input file or stdin
     if (arg === '-') {
       source = readFileSync(0, 'utf-8');
@@ -179,6 +187,20 @@ function main() {
   const { source, options, outputFile } = parseArgs(args);
 
   try {
+    // Annotated output mode
+    if (options.annotated) {
+      const annotatedOutput = compileAnnotated(source);
+
+      if (outputFile) {
+        writeFileSync(outputFile, annotatedOutput);
+        console.log(`Annotated output written to: ${outputFile}`);
+        return;
+      }
+
+      console.log(annotatedOutput);
+      return;
+    }
+
     const pathData = compile(source);
 
     // Output as SVG file
