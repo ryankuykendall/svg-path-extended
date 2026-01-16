@@ -259,6 +259,31 @@ describe('Parser', () => {
       const stmt = ast.body[0];
       expect(stmt.type === 'IfStatement' && stmt.alternate).not.toBeNull();
     });
+
+    it('parses if with calc() in condition', () => {
+      const ast = parse('if (calc(x % 2) == 0) { M 10 10 }');
+      expect(ast.body[0]).toMatchObject({
+        type: 'IfStatement',
+        condition: {
+          type: 'BinaryExpression',
+          operator: '==',
+          left: { type: 'CalcExpression' },
+        },
+      });
+    });
+
+    it('parses if with calc() on both sides', () => {
+      const ast = parse('if (calc(a + b) > calc(c * 2)) { M 10 10 }');
+      expect(ast.body[0]).toMatchObject({
+        type: 'IfStatement',
+        condition: {
+          type: 'BinaryExpression',
+          operator: '>',
+          left: { type: 'CalcExpression' },
+          right: { type: 'CalcExpression' },
+        },
+      });
+    });
   });
 
   describe('function definitions', () => {

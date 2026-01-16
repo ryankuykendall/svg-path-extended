@@ -510,6 +510,78 @@ describe('Evaluator', () => {
     it('evaluates if-else', () => {
       expect(compile('let x = 0; if (x > 0) { M 10 10 } else { M 0 0 }')).toBe('M 0 0');
     });
+
+    it('evaluates if with calc() in condition', () => {
+      expect(compile('let x = 4; if (calc(x % 2) == 0) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+      expect(compile('let x = 3; if (calc(x % 2) == 0) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
+    });
+
+    it('evaluates if with calc() on both sides', () => {
+      expect(compile('let a = 5; let b = 3; if (calc(a + b) > calc(b * 2)) { M 1 0 }')).toBe('M 1 0');
+    });
+
+    it('evaluates complex calc() in loop condition', () => {
+      const result = compile(`
+        for (i in 0..4) {
+          if (calc(i % 2) == 0) { M i 0 }
+        }
+      `);
+      expect(result).toBe('M 0 0 M 2 0');
+    });
+
+    it('evaluates calc() in if after path command', () => {
+      const result = compile(`
+        for (i in 1..5) {
+          v 20
+          if (calc(i % 2) == 0) {
+            h -10
+          } else {
+            h 10
+          }
+        }
+      `);
+      expect(result).toContain('v 20');
+      expect(result).toContain('h');
+    });
+
+    it('evaluates calc() in if after M command', () => {
+      const result = compile(`
+        M 0 0
+        if (calc(5 % 2) == 1) { L 10 10 }
+      `);
+      expect(result).toBe('M 0 0 L 10 10');
+    });
+
+    it('evaluates calc() in if after L command', () => {
+      const result = compile(`
+        M 0 0
+        L 10 10
+        if (calc(4 / 2) == 2) { L 20 20 }
+      `);
+      expect(result).toBe('M 0 0 L 10 10 L 20 20');
+    });
+
+    it('evaluates fingerJoint pattern', () => {
+      const result = compile(`
+        fn fingerJoint(thickness, height, fingers) {
+          let fingerHeight = calc(height / fingers);
+          for (i in 1..fingers) {
+            v fingerHeight
+            if (calc(i % 2) == 0) {
+              h calc(thickness * -1)
+            } else {
+              h thickness
+            }
+          }
+        }
+        M 0 0
+        fingerJoint(10, 100, 5)
+      `);
+      expect(result).toContain('M 0 0');
+      expect(result).toContain('v 20');
+      expect(result).toContain('h 10');
+      expect(result).toContain('h -10');
+    });
   });
 
   describe('function definitions', () => {

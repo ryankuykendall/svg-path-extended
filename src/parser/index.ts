@@ -241,11 +241,13 @@ const calcExpression: Parsimmon.Parser<CalcExpression> = P.seqMap(
   })
 );
 
-// Function call for path arguments (must check it's not a path command)
+// Function call for path arguments (must check it's not a path command or reserved word)
 const pathFunctionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
   token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)).chain((name) => {
-    // Single letter path commands followed by ( are function calls
-    // Multi-letter names are always function calls
+    // Reject reserved words (they start statements, not function calls in path context)
+    if (reservedWords.includes(name)) {
+      return P.fail(`Reserved word: ${name}`);
+    }
     return P.succeed(name);
   }),
   P.string('(').skip(optWhitespace),
