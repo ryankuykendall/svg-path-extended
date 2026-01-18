@@ -751,12 +751,12 @@ let x = 50;  // inline comment</code></pre>
         <p><code>moveTo(x, y)</code> <code>lineTo(x, y)</code> <code>closePath()</code></p>
 
         <h3>Example</h3>
-        <pre><code>// Points around a circle
+        <pre><code>// 8 points around a circle
 let cx = 100;
 let cy = 100;
 let r = 60;
 
-for (i in 0..8) {
+for (i in 0..7) {
   let angle = calc(i / 8 * TAU());
   let x = calc(cx + cos(angle) * r);
   let y = calc(cy + sin(angle) * r);
@@ -839,9 +839,9 @@ let points = 5;
 
 star(cx, cy, outerR, innerR, points)`,
 
-      grid: `// Grid of dots using nested loops
-for (row in 0..5) {
-  for (col in 0..5) {
+      grid: `// Grid of dots using nested loops (5x5)
+for (row in 0..4) {
+  for (col in 0..4) {
     circle(calc(20 + col * 40), calc(20 + row * 40), 5)
   }
 }`,
@@ -861,8 +861,8 @@ let petalCount = 6;
 let petalRadius = 25;
 let centerRadius = 15;
 
-// Petals
-for (i in 0..petalCount) {
+// Petals (0 to petalCount-1 for correct count)
+for (i in 0..calc(petalCount - 1)) {
   let angle = calc(i / petalCount * TAU());
   let px = calc(cx + cos(angle) * 35);
   let py = calc(cy + sin(angle) * 35);
@@ -889,7 +889,7 @@ let teeth = 12;
 
 M calc(cx + outerR) cy
 
-for (i in 0..teeth) {
+for (i in 0..calc(teeth - 1)) {
   let a1 = calc(i / teeth * TAU());
   let a2 = calc((i + 0.3) / teeth * TAU());
   let a3 = calc((i + 0.5) / teeth * TAU());
@@ -931,8 +931,8 @@ let cy = 100;
 // Draw a circle
 circle(cx, cy, 40)
 
-// Draw points around it
-for (i in 0..8) {
+// Draw 8 points around it
+for (i in 0..7) {
   let angle = calc(i / 8 * TAU());
   let x = calc(cx + cos(angle) * 70);
   let y = calc(cy + sin(angle) * 70);
