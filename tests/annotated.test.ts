@@ -40,11 +40,13 @@ L 10 20`);
 
   describe('for loops', () => {
     it('annotates simple for loop', () => {
+      // 0..3 is inclusive: 0, 1, 2, 3
       const result = compileAnnotated('for (i in 0..3) { M i 0 }');
       expect(result).toContain('//--- for (i in 0..3) from line 1');
       expect(result).toContain('//--- iteration 0');
       expect(result).toContain('//--- iteration 1');
       expect(result).toContain('//--- iteration 2');
+      expect(result).toContain('//--- iteration 3');
     });
 
     it('shows correct line number for loop', () => {
@@ -54,25 +56,29 @@ for (i in 0..2) { L i 0 }`);
     });
 
     it('truncates long loops', () => {
+      // 0..20 is inclusive: 21 iterations (0 through 20)
+      // First 3: 0, 1, 2. Last 3: 18, 19, 20. Skip: 15
       const result = compileAnnotated('for (i in 0..20) { M i 0 }');
       expect(result).toContain('//--- iteration 0');
       expect(result).toContain('//--- iteration 1');
       expect(result).toContain('//--- iteration 2');
-      expect(result).toContain('... 14 more iterations ...');
-      expect(result).toContain('//--- iteration 17');
+      expect(result).toContain('... 15 more iterations ...');
       expect(result).toContain('//--- iteration 18');
       expect(result).toContain('//--- iteration 19');
+      expect(result).toContain('//--- iteration 20');
       // Should NOT contain middle iterations
       expect(result).not.toContain('//--- iteration 10');
     });
 
     it('shows all iterations for short loops', () => {
+      // 0..5 is inclusive: 6 iterations (0 through 5), below truncation threshold
       const result = compileAnnotated('for (i in 0..5) { M i 0 }');
       expect(result).toContain('//--- iteration 0');
       expect(result).toContain('//--- iteration 1');
       expect(result).toContain('//--- iteration 2');
       expect(result).toContain('//--- iteration 3');
       expect(result).toContain('//--- iteration 4');
+      expect(result).toContain('//--- iteration 5');
       expect(result).not.toContain('more iterations');
     });
   });

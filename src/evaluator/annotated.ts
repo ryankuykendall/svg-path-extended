@@ -261,18 +261,30 @@ function evaluateStatementPlain(stmt: Statement, scope: Scope): string {
       }
 
       const MAX_ITERATIONS = 10000;
-      const iterations = Math.max(0, end - start);
+      const ascending = start <= end;
+      const iterations = ascending ? (end - start + 1) : (start - end + 1);
       if (iterations > MAX_ITERATIONS) {
         throw new Error(`for loop would run ${iterations} iterations (max ${MAX_ITERATIONS})`);
       }
 
       const results: string[] = [];
-      for (let i = start; i < end; i++) {
-        const loopScope = createScope(scope);
-        setVariable(loopScope, stmt.variable, i);
-        for (const bodyStmt of stmt.body) {
-          const result = evaluateStatementPlain(bodyStmt, loopScope);
-          if (result) results.push(result);
+      if (ascending) {
+        for (let i = start; i <= end; i++) {
+          const loopScope = createScope(scope);
+          setVariable(loopScope, stmt.variable, i);
+          for (const bodyStmt of stmt.body) {
+            const result = evaluateStatementPlain(bodyStmt, loopScope);
+            if (result) results.push(result);
+          }
+        }
+      } else {
+        for (let i = start; i >= end; i--) {
+          const loopScope = createScope(scope);
+          setVariable(loopScope, stmt.variable, i);
+          for (const bodyStmt of stmt.body) {
+            const result = evaluateStatementPlain(bodyStmt, loopScope);
+            if (result) results.push(result);
+          }
         }
       }
       return results.join(' ');
@@ -355,9 +367,10 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
       }
 
       const MAX_ITERATIONS = 10000;
-      const iterations = Math.max(0, end - start);
-      if (iterations > MAX_ITERATIONS) {
-        throw new Error(`for loop would run ${iterations} iterations (max ${MAX_ITERATIONS})`);
+      const ascending = start <= end;
+      const totalIterations = ascending ? (end - start + 1) : (start - end + 1);
+      if (totalIterations > MAX_ITERATIONS) {
+        throw new Error(`for loop would run ${totalIterations} iterations (max ${MAX_ITERATIONS})`);
       }
 
       ctx.output.push({
@@ -374,9 +387,16 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
       const TRUNCATE_THRESHOLD = 10;
       const SHOW_COUNT = 3;
 
-      for (let i = start; i < end; i++) {
-        const iterIndex = i - start;
-        const totalIterations = end - start;
+      // Build iteration values array (handles both ascending and descending)
+      const iterValues: number[] = [];
+      if (ascending) {
+        for (let i = start; i <= end; i++) iterValues.push(i);
+      } else {
+        for (let i = start; i >= end; i--) iterValues.push(i);
+      }
+
+      for (let iterIndex = 0; iterIndex < iterValues.length; iterIndex++) {
+        const i = iterValues[iterIndex];
 
         // Determine if we should show this iteration
         const isFirstFew = iterIndex < SHOW_COUNT;

@@ -158,8 +158,9 @@ describe('Evaluator', () => {
 
   describe('variable scoping', () => {
     it('shadows variables in for loop', () => {
+      // 0..3 is inclusive: 0, 1, 2, 3
       const result = compile('let i = 100; for (i in 0..3) { M i 0 } M i 0');
-      expect(result).toBe('M 0 0 M 1 0 M 2 0 M 100 0');
+      expect(result).toBe('M 0 0 M 1 0 M 2 0 M 3 0 M 100 0');
     });
 
     it('shadows variables in function scope', () => {
@@ -485,16 +486,19 @@ describe('Evaluator', () => {
 
   describe('for loops', () => {
     it('evaluates simple for loop', () => {
-      expect(compile('for (i in 0..3) { L i 0 }')).toBe('L 0 0 L 1 0 L 2 0');
+      // 0..3 is inclusive: 0, 1, 2, 3
+      expect(compile('for (i in 0..3) { L i 0 }')).toBe('L 0 0 L 1 0 L 2 0 L 3 0');
     });
 
     it('evaluates for loop with calc', () => {
-      expect(compile('for (i in 0..3) { L calc(i * 10) 0 }')).toBe('L 0 0 L 10 0 L 20 0');
+      // 0..3 is inclusive: 0, 1, 2, 3
+      expect(compile('for (i in 0..3) { L calc(i * 10) 0 }')).toBe('L 0 0 L 10 0 L 20 0 L 30 0');
     });
 
     it('evaluates nested for loops', () => {
+      // 0..2 is inclusive: 0, 1, 2 (3 values each = 9 total)
       const result = compile('for (i in 0..2) { for (j in 0..2) { M i j } }');
-      expect(result).toBe('M 0 0 M 0 1 M 1 0 M 1 1');
+      expect(result).toBe('M 0 0 M 0 1 M 0 2 M 1 0 M 1 1 M 1 2 M 2 0 M 2 1 M 2 2');
     });
 
     it('throws error for infinite loop range (Infinity)', () => {
@@ -510,10 +514,31 @@ describe('Evaluator', () => {
     });
 
     it('allows reasonable iteration count', () => {
-      // 100 iterations should be fine
+      // 0..100 is inclusive: 101 iterations (0 through 100)
       const result = compile('for (i in 0..100) { M i 0 }');
       expect(result).toContain('M 0 0');
       expect(result).toContain('M 99 0');
+      expect(result).toContain('M 100 0');
+    });
+
+    it('evaluates descending for loop', () => {
+      // 3..0 is inclusive descending: 3, 2, 1, 0
+      expect(compile('for (i in 3..0) { M i 0 }')).toBe('M 3 0 M 2 0 M 1 0 M 0 0');
+    });
+
+    it('evaluates descending for loop with larger range', () => {
+      // 10..8 is inclusive descending: 10, 9, 8
+      expect(compile('for (i in 10..8) { M i 0 }')).toBe('M 10 0 M 9 0 M 8 0');
+    });
+
+    it('evaluates descending for loop with negative values', () => {
+      // 2..-2 is inclusive descending: 2, 1, 0, -1, -2
+      expect(compile('for (i in 2..-2) { M i 0 }')).toBe('M 2 0 M 1 0 M 0 0 M -1 0 M -2 0');
+    });
+
+    it('evaluates ascending for loop with negative values', () => {
+      // -2..2 is inclusive ascending: -2, -1, 0, 1, 2
+      expect(compile('for (i in -2..2) { M i 0 }')).toBe('M -2 0 M -1 0 M 0 0 M 1 0 M 2 0');
     });
   });
 
@@ -540,12 +565,13 @@ describe('Evaluator', () => {
     });
 
     it('evaluates complex calc() in loop condition', () => {
+      // 0..4 is inclusive: 0, 1, 2, 3, 4. Even values: 0, 2, 4
       const result = compile(`
         for (i in 0..4) {
           if (calc(i % 2) == 0) { M i 0 }
         }
       `);
-      expect(result).toBe('M 0 0 M 2 0');
+      expect(result).toBe('M 0 0 M 2 0 M 4 0');
     });
 
     it('evaluates calc() in if after path command', () => {

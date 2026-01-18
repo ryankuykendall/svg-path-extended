@@ -127,12 +127,14 @@ describe('Runtime errors', () => {
 
 describe('Edge cases', () => {
   describe('empty constructs', () => {
-    it('handles empty for loop body', () => {
-      expect(compile('for (i in 0..0) { M i 0 }')).toBe('');
+    it('handles single-value range', () => {
+      // 0..0 is inclusive: just 0 (1 iteration)
+      expect(compile('for (i in 0..0) { M i 0 }')).toBe('M 0 0');
     });
 
-    it('handles for loop with zero iterations', () => {
-      expect(compile('for (i in 5..5) { M i 0 }')).toBe('');
+    it('handles single-value range with same start and end', () => {
+      // 5..5 is inclusive: just 5 (1 iteration)
+      expect(compile('for (i in 5..5) { M i 0 }')).toBe('M 5 0');
     });
 
     it('handles empty if body when condition is false', () => {

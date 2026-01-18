@@ -218,16 +218,27 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
       }
 
       const MAX_ITERATIONS = 10000;
-      const iterations = Math.max(0, end - start);
+      const ascending = start <= end;
+      // Inclusive ranges: both start and end are included
+      const iterations = ascending ? (end - start + 1) : (start - end + 1);
       if (iterations > MAX_ITERATIONS) {
         throw new Error(`for loop would run ${iterations} iterations (max ${MAX_ITERATIONS})`);
       }
 
       const results: string[] = [];
-      for (let i = start; i < end; i++) {
-        const loopScope = createScope(scope);
-        setVariable(loopScope, stmt.variable, i);
-        results.push(evaluateStatements(stmt.body, loopScope));
+      if (ascending) {
+        for (let i = start; i <= end; i++) {
+          const loopScope = createScope(scope);
+          setVariable(loopScope, stmt.variable, i);
+          results.push(evaluateStatements(stmt.body, loopScope));
+        }
+      } else {
+        // Descending range
+        for (let i = start; i >= end; i--) {
+          const loopScope = createScope(scope);
+          setVariable(loopScope, stmt.variable, i);
+          results.push(evaluateStatements(stmt.body, loopScope));
+        }
       }
       return results.filter(Boolean).join(' ');
     }

@@ -88,6 +88,8 @@ Output:
   M 1 0
   //--- iteration 2
   M 2 0
+  //--- iteration 3
+  M 3 0
 ```
 
 ### With Comments
@@ -108,6 +110,8 @@ Output:
   M 1 0
   //--- iteration 2
   M 2 0
+  //--- iteration 3
+  M 3 0
 ```
 
 ### Loop Truncation
@@ -127,13 +131,13 @@ Output:
   M 1 0
   //--- iteration 2
   M 2 0
-  ... 94 more iterations ...
-  //--- iteration 97
-  M 97 0
+  ... 95 more iterations ...
   //--- iteration 98
   M 98 0
   //--- iteration 99
   M 99 0
+  //--- iteration 100
+  M 100 0
 ```
 
 ### Function Call Annotations

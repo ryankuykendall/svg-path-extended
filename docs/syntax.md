@@ -87,17 +87,31 @@ for (i in 0..10) {
 }
 ```
 
-The range `0..10` includes 0 through 9 (exclusive end).
+The range `0..10` includes both endpoints (0 through 10, giving 11 iterations).
+
+### Descending Ranges
+
+Ranges automatically count down when start > end:
+
+```
+// Countdown from 5 to 1
+for (i in 5..1) {
+  M calc(i * 20) 0
+}
+// Produces: M 100 0 M 80 0 M 60 0 M 40 0 M 20 0
+```
 
 ### Nested Loops
 
 ```
-for (row in 0..3) {
-  for (col in 0..3) {
+for (row in 0..2) {
+  for (col in 0..2) {
     circle(calc(col * 50 + 25), calc(row * 50 + 25), 10)
   }
 }
 ```
+
+This creates a 3x3 grid (rows 0, 1, 2 and cols 0, 1, 2).
 
 ## Conditionals
 

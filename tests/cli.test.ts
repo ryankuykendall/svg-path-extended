@@ -251,8 +251,9 @@ describe('CLI', () => {
 
   describe('complex examples', () => {
     it('compiles for loops', () => {
+      // 0..3 is inclusive: 0, 1, 2, 3
       const result = runCli(['-e', 'for (i in 0..3) { M calc(i * 10) 0 }']);
-      expect(result.stdout.trim()).toBe('M 0 0 M 10 0 M 20 0');
+      expect(result.stdout.trim()).toBe('M 0 0 M 10 0 M 20 0 M 30 0');
     });
 
     it('compiles if statements', () => {
