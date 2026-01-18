@@ -643,6 +643,7 @@
     <div id="docs-tabs">
       <button class="docs-tab active" data-tab="syntax">Syntax</button>
       <button class="docs-tab" data-tab="stdlib">Stdlib</button>
+      <button class="docs-tab" data-tab="cli">CLI</button>
     </div>
     <div id="docs-content">
       <!-- Syntax Tab -->
@@ -770,6 +771,66 @@ for (i in 0..7) {
   let y = calc(cy + sin(angle) * r);
   circle(x, y, 5)
 }</code></pre>
+      </div>
+
+      <!-- CLI Tab -->
+      <div class="doc-section" id="doc-cli">
+        <h3>Installation</h3>
+        <pre><code>npm install -g svg-path-extended</code></pre>
+        <p>Or use with npx:</p>
+        <pre><code>npx svg-path-extended [options]</code></pre>
+
+        <h3>Basic Usage</h3>
+        <table>
+          <tr><td><code>svg-path-extended input.svgx</code></td><td>Compile a file</td></tr>
+          <tr><td><code>svg-path-extended -e 'code'</code></td><td>Compile inline code</td></tr>
+          <tr><td><code>echo 'code' | svg-path-extended -</code></td><td>Read from stdin</td></tr>
+        </table>
+
+        <h3>Output Options</h3>
+        <table>
+          <tr><td><code>-o file.txt</code></td><td>Output path data to file</td></tr>
+          <tr><td><code>--output-svg-file=out.svg</code></td><td>Output complete SVG file</td></tr>
+          <tr><td><code>--annotated</code></td><td>Debug output with comments</td></tr>
+        </table>
+
+        <h3>SVG Styling</h3>
+        <p>Use with <code>--output-svg-file</code>:</p>
+        <table>
+          <tr><td><code>--stroke=color</code></td><td>Stroke color (default: #000)</td></tr>
+          <tr><td><code>--fill=color</code></td><td>Fill color (default: none)</td></tr>
+          <tr><td><code>--stroke-width=n</code></td><td>Stroke width (default: 2)</td></tr>
+          <tr><td><code>--viewBox=box</code></td><td>SVG viewBox</td></tr>
+          <tr><td><code>--width=w</code></td><td>SVG width</td></tr>
+          <tr><td><code>--height=h</code></td><td>SVG height</td></tr>
+        </table>
+
+        <h3>Examples</h3>
+        <pre><code># Red circle SVG
+svg-path-extended -e 'circle(100, 100, 50)' \
+  --output-svg-file=circle.svg \
+  --stroke=red --stroke-width=3
+
+# Blue filled hexagon
+svg-path-extended -e 'polygon(100, 100, 80, 6)' \
+  --output-svg-file=hex.svg \
+  --stroke=navy --fill=lightblue</code></pre>
+
+        <h3>Annotated Output</h3>
+        <p>Shows loop iterations and function expansions:</p>
+        <pre><code>svg-path-extended -e 'for (i in 0..3) { M i 0 }' --annotated
+
+# Output:
+//--- for (i in 0..3) from line 1
+  //--- iteration 0
+  M 0 0
+  //--- iteration 1
+  M 1 0
+  ...</code></pre>
+
+        <h3>Help</h3>
+        <pre><code>svg-path-extended --help
+svg-path-extended --version</code></pre>
       </div>
     </div>
   </div>
