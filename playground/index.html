@@ -591,6 +591,7 @@
         <option value="sineWave">Sine Wave</option>
         <option value="gear">Gear</option>
         <option value="customFunction">Custom Function</option>
+        <option value="descending">Descending Ranges</option>
       </select>
     </div>
   </header>
@@ -918,7 +919,26 @@ fn diamond(cx, cy, size) {
 // Draw diamonds in a row
 for (i in 0..4) {
   diamond(calc(40 + i * 45), 100, 20)
-}`
+}`,
+
+      descending: `// Descending ranges: shrinking circles
+let cx = 100;
+let cy = 100;
+
+// Circles shrink from radius 80 down to 10
+for (r in 80..10) {
+  if (calc(r % 10) == 0) {
+    circle(cx, cy, r)
+  }
+}
+
+// Staircase going down (right to left)
+M 180 20
+for (i in 8..1) {
+  h -20
+  v 20
+}
+h -20`
     };
 
     // Default code
