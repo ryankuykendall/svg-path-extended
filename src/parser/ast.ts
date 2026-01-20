@@ -26,6 +26,7 @@ export type Node =
   | FunctionCall
   | BinaryExpression
   | UnaryExpression
+  | MemberExpression
   | Identifier
   | NumberLiteral;
 
@@ -83,7 +84,7 @@ export interface PathCommand {
   loc?: SourceLocation;
 }
 
-export type PathArg = NumberLiteral | Identifier | CalcExpression | FunctionCall;
+export type PathArg = NumberLiteral | Identifier | CalcExpression | FunctionCall | MemberExpression;
 
 // calc(x + 10)
 export interface CalcExpression {
@@ -114,6 +115,13 @@ export interface UnaryExpression {
   argument: Expression;
 }
 
+// Property access: ctx.x, ctx.position.x
+export interface MemberExpression {
+  type: 'MemberExpression';
+  object: Expression;
+  property: string;
+}
+
 // Variable reference
 export interface Identifier {
   type: 'Identifier';
@@ -131,5 +139,6 @@ export type Expression =
   | UnaryExpression
   | CalcExpression
   | FunctionCall
+  | MemberExpression
   | Identifier
   | NumberLiteral;

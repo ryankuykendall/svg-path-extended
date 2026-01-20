@@ -160,6 +160,61 @@ let x = 50;  // inline comment
 M x 0
 ```
 
+## Path Context (ctx)
+
+When using `compileWithContext()`, a `ctx` object tracks the current drawing state:
+
+```
+M 10 20
+L 30 40
+L calc(ctx.position.x + 10) ctx.position.y  // L 40 40
+```
+
+### ctx Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ctx.position.x` | number | Current X coordinate |
+| `ctx.position.y` | number | Current Y coordinate |
+| `ctx.start.x` | number | Subpath start X (set by M, used by Z) |
+| `ctx.start.y` | number | Subpath start Y |
+| `ctx.commands` | array | History of executed commands |
+
+### How Position Updates
+
+- **M/m**: Sets position and subpath start
+- **L/l, H/h, V/v**: Updates position to endpoint
+- **C/c, S/s, Q/q, T/t**: Updates position to curve endpoint
+- **A/a**: Updates position to arc endpoint
+- **Z/z**: Returns to subpath start
+
+Lowercase (relative) commands add to current position; uppercase (absolute) set it directly.
+
+### log() Function
+
+Use `log()` to inspect the context during evaluation:
+
+```
+M 10 20
+log(ctx)           // Logs full context as JSON
+log(ctx.position)  // Logs just position object
+log(ctx.position.x) // Logs just the x value
+L 30 40
+```
+
+The logs are captured in the `logs` array returned by `compileWithContext()`.
+
+### Example: Drawing Relative to Current Position
+
+```
+M 100 100
+L 150 150
+// Continue from current position
+L calc(ctx.position.x + 50) ctx.position.y
+L ctx.position.x calc(ctx.position.y + 50)
+Z
+```
+
 ## Complete Example
 
 ```

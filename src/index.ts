@@ -1,12 +1,12 @@
 import { parse, parseWithComments } from './parser';
-import { evaluate, evaluateAnnotated, formatAnnotated } from './evaluator';
+import { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } from './evaluator';
 
 export { parse, parseWithComments } from './parser';
-export { evaluate, evaluateAnnotated, formatAnnotated } from './evaluator';
+export { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } from './evaluator';
 export { stdlib } from './stdlib';
 
 export type { Program, Statement, Expression, Node, SourceLocation, Comment } from './parser/ast';
-export type { AnnotatedOutput, AnnotatedLine } from './evaluator';
+export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, PathContext, Point, CommandHistoryEntry } from './evaluator';
 export type { FormatOptions } from './evaluator/formatter';
 
 /**
@@ -54,4 +54,37 @@ export function compileAnnotated(source: string): string {
   const { program, comments } = parseWithComments(source);
   const annotated = evaluateAnnotated(program, comments);
   return formatAnnotated(annotated);
+}
+
+/**
+ * Compile extended SVG path syntax with context tracking.
+ * Returns path string, final context state, and any log() outputs.
+ *
+ * The context tracks:
+ * - `position`: Current pen position { x, y }
+ * - `start`: Subpath start position (set by M, used by Z)
+ * - `commands`: History of executed commands with start/end positions
+ *
+ * @param source - The extended SVG path source code
+ * @returns Object containing path, context, and logs
+ *
+ * @example
+ * ```ts
+ * import { compileWithContext } from 'svg-path-extended';
+ *
+ * const result = compileWithContext(`
+ *   M 10 20
+ *   L 30 40
+ *   log(ctx)
+ *   L calc(ctx.position.x + 10) ctx.position.y
+ * `);
+ *
+ * console.log(result.path);     // "M 10 20 L 30 40 L 40 40"
+ * console.log(result.context.position);  // { x: 40, y: 40 }
+ * console.log(result.logs);     // [JSON of context at log() call]
+ * ```
+ */
+export function compileWithContext(source: string) {
+  const ast = parse(source);
+  return evaluateWithContext(ast);
 }

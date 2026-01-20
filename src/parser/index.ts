@@ -10,6 +10,7 @@ import type {
   UnaryExpression,
   CalcExpression,
   FunctionCall,
+  MemberExpression,
   PathCommand,
   LetDeclaration,
   ForLoop,
@@ -67,7 +68,7 @@ const identifier: Parsimmon.Parser<Identifier> = token(
 }));
 
 // Reserved words that cannot be identifiers
-const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc'];
+const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log'];
 
 const nonReservedIdentifier: Parsimmon.Parser<Identifier> = identifier.chain((id) =>
   reservedWords.includes(id.name)
@@ -87,6 +88,30 @@ const nonPathCommandIdentifier: Parsimmon.Parser<Identifier> = token(
   }
   return P.succeed({ type: 'Identifier' as const, name });
 });
+
+// Property access: chains .property after a base expression
+// Returns either the base or a MemberExpression chain
+function withMemberAccess(base: Parsimmon.Parser<Expression>): Parsimmon.Parser<Expression> {
+  return base.chain((baseExpr) =>
+    P.seq(P.string('.'), token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)))
+      .many()
+      .map((properties) =>
+        properties.reduce<Expression>(
+          (obj, [, prop]) => ({
+            type: 'MemberExpression' as const,
+            object: obj,
+            property: prop,
+          }),
+          baseExpr
+        )
+      )
+  );
+}
+
+// Member expression for path arguments (base cannot be path command letter)
+const pathMemberExpression: Parsimmon.Parser<Expression> = withMemberAccess(
+  nonPathCommandIdentifier
+);
 
 // Expression parser with operator precedence
 const expression: Parsimmon.Parser<Expression> = P.lazy(() => orExpression);
@@ -231,13 +256,13 @@ const functionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
   })
 );
 
-// Primary expression: number, calc, identifier, function call, or parenthesized expression
+// Primary expression: number, calc, identifier (with optional property access), function call, or parenthesized expression
 const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
   P.alt(
     numberLiteral,
     calcExpression,
     functionCall,
-    nonReservedIdentifier,
+    withMemberAccess(nonReservedIdentifier),
     P.seq(word('('), expression, word(')')).map(([, expr]) => expr)
   )
 );
@@ -275,12 +300,12 @@ const pathFunctionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
   })
 );
 
-// Path argument: number, identifier (non-path-command), calc(), or function call
+// Path argument: number, identifier (non-path-command) with optional property access, calc(), or function call
 const pathArg: Parsimmon.Parser<PathArg> = P.alt(
   calcExpression,
   pathFunctionCall,
   numberLiteral,
-  nonPathCommandIdentifier
+  pathMemberExpression
 );
 
 // Path command: M, L, C, A, Z, etc. followed by arguments

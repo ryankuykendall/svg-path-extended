@@ -9,10 +9,27 @@ import type {
   IfStatement,
   FunctionDefinition,
   FunctionCall,
+  MemberExpression,
 } from '../parser/ast';
 import { stdlib } from '../stdlib';
+import {
+  type PathContext,
+  type Point,
+  type CommandHistoryEntry,
+  createPathContext,
+  updateContextForCommand,
+  contextToObject,
+} from './context';
 
-export type Value = number | string | PathSegment | UserFunction;
+export type Value = number | string | PathSegment | UserFunction | ContextObject;
+
+/**
+ * Represents an object value that supports property access (like ctx)
+ */
+export interface ContextObject {
+  type: 'ContextObject';
+  value: Record<string, unknown>;
+}
 
 export interface PathSegment {
   type: 'PathSegment';
@@ -25,15 +42,25 @@ export interface UserFunction {
   body: Statement[];
 }
 
+/**
+ * Evaluation state for context-aware evaluation
+ */
+export interface EvaluationState {
+  pathContext: PathContext;
+  logs: string[];
+}
+
 export interface Scope {
   variables: Map<string, Value>;
   parent: Scope | null;
+  evalState?: EvaluationState;  // Shared across all scopes during evaluation
 }
 
 function createScope(parent: Scope | null = null): Scope {
   return {
     variables: new Map(),
     parent,
+    evalState: parent?.evalState,  // Inherit evaluation state from parent
   };
 }
 
@@ -105,9 +132,45 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'FunctionCall':
       return evaluateFunctionCall(expr, scope);
 
+    case 'MemberExpression':
+      return evaluateMemberExpression(expr, scope);
+
     default:
       throw new Error(`Unknown expression type: ${(expr as Expression).type}`);
   }
+}
+
+function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
+  const obj = evaluateExpression(expr.object, scope);
+
+  // Handle ContextObject property access
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ContextObject') {
+    const contextObj = obj as ContextObject;
+    const propValue = contextObj.value[expr.property];
+
+    if (propValue === undefined) {
+      throw new Error(`Property '${expr.property}' does not exist on context object`);
+    }
+
+    // If the property is an object (like position or start), wrap it as ContextObject
+    if (typeof propValue === 'object' && propValue !== null && !Array.isArray(propValue)) {
+      return { type: 'ContextObject' as const, value: propValue as Record<string, unknown> };
+    }
+
+    // If it's a number, return it directly
+    if (typeof propValue === 'number') {
+      return propValue;
+    }
+
+    // If it's an array (like commands), wrap it as ContextObject
+    if (Array.isArray(propValue)) {
+      return { type: 'ContextObject' as const, value: { length: propValue.length, items: propValue } };
+    }
+
+    throw new Error(`Cannot access property '${expr.property}' of type ${typeof propValue}`);
+  }
+
+  throw new Error(`Cannot access property '${expr.property}' on non-object value`);
 }
 
 function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
@@ -181,8 +244,67 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
       throw new Error(`Function ${arg.name} did not return a valid path value`);
     }
 
+    case 'MemberExpression': {
+      const value = evaluateMemberExpression(arg, scope);
+      if (typeof value === 'number') {
+        return String(value);
+      }
+      throw new Error(`Member expression did not evaluate to a number`);
+    }
+
     default:
       throw new Error(`Unknown path argument type: ${(arg as PathArg).type}`);
+  }
+}
+
+/**
+ * Get numeric arguments from path args for context tracking
+ */
+function getNumericArgs(args: PathArg[], scope: Scope): number[] {
+  const numericArgs: number[] = [];
+  for (const arg of args) {
+    if (arg.type === 'NumberLiteral') {
+      numericArgs.push(arg.value);
+    } else if (arg.type === 'Identifier') {
+      const value = lookupVariable(scope, arg.name);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+    } else if (arg.type === 'CalcExpression') {
+      const value = evaluateExpression(arg.expression, scope);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+    } else if (arg.type === 'MemberExpression') {
+      const value = evaluateMemberExpression(arg, scope);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+    } else if (arg.type === 'FunctionCall') {
+      const value = evaluateFunctionCall(arg, scope);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+      // PathSegments don't contribute to numeric args for context tracking
+    }
+  }
+  return numericArgs;
+}
+
+/**
+ * Update the ctx variable in scope with current context state
+ */
+function updateCtxVariable(scope: Scope): void {
+  if (scope.evalState) {
+    // Find the root scope to update ctx
+    let rootScope = scope;
+    while (rootScope.parent) {
+      rootScope = rootScope.parent;
+    }
+    rootScope.variables.set('ctx', {
+      type: 'ContextObject' as const,
+      value: contextToObject(scope.evalState.pathContext),
+    });
   }
 }
 
@@ -192,8 +314,19 @@ function evaluatePathCommand(cmd: PathCommand, scope: Scope): string {
     const args = cmd.args.map((arg) => evaluatePathArg(arg, scope));
     return args.join(' ');
   }
-  const args = cmd.args.map((arg) => evaluatePathArg(arg, scope));
-  return cmd.command + (args.length > 0 ? ' ' + args.join(' ') : '');
+
+  // Get string args for output
+  const stringArgs = cmd.args.map((arg) => evaluatePathArg(arg, scope));
+  const result = cmd.command + (stringArgs.length > 0 ? ' ' + stringArgs.join(' ') : '');
+
+  // Update path context if tracking is enabled
+  if (scope.evalState && cmd.command !== '') {
+    const numericArgs = getNumericArgs(cmd.args, scope);
+    updateContextForCommand(scope.evalState.pathContext, cmd.command, numericArgs);
+    updateCtxVariable(scope);
+  }
+
+  return result;
 }
 
 function evaluateStatement(stmt: Statement, scope: Scope): string {
@@ -288,6 +421,72 @@ export function evaluate(program: Program): string {
   const scope = createScope();
   return evaluateStatements(program.body, scope);
 }
+
+/**
+ * Result of context-aware evaluation
+ */
+export interface EvaluateWithContextResult {
+  path: string;
+  context: PathContext;
+  logs: string[];
+}
+
+/**
+ * Evaluate a program with path context tracking
+ * Returns the path string, final context state, and any console.log outputs
+ */
+export function evaluateWithContext(program: Program): EvaluateWithContextResult {
+  const pathContext = createPathContext();
+  const logs: string[] = [];
+  const evalState: EvaluationState = { pathContext, logs };
+
+  const scope = createScope();
+  scope.evalState = evalState;
+
+  // Initialize ctx variable
+  scope.variables.set('ctx', {
+    type: 'ContextObject' as const,
+    value: contextToObject(pathContext),
+  });
+
+  // Add log function to scope (simpler than console.log for MVP)
+  scope.variables.set('log', createLogFunction(evalState));
+
+  const path = evaluateStatements(program.body, scope);
+
+  return {
+    path,
+    context: pathContext,
+    logs,
+  };
+}
+
+/**
+ * Create a log function that captures output to the evaluation state
+ * Usage: log(ctx) or log(ctx.position) or log(value)
+ * Returns empty PathSegment so it doesn't add to path output
+ */
+function createLogFunction(evalState: EvaluationState): (...args: unknown[]) => PathSegment {
+  return (...args: unknown[]) => {
+    const output = args.map((arg) => {
+      if (typeof arg === 'object' && arg !== null && 'type' in arg) {
+        const typed = arg as { type: string; value?: unknown };
+        if (typed.type === 'ContextObject' && typed.value) {
+          return JSON.stringify(typed.value, null, 2);
+        }
+      }
+      if (typeof arg === 'number') {
+        return String(arg);
+      }
+      return String(arg);
+    }).join(' ');
+    evalState.logs.push(output);
+    return { type: 'PathSegment' as const, value: '' };  // Empty path segment
+  };
+}
+
+// Re-export types from context module
+export type { PathContext, Point, CommandHistoryEntry } from './context';
 
 // Re-export annotated evaluator and formatter
 export { evaluateAnnotated, type AnnotatedOutput, type AnnotatedLine } from './annotated';
