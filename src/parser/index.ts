@@ -5,6 +5,7 @@ import type {
   Expression,
   PathArg,
   NumberLiteral,
+  StringLiteral,
   Identifier,
   BinaryExpression,
   UnaryExpression,
@@ -57,6 +58,23 @@ const numberLiteral: Parsimmon.Parser<NumberLiteral> = token(
 ).map((str) => ({
   type: 'NumberLiteral' as const,
   value: parseFloat(str),
+}));
+
+// String literal: "hello" or 'hello'
+// Supports escape sequences: \n, \t, \\, \", \'
+const stringLiteral: Parsimmon.Parser<StringLiteral> = token(
+  P.alt(
+    P.regexp(/"(?:[^"\\]|\\.)*"/).map((str) => str.slice(1, -1)),
+    P.regexp(/'(?:[^'\\]|\\.)*'/).map((str) => str.slice(1, -1))
+  )
+).map((value) => ({
+  type: 'StringLiteral' as const,
+  value: value
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\\\/g, '\\'),
 }));
 
 // Identifier: x, myVar, _private (for general use)
@@ -256,10 +274,11 @@ const functionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
   })
 );
 
-// Primary expression: number, calc, identifier (with optional property access), function call, or parenthesized expression
+// Primary expression: number, string, calc, identifier (with optional property access), function call, or parenthesized expression
 const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
   P.alt(
     numberLiteral,
+    stringLiteral,
     calcExpression,
     functionCall,
     withMemberAccess(nonReservedIdentifier),

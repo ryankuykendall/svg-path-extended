@@ -6,7 +6,7 @@ export { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } fro
 export { stdlib } from './stdlib';
 
 export type { Program, Statement, Expression, Node, SourceLocation, Comment } from './parser/ast';
-export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, PathContext, Point, CommandHistoryEntry } from './evaluator';
+export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart } from './evaluator';
 export type { FormatOptions } from './evaluator/formatter';
 
 /**

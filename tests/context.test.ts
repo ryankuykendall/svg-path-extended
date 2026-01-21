@@ -171,15 +171,19 @@ describe('Path Context Tracking', () => {
   });
 
   describe('log() function', () => {
-    it('captures log output', () => {
+    it('captures log output with line numbers and labels', () => {
       const result = compileWithContext(`
         M 10 20
         log(ctx)
       `);
       expect(result.logs).toHaveLength(1);
-      expect(result.logs[0]).toContain('"position"');
-      expect(result.logs[0]).toContain('"x": 10');
-      expect(result.logs[0]).toContain('"y": 20');
+      expect(result.logs[0].line).toBe(3);
+      expect(result.logs[0].parts).toHaveLength(1);
+      expect(result.logs[0].parts[0].type).toBe('value');
+      expect(result.logs[0].parts[0].label).toBe('ctx');
+      expect(result.logs[0].parts[0].value).toContain('"position"');
+      expect(result.logs[0].parts[0].value).toContain('"x": 10');
+      expect(result.logs[0].parts[0].value).toContain('"y": 20');
     });
 
     it('captures multiple log calls', () => {
@@ -192,22 +196,51 @@ describe('Path Context Tracking', () => {
       expect(result.logs).toHaveLength(2);
     });
 
-    it('logs specific properties', () => {
+    it('logs specific properties with labels', () => {
       const result = compileWithContext(`
         M 10 20
         log(ctx.position)
       `);
       expect(result.logs).toHaveLength(1);
-      const parsed = JSON.parse(result.logs[0]);
+      expect(result.logs[0].parts[0].label).toBe('ctx.position');
+      const parsed = JSON.parse(result.logs[0].parts[0].value);
       expect(parsed).toEqual({ x: 10, y: 20 });
     });
 
-    it('logs numeric values', () => {
+    it('logs numeric values with labels', () => {
       const result = compileWithContext(`
         M 10 20
         log(ctx.position.x)
       `);
-      expect(result.logs).toEqual(['10']);
+      expect(result.logs).toHaveLength(1);
+      expect(result.logs[0].parts[0].label).toBe('ctx.position.x');
+      expect(result.logs[0].parts[0].value).toBe('10');
+    });
+
+    it('logs string literals without labels', () => {
+      const result = compileWithContext(`
+        M 10 20
+        log("position:", ctx.position)
+      `);
+      expect(result.logs).toHaveLength(1);
+      expect(result.logs[0].parts).toHaveLength(2);
+      expect(result.logs[0].parts[0].type).toBe('string');
+      expect(result.logs[0].parts[0].value).toBe('position:');
+      expect(result.logs[0].parts[1].type).toBe('value');
+      expect(result.logs[0].parts[1].label).toBe('ctx.position');
+    });
+
+    it('supports multiple arguments with mixed types', () => {
+      const result = compileWithContext(`
+        M 10 20
+        log("x =", ctx.position.x, "y =", ctx.position.y)
+      `);
+      expect(result.logs).toHaveLength(1);
+      expect(result.logs[0].parts).toHaveLength(4);
+      expect(result.logs[0].parts[0]).toEqual({ type: 'string', value: 'x =' });
+      expect(result.logs[0].parts[1]).toEqual({ type: 'value', label: 'ctx.position.x', value: '10' });
+      expect(result.logs[0].parts[2]).toEqual({ type: 'string', value: 'y =' });
+      expect(result.logs[0].parts[3]).toEqual({ type: 'value', label: 'ctx.position.y', value: '20' });
     });
 
     it('does not add to path output', () => {

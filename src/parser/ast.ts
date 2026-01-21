@@ -28,7 +28,8 @@ export type Node =
   | UnaryExpression
   | MemberExpression
   | Identifier
-  | NumberLiteral;
+  | NumberLiteral
+  | StringLiteral;
 
 export interface Program {
   type: 'Program';
@@ -134,6 +135,12 @@ export interface NumberLiteral {
   value: number;
 }
 
+// String literal (for log messages)
+export interface StringLiteral {
+  type: 'StringLiteral';
+  value: string;
+}
+
 export type Expression =
   | BinaryExpression
   | UnaryExpression
@@ -141,4 +148,5 @@ export type Expression =
   | FunctionCall
   | MemberExpression
   | Identifier
-  | NumberLiteral;
+  | NumberLiteral
+  | StringLiteral;

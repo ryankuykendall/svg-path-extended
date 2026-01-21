@@ -31,6 +31,49 @@ export interface ContextObject {
   value: Record<string, unknown>;
 }
 
+/**
+ * Represents a single log entry with metadata
+ */
+export interface LogEntry {
+  line: number | null;
+  parts: LogPart[];
+}
+
+/**
+ * A single part of a log entry (either a label string or a labeled value)
+ */
+export interface LogPart {
+  type: 'string' | 'value';
+  label?: string;  // For values: the expression that was logged (e.g., "ctx.position")
+  value: string;   // The stringified value
+}
+
+/**
+ * Convert an Expression AST node to its source text representation
+ */
+function expressionToSource(expr: Expression): string {
+  switch (expr.type) {
+    case 'NumberLiteral':
+      return String(expr.value);
+    case 'StringLiteral':
+      return `"${expr.value}"`;
+    case 'Identifier':
+      return expr.name;
+    case 'MemberExpression':
+      return `${expressionToSource(expr.object)}.${expr.property}`;
+    case 'FunctionCall':
+      return `${expr.name}(${expr.args.map(expressionToSource).join(', ')})`;
+    case 'CalcExpression':
+      return `calc(${expressionToSource(expr.expression)})`;
+    case 'BinaryExpression':
+      return `(${expressionToSource(expr.left)} ${expr.operator} ${expressionToSource(expr.right)})`;
+    case 'UnaryExpression':
+      return `${expr.operator}${expressionToSource(expr.argument)}`;
+    default:
+      return '?';
+  }
+}
+
 export interface PathSegment {
   type: 'PathSegment';
   value: string;
@@ -47,7 +90,7 @@ export interface UserFunction {
  */
 export interface EvaluationState {
   pathContext: PathContext;
-  logs: string[];
+  logs: LogEntry[];
 }
 
 export interface Scope {
@@ -85,6 +128,9 @@ function setVariable(scope: Scope, name: string, value: Value): void {
 function evaluateExpression(expr: Expression, scope: Scope): Value {
   switch (expr.type) {
     case 'NumberLiteral':
+      return expr.value;
+
+    case 'StringLiteral':
       return expr.value;
 
     case 'Identifier':
@@ -174,12 +220,70 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
 }
 
 function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
+  // Special handling for log() function
+  if (call.name === 'log' && scope.evalState) {
+    const lineNumber = call.loc?.line ?? null;
+    const parts: LogPart[] = [];
+
+    for (const arg of call.args) {
+      const value = evaluateExpression(arg, scope);
+
+      // String literals are displayed directly without a label
+      if (arg.type === 'StringLiteral') {
+        parts.push({
+          type: 'string',
+          value: arg.value,
+        });
+      } else {
+        // Non-string expressions get a label showing what was logged
+        const label = expressionToSource(arg);
+        let stringValue: string;
+
+        if (typeof value === 'object' && value !== null && 'type' in value) {
+          const typed = value as { type: string; value?: unknown };
+          if (typed.type === 'ContextObject' && typed.value) {
+            stringValue = JSON.stringify(typed.value, null, 2);
+          } else if (typed.type === 'PathSegment') {
+            stringValue = (typed as PathSegment).value;
+          } else {
+            stringValue = String(value);
+          }
+        } else if (typeof value === 'number') {
+          stringValue = String(value);
+        } else if (typeof value === 'string') {
+          stringValue = value;
+        } else {
+          stringValue = String(value);
+        }
+
+        parts.push({
+          type: 'value',
+          label,
+          value: stringValue,
+        });
+      }
+    }
+
+    scope.evalState.logs.push({ line: lineNumber, parts });
+    return { type: 'PathSegment' as const, value: '' };  // Empty path segment
+  }
+
   const fn = lookupVariable(scope, call.name);
 
   // Check if it's a stdlib function
   if (typeof fn === 'function') {
     const args = call.args.map((arg) => evaluateExpression(arg, scope));
-    return (fn as (...args: number[]) => number)(...args as number[]);
+    const result = (fn as (...args: number[]) => number)(...args as number[]);
+
+    // If stdlib function returns a PathSegment, track its commands
+    if (typeof result === 'object' && result !== null && 'type' in result) {
+      const typed = result as { type: string; value?: string };
+      if (typed.type === 'PathSegment' && typed.value && scope.evalState) {
+        parseAndTrackPathString(typed.value, scope);
+      }
+    }
+
+    return result;
   }
 
   // Check if it's a user-defined function
@@ -329,6 +433,38 @@ function evaluatePathCommand(cmd: PathCommand, scope: Scope): string {
   return result;
 }
 
+/**
+ * Parse a path string and update context for each command found.
+ * Used for tracking context when stdlib functions return path strings.
+ */
+function parseAndTrackPathString(pathStr: string, scope: Scope): void {
+  if (!scope.evalState) return;
+
+  // Parse path commands from string: M 10 20 L 30 40 A 5 5 0 1 1 50 50 etc.
+  const commandRegex = /([MLHVCSQTAZmlhvcsqtaz])\s*([\d\s.,-]*)/g;
+  let match;
+
+  while ((match = commandRegex.exec(pathStr)) !== null) {
+    const command = match[1];
+    const argsStr = match[2].trim();
+
+    // Parse numeric arguments
+    const args: number[] = [];
+    if (argsStr) {
+      const numMatches = argsStr.match(/-?[\d.]+/g);
+      if (numMatches) {
+        for (const num of numMatches) {
+          args.push(parseFloat(num));
+        }
+      }
+    }
+
+    updateContextForCommand(scope.evalState.pathContext, command, args);
+  }
+
+  updateCtxVariable(scope);
+}
+
 function evaluateStatement(stmt: Statement, scope: Scope): string {
   switch (stmt.type) {
     case 'LetDeclaration': {
@@ -428,16 +564,16 @@ export function evaluate(program: Program): string {
 export interface EvaluateWithContextResult {
   path: string;
   context: PathContext;
-  logs: string[];
+  logs: LogEntry[];
 }
 
 /**
  * Evaluate a program with path context tracking
- * Returns the path string, final context state, and any console.log outputs
+ * Returns the path string, final context state, and any log() outputs
  */
 export function evaluateWithContext(program: Program): EvaluateWithContextResult {
   const pathContext = createPathContext();
-  const logs: string[] = [];
+  const logs: LogEntry[] = [];
   const evalState: EvaluationState = { pathContext, logs };
 
   const scope = createScope();
@@ -449,8 +585,7 @@ export function evaluateWithContext(program: Program): EvaluateWithContextResult
     value: contextToObject(pathContext),
   });
 
-  // Add log function to scope (simpler than console.log for MVP)
-  scope.variables.set('log', createLogFunction(evalState));
+  // Note: log() is handled specially in evaluateFunctionCall, not registered here
 
   const path = evaluateStatements(program.body, scope);
 
@@ -458,30 +593,6 @@ export function evaluateWithContext(program: Program): EvaluateWithContextResult
     path,
     context: pathContext,
     logs,
-  };
-}
-
-/**
- * Create a log function that captures output to the evaluation state
- * Usage: log(ctx) or log(ctx.position) or log(value)
- * Returns empty PathSegment so it doesn't add to path output
- */
-function createLogFunction(evalState: EvaluationState): (...args: unknown[]) => PathSegment {
-  return (...args: unknown[]) => {
-    const output = args.map((arg) => {
-      if (typeof arg === 'object' && arg !== null && 'type' in arg) {
-        const typed = arg as { type: string; value?: unknown };
-        if (typed.type === 'ContextObject' && typed.value) {
-          return JSON.stringify(typed.value, null, 2);
-        }
-      }
-      if (typeof arg === 'number') {
-        return String(arg);
-      }
-      return String(arg);
-    }).join(' ');
-    evalState.logs.push(output);
-    return { type: 'PathSegment' as const, value: '' };  // Empty path segment
   };
 }
 

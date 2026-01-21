@@ -652,20 +652,49 @@
     }
 
     .log-entry {
-      padding: 4px 0;
+      padding: 8px 0;
       border-bottom: 1px solid #333;
-      white-space: pre-wrap;
-      word-break: break-all;
     }
 
     .log-entry:last-child {
       border-bottom: none;
     }
 
-    .log-index {
-      color: #6a9955;
+    .log-line {
+      color: #569cd6;
+      font-weight: 500;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.7rem;
+    }
+
+    .log-string {
+      color: #ce9178;
       margin-right: 8px;
-      user-select: none;
+    }
+
+    .log-labeled-value {
+      margin: 4px 0;
+    }
+
+    .log-label {
+      color: #9cdcfe;
+    }
+
+    .log-value {
+      color: #b5cea8;
+    }
+
+    .log-json {
+      color: #d4d4d4;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: block;
+      margin-left: 12px;
+      background: #1a1a1a;
+      padding: 4px 8px;
+      border-radius: 3px;
+      margin-top: 2px;
     }
 
     .log-empty {
@@ -1314,9 +1343,31 @@ for (i in 0..7) {
         consoleOutput.innerHTML = '<div class="log-empty">No log output</div>';
       } else {
         consoleOutput.innerHTML = currentLogs
-          .map((log, i) => `<div class="log-entry"><span class="log-index">[${i}]</span>${escapeHtml(log)}</div>`)
+          .map((logEntry) => formatLogEntry(logEntry))
           .join('');
       }
+    }
+
+    // Format a single log entry with line number and labeled values
+    function formatLogEntry(logEntry) {
+      const linePrefix = logEntry.line !== null
+        ? `<span class="log-line">Line ${logEntry.line}:</span>`
+        : '';
+
+      const partsHtml = logEntry.parts.map((part) => {
+        if (part.type === 'string') {
+          return `<span class="log-string">${escapeHtml(part.value)}</span>`;
+        } else {
+          // Value with label
+          const label = part.label ? `<span class="log-label">${escapeHtml(part.label)} =</span> ` : '';
+          // Check if value looks like JSON (starts with { or [)
+          const isJson = part.value.trim().startsWith('{') || part.value.trim().startsWith('[');
+          const valueClass = isJson ? 'log-json' : 'log-value';
+          return `<div class="log-labeled-value">${label}<span class="${valueClass}">${escapeHtml(part.value)}</span></div>`;
+        }
+      }).join('');
+
+      return `<div class="log-entry">${linePrefix}${partsHtml}</div>`;
     }
 
     // Escape HTML for safe display
