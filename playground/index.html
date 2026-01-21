@@ -573,6 +573,117 @@
         flex: 0 0 200px;
       }
     }
+
+    /* Console toggle button */
+    #console-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    #console-toggle:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    #console-toggle.active {
+      background: var(--accent-color);
+      border-color: var(--accent-color);
+      color: white;
+    }
+
+    #console-toggle .toggle-icon {
+      font-size: 0.875rem;
+      transition: transform 0.2s;
+    }
+
+    #console-toggle.active .toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    /* Console Panel */
+    #console-pane {
+      flex: 0 0 0;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-right: 1px solid var(--border-color);
+      position: relative;
+      overflow: hidden;
+      transition: flex-basis 0.3s ease;
+    }
+
+    #console-pane.open {
+      flex: 1 1 0;
+    }
+
+    #console-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    #console-header span {
+      font-weight: 500;
+    }
+
+    #console-output {
+      flex: 1;
+      overflow: auto;
+      background: #1e1e1e;
+      padding: 12px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      color: #d4d4d4;
+    }
+
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid #333;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-index {
+      color: #6a9955;
+      margin-right: 8px;
+      user-select: none;
+    }
+
+    .log-empty {
+      color: #666;
+      font-style: italic;
+    }
+
+    @media (max-width: 800px) {
+      #console-pane {
+        flex-basis: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      #console-pane.open {
+        flex: 0 0 200px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -582,6 +693,10 @@
       <button id="annotated-toggle" title="Show annotated output">
         <span class="toggle-icon">&#9654;</span>
         Annotated
+      </button>
+      <button id="console-toggle" title="Show console output">
+        <span class="toggle-icon">&#9654;</span>
+        Console
       </button>
       <button id="copy-url" class="secondary-btn">Copy URL</button>
       <span id="copy-feedback">Copied!</span>
@@ -614,6 +729,13 @@
         <button id="copy-annotated" class="pane-copy-btn" style="position: static; opacity: 1;">Copy</button>
       </div>
       <div id="annotated-container"></div>
+    </div>
+    <div id="console-pane">
+      <div id="console-header">
+        <span>Console</span>
+        <button id="clear-console" class="pane-copy-btn" style="position: static; opacity: 1;">Clear</button>
+      </div>
+      <div id="console-output"></div>
     </div>
     <div id="preview-pane">
       <button id="copy-svg" class="pane-copy-btn">Copy SVG</button>
@@ -1060,12 +1182,18 @@ for (i in 0..7) {
     const annotatedPane = document.getElementById('annotated-pane');
     const annotatedContainer = document.getElementById('annotated-container');
     const copyAnnotatedBtn = document.getElementById('copy-annotated');
+    const consoleToggle = document.getElementById('console-toggle');
+    const consolePane = document.getElementById('console-pane');
+    const consoleOutput = document.getElementById('console-output');
+    const clearConsoleBtn = document.getElementById('clear-console');
 
     // State
     let debounceTimer = null;
     let editor = null;
     let annotatedEditor = null;
     let annotatedPaneOpen = false;
+    let consolePaneOpen = false;
+    let currentLogs = [];
 
     // Initialize editor
     function createEditor(initialCode) {
@@ -1167,16 +1295,57 @@ for (i in 0..7) {
       }
     }
 
+    // Toggle console pane
+    function toggleConsolePane() {
+      consolePaneOpen = !consolePaneOpen;
+      consolePane.classList.toggle('open', consolePaneOpen);
+      consoleToggle.classList.toggle('active', consolePaneOpen);
+
+      if (consolePaneOpen) {
+        updateConsoleOutput();
+      }
+    }
+
+    // Update console output
+    function updateConsoleOutput() {
+      if (!consolePaneOpen) return;
+
+      if (currentLogs.length === 0) {
+        consoleOutput.innerHTML = '<div class="log-empty">No log output</div>';
+      } else {
+        consoleOutput.innerHTML = currentLogs
+          .map((log, i) => `<div class="log-entry"><span class="log-index">[${i}]</span>${escapeHtml(log)}</div>`)
+          .join('');
+      }
+    }
+
+    // Escape HTML for safe display
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Clear console
+    function clearConsole() {
+      currentLogs = [];
+      updateConsoleOutput();
+    }
+
     // Update preview
     function updatePreview() {
       const code = editor.state.doc.toString();
 
       try {
-        const pathData = window.SvgPathExtended.compile(code);
-        previewPath.setAttribute('d', pathData);
+        const result = window.SvgPathExtended.compileWithContext(code);
+        previewPath.setAttribute('d', result.path);
+        currentLogs = result.logs || [];
+        updateConsoleOutput();
         hideError();
       } catch (e) {
         showError(e.message);
+        currentLogs = [];
+        updateConsoleOutput();
       }
 
       updateSvgStyles();
@@ -1246,6 +1415,7 @@ for (i in 0..7) {
         gc: gridColorInput.value,
         gs: gridSizeSelect.value,
         ao: annotatedPaneOpen,
+        co: consolePaneOpen,
       };
       return btoa(encodeURIComponent(JSON.stringify(state)));
     }
@@ -1285,6 +1455,13 @@ for (i in 0..7) {
         annotatedPaneOpen = true;
         annotatedPane.classList.add('open');
         annotatedToggle.classList.add('active');
+      }
+
+      // Restore console pane state
+      if (state.co) {
+        consolePaneOpen = true;
+        consolePane.classList.add('open');
+        consoleToggle.classList.add('active');
       }
 
       return state.code || null;
@@ -1339,6 +1516,10 @@ for (i in 0..7) {
 
     // Annotated pane toggle
     annotatedToggle.addEventListener('click', toggleAnnotatedPane);
+
+    // Console pane toggle and clear
+    consoleToggle.addEventListener('click', toggleConsolePane);
+    clearConsoleBtn.addEventListener('click', clearConsole);
 
     // Copy annotated output
     copyAnnotatedBtn.addEventListener('click', () => {
@@ -1434,6 +1615,11 @@ for (i in 0..7) {
       if (annotatedPaneOpen) {
         annotatedEditor = createAnnotatedEditor();
         updateAnnotatedOutput();
+      }
+
+      // If console pane was open from URL state, update console output
+      if (consolePaneOpen) {
+        updateConsoleOutput();
       }
     });
   </script>
