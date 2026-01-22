@@ -147,6 +147,45 @@ function convertAngleUnit(value: number, unit?: 'deg' | 'rad'): number {
   return value; // rad or no unit = radians (internal standard)
 }
 
+/**
+ * Check if an expression is a NumberLiteral with an angle unit (deg/rad)
+ */
+function hasAngleUnit(expr: Expression): boolean {
+  if (expr.type === 'NumberLiteral') {
+    return expr.unit !== undefined;
+  }
+  // For unary minus on a number with unit: -45deg
+  if (expr.type === 'UnaryExpression' && expr.operator === '-') {
+    return hasAngleUnit(expr.argument);
+  }
+  return false;
+}
+
+/**
+ * Check if adding/subtracting expressions with mismatched angle units
+ * Throws an error if one operand has an angle unit and the other doesn't
+ */
+function checkAngleUnitMismatch(left: Expression, right: Expression, operator: string): void {
+  const leftHasUnit = hasAngleUnit(left);
+  const rightHasUnit = hasAngleUnit(right);
+
+  // If both are NumberLiterals (or unary negations of them), check for mismatch
+  const leftIsLiteral = left.type === 'NumberLiteral' ||
+    (left.type === 'UnaryExpression' && left.argument.type === 'NumberLiteral');
+  const rightIsLiteral = right.type === 'NumberLiteral' ||
+    (right.type === 'UnaryExpression' && right.argument.type === 'NumberLiteral');
+
+  if (leftIsLiteral && rightIsLiteral && leftHasUnit !== rightHasUnit) {
+    const op = operator === '+' ? 'add' : 'subtract';
+    const withUnit = leftHasUnit ? 'left' : 'right';
+    const withoutUnit = leftHasUnit ? 'right' : 'left';
+    throw new Error(
+      `Cannot ${op} a number with angle unit (${withUnit}) and a number without unit (${withoutUnit}). ` +
+      `Use explicit units: e.g., 90deg + 5deg or 1.57rad + 0.5rad`
+    );
+  }
+}
+
 function evaluateExpression(expr: Expression, scope: Scope): Value {
   switch (expr.type) {
     case 'NumberLiteral':
@@ -159,6 +198,11 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
       return lookupVariable(scope, expr.name);
 
     case 'BinaryExpression': {
+      // Check for angle unit mismatch before evaluation for +/-
+      if (expr.operator === '+' || expr.operator === '-') {
+        checkAngleUnitMismatch(expr.left, expr.right, expr.operator);
+      }
+
       const left = evaluateExpression(expr.left, scope);
       const right = evaluateExpression(expr.right, scope);
 

@@ -178,4 +178,53 @@ describe('Edge cases', () => {
       expect(result).toContain('NaN');
     });
   });
+
+  describe('angle unit mismatches', () => {
+    it('throws when adding deg to plain number', () => {
+      expect(() => compile('M calc(90deg + 5) 0')).toThrow(/Cannot add.*angle unit/);
+    });
+
+    it('throws when subtracting plain number from deg', () => {
+      expect(() => compile('M calc(90deg - 5) 0')).toThrow(/Cannot subtract.*angle unit/);
+    });
+
+    it('throws when adding plain number to deg (reversed order)', () => {
+      expect(() => compile('M calc(5 + 90deg) 0')).toThrow(/Cannot add.*angle unit/);
+    });
+
+    it('throws when adding deg to negative plain number', () => {
+      expect(() => compile('M calc(90deg + -5) 0')).toThrow(/Cannot add.*angle unit/);
+    });
+
+    it('allows adding deg to deg', () => {
+      const result = compile('M calc(90deg + 5deg) 0');
+      expect(result).toMatch(/^M [\d.]+ 0$/);
+    });
+
+    it('allows adding rad to rad', () => {
+      const result = compile('M calc(1rad + 0.5rad) 0');
+      expect(result).toBe('M 1.5 0');
+    });
+
+    it('allows multiplying deg by plain number', () => {
+      const result = compile('M calc(45deg * 2) 0');
+      expect(result).toMatch(/^M [\d.]+ 0$/);
+    });
+
+    it('allows dividing deg by plain number', () => {
+      const result = compile('M calc(90deg / 2) 0');
+      expect(result).toMatch(/^M [\d.]+ 0$/);
+    });
+
+    it('allows adding negative deg to deg', () => {
+      const result = compile('M calc(-45deg + 90deg) 0');
+      expect(result).toMatch(/^M [\d.]+ 0$/);
+    });
+
+    it('allows function result plus plain number (no unit tracking through functions)', () => {
+      // sin(90deg) returns 1 (dimensionless), so adding 0.5 is valid
+      const result = compile('M calc(sin(90deg) + 0.5) 0');
+      expect(result).toBe('M 1.5 0');
+    });
+  });
 });
