@@ -127,9 +127,22 @@ function withMemberAccess(base: Parsimmon.Parser<Expression>): Parsimmon.Parser<
 }
 
 // Member expression for path arguments (base cannot be path command letter)
-const pathMemberExpression: Parsimmon.Parser<Expression> = withMemberAccess(
-  nonPathCommandIdentifier
-);
+// Type is narrowed to Identifier | MemberExpression to satisfy PathArg
+const pathMemberExpression: Parsimmon.Parser<Identifier | MemberExpression> =
+  nonPathCommandIdentifier.chain((baseExpr) =>
+    P.seq(P.string('.'), token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)))
+      .many()
+      .map((properties) =>
+        properties.reduce<Identifier | MemberExpression>(
+          (obj, [, prop]) => ({
+            type: 'MemberExpression' as const,
+            object: obj,
+            property: prop,
+          }),
+          baseExpr
+        )
+      )
+  );
 
 // Expression parser with operator precedence
 const expression: Parsimmon.Parser<Expression> = P.lazy(() => orExpression);
