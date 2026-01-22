@@ -364,6 +364,60 @@ describe('Path Context Tracking', () => {
       const value = parseFloat(result.logs[0].parts[0].value);
       expect(approxEqual(value, 1.5)).toBe(true);
     });
+
+    it('supports angle arithmetic in calc - addition', () => {
+      const result = compileWithContext(`
+        M 100 100
+        let sum = calc(90deg + 90deg);
+        log(sum)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const value = parseFloat(result.logs[0].parts[0].value);
+      expect(approxEqual(value, Math.PI)).toBe(true); // 180deg = π
+    });
+
+    it('supports angle arithmetic in calc - multiplication', () => {
+      const result = compileWithContext(`
+        M 100 100
+        let doubled = calc(45deg * 2);
+        log(doubled)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const value = parseFloat(result.logs[0].parts[0].value);
+      expect(approxEqual(value, Math.PI / 2)).toBe(true); // 90deg = π/2
+    });
+
+    it('supports angle arithmetic in calc - division', () => {
+      const result = compileWithContext(`
+        M 100 100
+        let halved = calc(90deg / 2);
+        log(halved)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const value = parseFloat(result.logs[0].parts[0].value);
+      expect(approxEqual(value, Math.PI / 4)).toBe(true); // 45deg = π/4
+    });
+
+    it('supports mixing deg with radians in calc', () => {
+      // 90deg (π/2) + PI()/2 (π/2) = π
+      const result = compileWithContext(`
+        M 100 100
+        let mixed = calc(90deg + PI() / 2);
+        log(mixed)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const value = parseFloat(result.logs[0].parts[0].value);
+      expect(approxEqual(value, Math.PI)).toBe(true);
+    });
+
+    it('works with deg in path command calc', () => {
+      // cos(90deg) = 0, sin(90deg) = 1
+      const result = compileWithContext(`
+        M calc(100 + cos(90deg) * 50) calc(100 + sin(90deg) * 50)
+      `);
+      expect(result.context.position.x).toBeCloseTo(100, 5);
+      expect(result.context.position.y).toBeCloseTo(150, 5);
+    });
   });
 
   describe('polarPoint', () => {
