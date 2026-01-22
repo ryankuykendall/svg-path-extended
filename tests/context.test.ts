@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { compileWithContext } from '../src';
 
+// Helper to check if two numbers are approximately equal
+function approxEqual(a: number, b: number, epsilon = 0.0001): boolean {
+  return Math.abs(a - b) < epsilon;
+}
+
 describe('Path Context Tracking', () => {
   describe('position tracking', () => {
     it('tracks position for M (absolute moveto)', () => {
@@ -324,6 +329,288 @@ describe('Path Context Tracking', () => {
         M x y
       `);
       expect(result.context.position).toEqual({ x: 100, y: 200 });
+    });
+  });
+
+  describe('angle units', () => {
+    it('converts deg to radians', () => {
+      const result = compileWithContext(`
+        M 100 100
+        log(90deg)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const value = parseFloat(result.logs[0].parts[0].value);
+      expect(approxEqual(value, Math.PI / 2)).toBe(true);
+    });
+
+    it('keeps rad as-is', () => {
+      const result = compileWithContext(`
+        M 100 100
+        log(1.5rad)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const value = parseFloat(result.logs[0].parts[0].value);
+      expect(approxEqual(value, 1.5)).toBe(true);
+    });
+
+    it('plain number stays unchanged', () => {
+      // Use a variable to force debug log (plain log(1.5) is treated as math log)
+      const result = compileWithContext(`
+        M 100 100
+        let x = 1.5;
+        log(x)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const value = parseFloat(result.logs[0].parts[0].value);
+      expect(approxEqual(value, 1.5)).toBe(true);
+    });
+  });
+
+  describe('polarPoint', () => {
+    it('calculates point at 0 radians', () => {
+      const result = compileWithContext(`
+        M 100 100
+        let pt = polarPoint(0, 50);
+        L pt.x pt.y
+      `);
+      expect(result.context.position.x).toBeCloseTo(150, 5);
+      expect(result.context.position.y).toBeCloseTo(100, 5);
+    });
+
+    it('calculates point at 90deg', () => {
+      const result = compileWithContext(`
+        M 100 100
+        let pt = polarPoint(90deg, 50);
+        L pt.x pt.y
+      `);
+      expect(result.context.position.x).toBeCloseTo(100, 5);
+      expect(result.context.position.y).toBeCloseTo(150, 5);
+    });
+
+    it('calculates point at 45deg', () => {
+      const result = compileWithContext(`
+        M 100 100
+        let pt = polarPoint(45deg, 50);
+        L pt.x pt.y
+      `);
+      const sqrt2over2 = Math.SQRT2 / 2;
+      expect(result.context.position.x).toBeCloseTo(100 + 50 * sqrt2over2, 5);
+      expect(result.context.position.y).toBeCloseTo(100 + 50 * sqrt2over2, 5);
+    });
+  });
+
+  describe('polarMove', () => {
+    it('generates L command by default', () => {
+      const result = compileWithContext(`
+        M 100 100
+        polarMove(0, 50)
+      `);
+      expect(result.path).toContain('L 150 100');
+      expect(result.context.position.x).toBeCloseTo(150, 5);
+    });
+
+    it('generates M command when isMoveTo=1', () => {
+      const result = compileWithContext(`
+        M 100 100
+        polarMove(0, 50, 1)
+      `);
+      expect(result.path).toContain('M 150 100');
+    });
+
+    it('updates lastTangent', () => {
+      const result = compileWithContext(`
+        M 100 100
+        polarMove(90deg, 50)
+        log(ctx.lastTangent)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const tangent = parseFloat(result.logs[0].parts[0].value);
+      expect(tangent).toBeCloseTo(Math.PI / 2, 5);
+    });
+  });
+
+  describe('polarLine', () => {
+    it('always generates L command', () => {
+      const result = compileWithContext(`
+        M 100 100
+        polarLine(0, 50)
+      `);
+      expect(result.path).toContain('L 150 100');
+    });
+
+    it('updates position and lastTangent', () => {
+      const result = compileWithContext(`
+        M 100 100
+        polarLine(45deg, 50)
+        log(ctx.lastTangent)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const tangent = parseFloat(result.logs[0].parts[0].value);
+      expect(tangent).toBeCloseTo(Math.PI / 4, 5);
+    });
+  });
+
+  describe('arcFromCenter', () => {
+    it('draws arc clockwise', () => {
+      const result = compileWithContext(`
+        arcFromCenter(100, 100, 50, 0, 90deg, 1)
+      `);
+      // Should start at (150, 100) and end at (100, 150)
+      expect(result.path).toContain('M 150 100');
+      expect(result.path).toContain('A 50 50');
+      expect(result.context.position.x).toBeCloseTo(100, 5);
+      expect(result.context.position.y).toBeCloseTo(150, 5);
+    });
+
+    it('draws arc counter-clockwise', () => {
+      const result = compileWithContext(`
+        arcFromCenter(100, 100, 50, 0, -90deg, 0)
+      `);
+      // Should start at (150, 100) and end at (100, 50)
+      expect(result.path).toContain('M 150 100');
+      expect(result.context.position.x).toBeCloseTo(100, 5);
+      expect(result.context.position.y).toBeCloseTo(50, 5);
+    });
+
+    it('returns correct tangent angle', () => {
+      const result = compileWithContext(`
+        let arc = arcFromCenter(100, 100, 50, 0, 90deg, 1);
+        log(arc.angle)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const angle = parseFloat(result.logs[0].parts[0].value);
+      // For clockwise arc ending at 90deg, tangent is 90deg + 90deg = 180deg = π
+      expect(angle).toBeCloseTo(Math.PI, 5);
+    });
+
+    it('sets lastTangent in context', () => {
+      const result = compileWithContext(`
+        arcFromCenter(100, 100, 50, 0, 90deg, 1)
+        log(ctx.lastTangent)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const tangent = parseFloat(result.logs[0].parts[0].value);
+      expect(tangent).toBeCloseTo(Math.PI, 5);
+    });
+  });
+
+  describe('tangentLine', () => {
+    it('continues in tangent direction after polarLine', () => {
+      const result = compileWithContext(`
+        M 100 100
+        polarLine(0, 50)
+        tangentLine(30)
+      `);
+      // After polarLine(0, 50), position is (150, 100), tangent is 0
+      // tangentLine(30) should go to (180, 100)
+      expect(result.context.position.x).toBeCloseTo(180, 5);
+      expect(result.context.position.y).toBeCloseTo(100, 5);
+    });
+
+    it('throws if no lastTangent', () => {
+      expect(() => {
+        compileWithContext(`
+          M 100 100
+          tangentLine(30)
+        `);
+      }).toThrow('tangentLine requires a previous arc or polar command');
+    });
+
+    it('works after arcFromCenter', () => {
+      const result = compileWithContext(`
+        arcFromCenter(100, 100, 50, 0, 90deg, 1)
+        tangentLine(30)
+      `);
+      // After arc, position is (100, 150), tangent is π (pointing left)
+      // tangentLine(30) should go 30px left: (70, 150)
+      expect(result.context.position.x).toBeCloseTo(70, 5);
+      expect(result.context.position.y).toBeCloseTo(150, 5);
+    });
+  });
+
+  describe('tangentArc', () => {
+    it('creates smooth continuation with positive sweep', () => {
+      const result = compileWithContext(`
+        M 50 100
+        polarLine(0, 50)
+        tangentArc(20, 90deg)
+      `);
+      // After polarLine, position is (100, 100), tangent is 0 (pointing right)
+      // tangentArc with positive sweep curves "down" (clockwise)
+      // Center is at (100, 120) - 20px below current position
+      // End point after 90deg sweep should be around (120, 120)
+      expect(result.context.position.x).toBeCloseTo(120, 5);
+      expect(result.context.position.y).toBeCloseTo(120, 5);
+    });
+
+    it('handles negative sweepAngle (counter-clockwise)', () => {
+      const result = compileWithContext(`
+        M 50 100
+        polarLine(0, 50)
+        tangentArc(20, -90deg)
+      `);
+      // tangentArc with negative sweep curves "up" (counter-clockwise)
+      // Center is at (100, 80) - 20px above current position
+      // End point after -90deg sweep should be around (120, 80)
+      expect(result.context.position.x).toBeCloseTo(120, 5);
+      expect(result.context.position.y).toBeCloseTo(80, 5);
+    });
+
+    it('updates lastTangent for chaining', () => {
+      const result = compileWithContext(`
+        M 50 100
+        polarLine(0, 50)
+        tangentArc(20, 90deg)
+        log(ctx.lastTangent)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const tangent = parseFloat(result.logs[0].parts[0].value);
+      // After 90deg clockwise turn from heading right, new tangent should be down (π/2)
+      expect(tangent).toBeCloseTo(Math.PI / 2, 5);
+    });
+
+    it('throws if no lastTangent', () => {
+      expect(() => {
+        compileWithContext(`
+          M 100 100
+          tangentArc(20, 90deg)
+        `);
+      }).toThrow('tangentArc requires a previous arc or polar command');
+    });
+  });
+
+  describe('tangent function chaining', () => {
+    it('chains multiple tangent operations', () => {
+      const result = compileWithContext(`
+        M 20 100
+        polarLine(0, 40)
+        tangentArc(30, 90deg)
+        tangentLine(20)
+        tangentArc(30, -90deg)
+        tangentLine(40)
+      `);
+      // This creates a path that:
+      // 1. Goes right 40px: (60, 100)
+      // 2. Turns right (90deg), curving down: (90, 130)
+      // 3. Goes down 20px: (90, 150)
+      // 4. Turns left (-90deg), continuing down then right: (120, 180)
+      // 5. Goes right 40px: (160, 180)
+      // Verify the chaining works and produces valid output
+      expect(result.context.position.x).toBeCloseTo(160, 0);
+      expect(result.context.position.y).toBeCloseTo(180, 0);
+      expect(result.path).toContain('A'); // Should contain arc commands
+    });
+
+    it('chains arcFromCenter with tangentLine', () => {
+      const result = compileWithContext(`
+        arcFromCenter(50, 50, 30, 0, 90deg, 1)
+        tangentLine(40)
+        tangentLine(40)
+      `);
+      // After arc, tangent points left (π)
+      // Two tangentLines of 40 each should move 80px left total
+      expect(result.context.position.x).toBeCloseTo(50 - 80, 5);
+      expect(result.context.position.y).toBeCloseTo(80, 5);
     });
   });
 });

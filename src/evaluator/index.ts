@@ -11,7 +11,7 @@ import type {
   FunctionCall,
   MemberExpression,
 } from '../parser/ast';
-import { stdlib } from '../stdlib';
+import { stdlib, contextAwareFunctions } from '../stdlib';
 import {
   type PathContext,
   type Point,
@@ -21,7 +21,7 @@ import {
   contextToObject,
 } from './context';
 
-export type Value = number | string | PathSegment | UserFunction | ContextObject;
+export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult;
 
 /**
  * Represents an object value that supports property access (like ctx)
@@ -29,6 +29,16 @@ export type Value = number | string | PathSegment | UserFunction | ContextObject
 export interface ContextObject {
   type: 'ContextObject';
   value: Record<string, unknown>;
+}
+
+/**
+ * Represents a function result that includes both path output AND a result value.
+ * Used by functions like arcFromCenter that emit path and return arc info.
+ */
+export interface PathWithResult {
+  type: 'PathWithResult';
+  path: string;      // The path string to emit
+  result: ContextObject;  // The result value (for assignments)
 }
 
 /**
@@ -54,7 +64,7 @@ export interface LogPart {
 function expressionToSource(expr: Expression): string {
   switch (expr.type) {
     case 'NumberLiteral':
-      return String(expr.value);
+      return String(expr.value) + (expr.unit || '');
     case 'StringLiteral':
       return `"${expr.value}"`;
     case 'Identifier':
@@ -125,10 +135,22 @@ function setVariable(scope: Scope, name: string, value: Value): void {
   scope.variables.set(name, value);
 }
 
+/**
+ * Convert angle value based on unit suffix
+ * - 'deg': converts degrees to radians
+ * - 'rad' or undefined: returns value unchanged (radians are internal standard)
+ */
+function convertAngleUnit(value: number, unit?: 'deg' | 'rad'): number {
+  if (unit === 'deg') {
+    return value * Math.PI / 180;
+  }
+  return value; // rad or no unit = radians (internal standard)
+}
+
 function evaluateExpression(expr: Expression, scope: Scope): Value {
   switch (expr.type) {
     case 'NumberLiteral':
-      return expr.value;
+      return convertAngleUnit(expr.value, expr.unit);
 
     case 'StringLiteral':
       return expr.value;
@@ -219,9 +241,39 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
   throw new Error(`Cannot access property '${expr.property}' on non-object value`);
 }
 
+// Check if an expression looks like it's intended for math log (natural logarithm)
+function isMathLogCandidate(arg: Expression): boolean {
+  // Plain number literal without unit (like log(1), log(2.5)) → math log
+  if (arg.type === 'NumberLiteral' && !arg.unit) {
+    return true;
+  }
+  // Function call to known math functions that return numbers → math log
+  // e.g., log(E()), log(sqrt(2))
+  if (arg.type === 'FunctionCall' && arg.name in stdlib) {
+    return true;
+  }
+  // Everything else (90deg, ctx.position.x, variables, expressions) → debug log
+  return false;
+}
+
 function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
-  // Special handling for log() function
+  // Special handling for log() function - distinguish between debug log and math log
+  // Math log: single arg that is a plain number or math function call (log(1), log(E()))
+  // Debug log: everything else (log(ctx), log(90deg), log("msg"), log(x, y))
   if (call.name === 'log' && scope.evalState) {
+    // Only use math log for clear math-log-like calls
+    if (call.args.length === 1 && isMathLogCandidate(call.args[0])) {
+      const argValue = evaluateExpression(call.args[0], scope);
+      if (typeof argValue === 'number') {
+        // It's a numeric value - use math log (natural logarithm)
+        const fn = stdlib[call.name as keyof typeof stdlib];
+        if (fn && typeof fn === 'function') {
+          return (fn as (x: number) => number)(argValue);
+        }
+      }
+    }
+
+    // Debug log handling
     const lineNumber = call.loc?.line ?? null;
     const parts: LogPart[] = [];
 
@@ -264,8 +316,17 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
       }
     }
 
-    scope.evalState.logs.push({ line: lineNumber, parts });
+    scope.evalState!.logs.push({ line: lineNumber, parts });
     return { type: 'PathSegment' as const, value: '' };  // Empty path segment
+  }
+
+  // Check if it's a context-aware function
+  if (contextAwareFunctions.has(call.name)) {
+    if (!scope.evalState) {
+      throw new Error(`Function '${call.name}' requires evaluation context`);
+    }
+    const args = call.args.map((arg) => evaluateExpression(arg, scope));
+    return evaluateContextAwareFunction(call.name, args, scope);
   }
 
   const fn = lookupVariable(scope, call.name);
@@ -342,8 +403,14 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
       if (typeof value === 'number') {
         return String(value);
       }
-      if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathSegment') {
-        return value.value;
+      if (typeof value === 'object' && value !== null && 'type' in value) {
+        if (value.type === 'PathSegment') {
+          return value.value;
+        }
+        if (value.type === 'PathWithResult') {
+          // Extract path from compound result (result is stored but path is emitted)
+          return (value as PathWithResult).path;
+        }
       }
       throw new Error(`Function ${arg.name} did not return a valid path value`);
     }
@@ -412,6 +479,172 @@ function updateCtxVariable(scope: Scope): void {
   }
 }
 
+/**
+ * Evaluate a context-aware function that needs access to path context
+ */
+function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope): Value {
+  const ctx = scope.evalState!.pathContext;
+
+  switch (name) {
+    case 'polarPoint': {
+      // polarPoint(angle, distance) → ContextObject with {x, y}
+      const [angle, distance] = args as [number, number];
+      return {
+        type: 'ContextObject' as const,
+        value: {
+          x: ctx.position.x + Math.cos(angle) * distance,
+          y: ctx.position.y + Math.sin(angle) * distance,
+        },
+      };
+    }
+
+    case 'polarMove': {
+      // polarMove(angle, distance, isMoveTo?) → PathSegment
+      const [angle, distance, isMoveTo = 0] = args as number[];
+      const x = ctx.position.x + Math.cos(angle) * distance;
+      const y = ctx.position.y + Math.sin(angle) * distance;
+      const command = isMoveTo ? 'M' : 'L';
+
+      updateContextForCommand(ctx, command, [x, y]);
+      ctx.lastTangent = angle;  // Set tangent to movement direction
+      updateCtxVariable(scope);
+
+      return { type: 'PathSegment' as const, value: `${command} ${x} ${y}` };
+    }
+
+    case 'polarLine': {
+      // polarLine(angle, distance) → PathSegment (always L command)
+      const [angle, distance] = args as [number, number];
+      const x = ctx.position.x + Math.cos(angle) * distance;
+      const y = ctx.position.y + Math.sin(angle) * distance;
+
+      updateContextForCommand(ctx, 'L', [x, y]);
+      ctx.lastTangent = angle;
+      updateCtxVariable(scope);
+
+      return { type: 'PathSegment' as const, value: `L ${x} ${y}` };
+    }
+
+    case 'arcFromCenter': {
+      // arcFromCenter(cx, cy, radius, startAngle, endAngle, clockwise) → PathWithResult
+      const [cx, cy, radius, startAngle, endAngle, clockwise] = args as number[];
+
+      // Calculate start/end points
+      const startX = cx + radius * Math.cos(startAngle);
+      const startY = cy + radius * Math.sin(startAngle);
+      const endX = cx + radius * Math.cos(endAngle);
+      const endY = cy + radius * Math.sin(endAngle);
+
+      // Calculate arc flags
+      const sweep = clockwise ? 1 : 0;
+      const angleDiff = clockwise ? endAngle - startAngle : startAngle - endAngle;
+      // Normalize angle difference to handle wrap-around
+      const normalizedDiff = ((angleDiff % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const largeArc = normalizedDiff > Math.PI ? 1 : 0;
+
+      // Tangent angle at endpoint (perpendicular to radius)
+      const tangentAngle = clockwise ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
+
+      // Generate path string
+      const pathStr = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+
+      // Update context tracking
+      parseAndTrackPathString(pathStr, scope);
+
+      // Store tangent for tangentLine/tangentArc
+      ctx.lastTangent = tangentAngle;
+      updateCtxVariable(scope);
+
+      // Return both path and result info
+      return {
+        type: 'PathWithResult' as const,
+        path: pathStr,
+        result: {
+          type: 'ContextObject' as const,
+          value: {
+            point: { x: endX, y: endY },
+            angle: tangentAngle,
+          },
+        },
+      };
+    }
+
+    case 'tangentLine': {
+      // tangentLine(length) → PathSegment
+      const [length] = args as [number];
+
+      if (ctx.lastTangent === undefined) {
+        throw new Error('tangentLine requires a previous arc or polar command');
+      }
+
+      const x = ctx.position.x + Math.cos(ctx.lastTangent) * length;
+      const y = ctx.position.y + Math.sin(ctx.lastTangent) * length;
+
+      updateContextForCommand(ctx, 'L', [x, y]);
+      // lastTangent stays the same (continuing in same direction)
+      updateCtxVariable(scope);
+
+      return { type: 'PathSegment' as const, value: `L ${x} ${y}` };
+    }
+
+    case 'tangentArc': {
+      // tangentArc(radius, sweepAngle) → PathWithResult
+      const [radius, sweepAngle] = args as [number, number];
+
+      if (ctx.lastTangent === undefined) {
+        throw new Error('tangentArc requires a previous arc or polar command');
+      }
+
+      // Center is perpendicular to tangent direction
+      // For positive sweep (turning right on screen): center is to the right (+π/2 from heading)
+      // For negative sweep (turning left on screen): center is to the left (-π/2 from heading)
+      const toCenter = ctx.lastTangent + (sweepAngle >= 0 ? Math.PI / 2 : -Math.PI / 2);
+      const cx = ctx.position.x + Math.cos(toCenter) * radius;
+      const cy = ctx.position.y + Math.sin(toCenter) * radius;
+
+      // Start angle is from center to current position
+      const startAngle = Math.atan2(ctx.position.y - cy, ctx.position.x - cx);
+      const endAngle = startAngle + sweepAngle;
+
+      // End point
+      const endX = cx + radius * Math.cos(endAngle);
+      const endY = cy + radius * Math.sin(endAngle);
+
+      // Arc flags
+      const sweep = sweepAngle >= 0 ? 1 : 0;
+      const largeArc = Math.abs(sweepAngle) > Math.PI ? 1 : 0;
+
+      // New tangent at endpoint
+      const newTangent = sweepAngle >= 0 ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
+
+      // Generate path string
+      const pathStr = `A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+
+      // Update context tracking
+      parseAndTrackPathString(pathStr, scope);
+
+      ctx.lastTangent = newTangent;
+      updateCtxVariable(scope);
+
+      // Return both path and result info
+      return {
+        type: 'PathWithResult' as const,
+        path: pathStr,
+        result: {
+          type: 'ContextObject' as const,
+          value: {
+            point: { x: endX, y: endY },
+            angle: newTangent,
+          },
+        },
+      };
+    }
+
+    default:
+      throw new Error(`Unknown context-aware function: ${name}`);
+  }
+}
+
 function evaluatePathCommand(cmd: PathCommand, scope: Scope): string {
   // Empty command means it's a statement-level function call
   if (cmd.command === '') {
@@ -469,6 +702,12 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
   switch (stmt.type) {
     case 'LetDeclaration': {
       const value = evaluateExpression(stmt.value, scope);
+      // Handle PathWithResult: assign the result to variable, emit the path
+      if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathWithResult') {
+        const pwr = value as PathWithResult;
+        setVariable(scope, stmt.name, pwr.result);
+        return pwr.path;  // Emit the path
+      }
       setVariable(scope, stmt.name, value);
       return '';
     }
@@ -554,7 +793,19 @@ function evaluateStatements(stmts: Statement[], scope: Scope): string {
 }
 
 export function evaluate(program: Program): string {
+  const pathContext = createPathContext();
+  const logs: LogEntry[] = [];
+  const evalState: EvaluationState = { pathContext, logs };
+
   const scope = createScope();
+  scope.evalState = evalState;
+
+  // Initialize ctx variable
+  scope.variables.set('ctx', {
+    type: 'ContextObject' as const,
+    value: contextToObject(pathContext),
+  });
+
   return evaluateStatements(program.body, scope);
 }
 

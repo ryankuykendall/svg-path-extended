@@ -823,6 +823,7 @@
         <option value="gear">Gear</option>
         <option value="customFunction">Custom Function</option>
         <option value="descending">Descending Ranges</option>
+        <option value="polarPath">Polar & Tangent</option>
       </select>
     </div>
   </header>
@@ -990,6 +991,56 @@ let x = 50;  // inline comment</code></pre>
 
         <h4>Commands</h4>
         <p><code>moveTo(x, y)</code> <code>lineTo(x, y)</code> <code>closePath()</code></p>
+
+        <h3>Angle Units</h3>
+        <p>Numbers can have angle unit suffixes:</p>
+        <table>
+          <tr><td><code>45deg</code></td><td>Degrees (converted to radians)</td></tr>
+          <tr><td><code>1.5rad</code></td><td>Radians (no conversion)</td></tr>
+        </table>
+        <pre><code>let angle = 90deg;
+M sin(45deg) cos(45deg)</code></pre>
+
+        <h3>Polar Coordinate Functions</h3>
+        <p>These functions use the current position from <code>ctx.position</code>.</p>
+
+        <h4>polarPoint(angle, distance)</h4>
+        <p>Returns a point at angle/distance from current position:</p>
+        <pre><code>M 100 100
+let pt = polarPoint(45deg, 50);
+L pt.x pt.y</code></pre>
+
+        <h4>polarMove(angle, distance, isMoveTo?)</h4>
+        <p>Moves by angle/distance, drawing a line (or move if isMoveTo=1):</p>
+        <pre><code>M 50 50
+polarMove(0, 30)        // L 80 50 (line east)
+polarMove(90deg, 30, 1) // M 80 80 (move south)</code></pre>
+
+        <h4>polarLine(angle, distance)</h4>
+        <p>Always draws a line by angle/distance:</p>
+        <pre><code>M 100 100
+polarLine(45deg, 50)    // L 135.35 135.35</code></pre>
+
+        <h3>Arc & Tangent Functions</h3>
+
+        <h4>arcFromCenter(cx, cy, r, startAngle, endAngle, clockwise)</h4>
+        <p>Draws an arc defined by center point and angles. Returns object with endpoint and tangent:</p>
+        <pre><code>let arc = arcFromCenter(100, 100, 50, 0, 90deg, 1);
+// arc.point = {x, y}
+// arc.angle = tangent angle</code></pre>
+
+        <h4>tangentLine(length)</h4>
+        <p>Draws a line continuing in the last tangent direction (from polarLine, polarMove, arcFromCenter, or tangentArc):</p>
+        <pre><code>M 50 50
+polarLine(0, 40)        // Going east
+tangentLine(30)         // Continue east 30px</code></pre>
+
+        <h4>tangentArc(radius, sweepAngle)</h4>
+        <p>Draws an arc that starts tangent to the previous direction:</p>
+        <pre><code>M 50 100
+polarLine(0, 40)        // Going east
+tangentArc(20, 90deg)   // Smooth 90° curve
+tangentLine(30)         // Continue in new direction</code></pre>
 
         <h3>Example</h3>
         <pre><code>// 8 points around a circle
@@ -1305,7 +1356,39 @@ for (i in 8..1) {
   h -20
   v 20
 }
-h -20`
+h -20`,
+
+      polarPath: `// Polar coordinates and tangent functions
+// Create an S-curve with smooth arcs
+
+M 20 100
+
+// Start going right
+polarLine(0, 40)
+
+// Smooth 90° turn downward
+tangentArc(25, 90deg)
+
+// Short straight segment
+tangentLine(20)
+
+// Smooth 90° turn back (negative = opposite curve)
+tangentArc(25, -90deg)
+
+// Finish going right
+tangentLine(40)
+
+// Draw reference points using polarPoint
+M 100 50
+let pt1 = polarPoint(45deg, 30);
+circle(pt1.x, pt1.y, 5)
+let pt2 = polarPoint(135deg, 30);
+circle(pt2.x, pt2.y, 5)
+let pt3 = polarPoint(225deg, 30);
+circle(pt3.x, pt3.y, 5)
+let pt4 = polarPoint(315deg, 30);
+circle(pt4.x, pt4.y, 5)
+circle(100, 50, 3)`
     };
 
     // Default code

@@ -51,14 +51,18 @@ function keyword(str: string): Parsimmon.Parser<string> {
   return token(P.regexp(new RegExp(str + '(?![a-zA-Z0-9_])')));
 }
 
-// Number literal: 123, 45.67, -89, .5
+// Number literal: 123, 45.67, -89, .5, optionally with angle unit suffix (deg/rad)
 // Uses negative lookahead to avoid consuming '.' when followed by '..' (range operator)
 const numberLiteral: Parsimmon.Parser<NumberLiteral> = token(
-  P.regexp(/-?(?:\d+(?:\.(?!\.))\d*|\.\d+|\d+)/)
-).map((str) => ({
-  type: 'NumberLiteral' as const,
-  value: parseFloat(str),
-}));
+  P.regexp(/-?(?:\d+(?:\.(?!\.))\d*|\.\d+|\d+)(deg|rad)?/)
+).map((str) => {
+  const match = str.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+|\d+))(deg|rad)?$/);
+  return {
+    type: 'NumberLiteral' as const,
+    value: parseFloat(match![1]),
+    unit: match![2] as 'deg' | 'rad' | undefined,
+  };
+});
 
 // String literal: "hello" or 'hello'
 // Supports escape sequences: \n, \t, \\, \", \'
@@ -87,6 +91,17 @@ const identifier: Parsimmon.Parser<Identifier> = token(
 
 // Reserved words that cannot be identifiers
 const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log'];
+
+// Context-aware functions that should be parsed as statements, not path arguments
+// These functions require path context and produce path output
+const contextAwareFunctionNames = [
+  'polarPoint',
+  'polarMove',
+  'polarLine',
+  'arcFromCenter',
+  'tangentLine',
+  'tangentArc',
+];
 
 const nonReservedIdentifier: Parsimmon.Parser<Identifier> = identifier.chain((id) =>
   reservedWords.includes(id.name)
@@ -126,22 +141,38 @@ function withMemberAccess(base: Parsimmon.Parser<Expression>): Parsimmon.Parser<
   );
 }
 
-// Member expression for path arguments (base cannot be path command letter)
+// Member expression for path arguments (base cannot be path command letter or context-aware function call)
 // Type is narrowed to Identifier | MemberExpression to satisfy PathArg
 const pathMemberExpression: Parsimmon.Parser<Identifier | MemberExpression> =
-  nonPathCommandIdentifier.chain((baseExpr) =>
-    P.seq(P.string('.'), token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)))
-      .many()
-      .map((properties) =>
-        properties.reduce<Identifier | MemberExpression>(
-          (obj, [, prop]) => ({
-            type: 'MemberExpression' as const,
-            object: obj,
-            property: prop,
-          }),
-          baseExpr
+  // First check: fail if this is a context-aware function followed by '('
+  P.lookahead(
+    P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/).chain((name) => {
+      if (contextAwareFunctionNames.includes(name)) {
+        // Peek ahead to check if followed by '(' (with optional whitespace)
+        return P.regexp(/\s*\(/).map(() => 'function-call').or(P.succeed('not-function-call'));
+      }
+      return P.succeed('not-context-aware');
+    }).chain((result) => {
+      if (result === 'function-call') {
+        return P.fail('context-aware function call');
+      }
+      return P.succeed(null);
+    })
+  ).then(
+    nonPathCommandIdentifier.chain((baseExpr) =>
+      P.seq(P.string('.'), token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)))
+        .many()
+        .map((properties) =>
+          properties.reduce<Identifier | MemberExpression>(
+            (obj, [, prop]) => ({
+              type: 'MemberExpression' as const,
+              object: obj,
+              property: prop,
+            }),
+            baseExpr
+          )
         )
-      )
+    )
   );
 
 // Expression parser with operator precedence
@@ -312,7 +343,17 @@ const calcExpression: Parsimmon.Parser<CalcExpression> = P.seqMap(
 );
 
 // Function call for path arguments (must check it's not a path command or reserved word)
+// Uses lookahead to reject context-aware functions WITHOUT consuming input
 const pathFunctionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
+  // First, use lookahead to check if this is a context-aware function (fail early without consuming)
+  P.lookahead(
+    P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/).chain((name) => {
+      if (contextAwareFunctionNames.includes(name)) {
+        return P.fail('context-aware function');
+      }
+      return P.succeed(name);
+    })
+  ),
   P.index,
   token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)).chain((name) => {
     // Reject reserved words (they start statements, not function calls in path context)
@@ -324,7 +365,7 @@ const pathFunctionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
   P.string('(').skip(optWhitespace),
   P.sepBy(P.lazy(() => expression), word(',')),
   word(')'),
-  (startIndex, name, _open, args, _close) => ({
+  (_lookahead, startIndex, name, _open, args, _close) => ({
     type: 'FunctionCall' as const,
     name,
     args,

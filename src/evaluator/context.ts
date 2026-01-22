@@ -26,6 +26,7 @@ export interface PathContext {
   position: Point;     // Current pen position
   start: Point;        // Subpath start (set by M, used by Z)
   commands: CommandHistoryEntry[];
+  lastTangent?: number; // Tangent angle from last arc/polar command (radians)
 }
 
 /**
@@ -203,7 +204,7 @@ export function updateContextForCommand(
  * This is what users will access via ctx.position.x, etc.
  */
 export function contextToObject(ctx: PathContext): Record<string, unknown> {
-  return {
+  const obj: Record<string, unknown> = {
     position: { x: ctx.position.x, y: ctx.position.y },
     start: { x: ctx.start.x, y: ctx.start.y },
     commands: ctx.commands.map((cmd) => ({
@@ -213,4 +214,9 @@ export function contextToObject(ctx: PathContext): Record<string, unknown> {
       end: { x: cmd.end.x, y: cmd.end.y },
     })),
   };
+  // Include lastTangent if defined
+  if (ctx.lastTangent !== undefined) {
+    obj.lastTangent = ctx.lastTangent;
+  }
+  return obj;
 }

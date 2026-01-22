@@ -137,6 +137,66 @@ describe('Parser', () => {
     });
   });
 
+  describe('angle units', () => {
+    it('parses number with deg suffix', () => {
+      const ast = parse('let x = 45deg;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        name: 'x',
+        value: { type: 'NumberLiteral', value: 45, unit: 'deg' },
+      });
+    });
+
+    it('parses number with rad suffix', () => {
+      const ast = parse('let x = 1.5rad;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        name: 'x',
+        value: { type: 'NumberLiteral', value: 1.5, unit: 'rad' },
+      });
+    });
+
+    it('parses negative angle with deg suffix', () => {
+      const ast = parse('let x = -45deg;');
+      // Negative angles are parsed as UnaryExpression('-', NumberLiteral)
+      // which is semantically equivalent
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        name: 'x',
+        value: {
+          type: 'UnaryExpression',
+          operator: '-',
+          argument: { type: 'NumberLiteral', value: 45, unit: 'deg' },
+        },
+      });
+    });
+
+    it('parses plain number without unit', () => {
+      const ast = parse('let x = 45;');
+      const decl = ast.body[0];
+      expect(decl.type === 'LetDeclaration' && decl.value).toMatchObject({
+        type: 'NumberLiteral',
+        value: 45,
+      });
+      // unit should be undefined
+      if (decl.type === 'LetDeclaration' && decl.value.type === 'NumberLiteral') {
+        expect(decl.value.unit).toBeUndefined();
+      }
+    });
+
+    it('parses angle in function call', () => {
+      const ast = parse('M sin(90deg) 0');
+      const cmd = ast.body[0];
+      if (cmd.type === 'PathCommand') {
+        expect(cmd.args[0]).toMatchObject({
+          type: 'FunctionCall',
+          name: 'sin',
+          args: [{ type: 'NumberLiteral', value: 90, unit: 'deg' }],
+        });
+      }
+    });
+  });
+
   describe('expressions', () => {
     it('parses arithmetic with correct precedence', () => {
       const ast = parse('let x = 1 + 2 * 3;');
