@@ -874,6 +874,7 @@
     <div id="docs-tabs">
       <button class="docs-tab active" data-tab="syntax">Syntax</button>
       <button class="docs-tab" data-tab="stdlib">Stdlib</button>
+      <button class="docs-tab" data-tab="debug">Debug</button>
       <button class="docs-tab" data-tab="cli">CLI</button>
     </div>
     <div id="docs-content">
@@ -1001,6 +1002,73 @@ for (i in 0..7) {
   let x = calc(cx + cos(angle) * r);
   let y = calc(cy + sin(angle) * r);
   circle(x, y, 5)
+}</code></pre>
+      </div>
+
+      <!-- Debug Tab -->
+      <div class="doc-section" id="doc-debug">
+        <h3>Console Output</h3>
+        <p>Click the <strong>Console</strong> button in the header to view debug output.</p>
+
+        <h3>log() Function</h3>
+        <p>Use <code>log()</code> to inspect values during execution:</p>
+        <pre><code>log("message")           // String message
+log(myVar)               // Variable with label
+log("pos:", ctx.position) // Multiple args
+log(ctx)                 // Full context object</code></pre>
+
+        <h4>Output Format</h4>
+        <p>String arguments display as-is. Other expressions show a label with the source:</p>
+        <pre><code>log("radius is", r)
+// Output:
+// radius is
+// r = 50</code></pre>
+
+        <p>Objects are expandable in the console - click the arrow to explore nested properties.</p>
+
+        <h3>ctx Object</h3>
+        <p>The <code>ctx</code> object tracks path state during evaluation:</p>
+
+        <h4>ctx.position</h4>
+        <p>Current pen position after the last command.</p>
+        <table>
+          <tr><td><code>ctx.position.x</code></td><td>X coordinate</td></tr>
+          <tr><td><code>ctx.position.y</code></td><td>Y coordinate</td></tr>
+        </table>
+        <pre><code>M 100 50
+log(ctx.position)  // {x: 100, y: 50}
+L 150 75
+log(ctx.position)  // {x: 150, y: 75}</code></pre>
+
+        <h4>ctx.start</h4>
+        <p>Subpath start position (set by <code>M</code>/<code>m</code>, used by <code>Z</code>).</p>
+        <table>
+          <tr><td><code>ctx.start.x</code></td><td>X coordinate</td></tr>
+          <tr><td><code>ctx.start.y</code></td><td>Y coordinate</td></tr>
+        </table>
+
+        <h4>ctx.commands</h4>
+        <p>Array of all executed commands with their positions:</p>
+        <pre><code>// Each entry contains:
+{
+  command: "L",        // Command letter
+  args: [150, 75],     // Evaluated arguments
+  start: {x: 100, y: 50},
+  end: {x: 150, y: 75}
+}</code></pre>
+
+        <h3>Using ctx in Paths</h3>
+        <p>Access position values with <code>calc()</code>:</p>
+        <pre><code>M 50 50
+// Draw relative to current position
+L calc(ctx.position.x + 30) ctx.position.y
+circle(ctx.position.x, ctx.position.y, 5)</code></pre>
+
+        <h3>Example: Debug a Loop</h3>
+        <pre><code>M 20 100
+for (i in 0..4) {
+  log("iteration", i, ctx.position)
+  L calc(ctx.position.x + 40) 100
 }</code></pre>
       </div>
 
