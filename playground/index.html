@@ -713,6 +713,86 @@
         flex: 0 0 200px;
       }
     }
+
+    /* Expandable object styles */
+    .log-expandable {
+      display: inline;
+    }
+
+    .log-toggle {
+      cursor: pointer;
+      display: inline-block;
+      width: 12px;
+      color: #888;
+      user-select: none;
+      transition: transform 0.1s;
+    }
+
+    .log-expandable.expanded > .log-toggle {
+      transform: rotate(90deg);
+    }
+
+    .log-preview {
+      color: #9cdcfe;
+    }
+
+    .log-content {
+      display: none;
+      margin-left: 16px;
+      padding-left: 8px;
+      border-left: 1px solid #444;
+    }
+
+    .log-expandable.expanded > .log-content {
+      display: block;
+    }
+
+    .log-property {
+      display: block;
+      padding: 1px 0;
+    }
+
+    .log-key {
+      color: #9cdcfe;
+    }
+
+    .log-index {
+      color: #b5cea8;
+    }
+
+    .log-primitive-null {
+      color: #569cd6;
+      font-style: italic;
+    }
+
+    .log-primitive-undefined {
+      color: #569cd6;
+      font-style: italic;
+    }
+
+    .log-primitive-number {
+      color: #b5cea8;
+    }
+
+    .log-primitive-string {
+      color: #ce9178;
+    }
+
+    .log-primitive-string::before,
+    .log-primitive-string::after {
+      content: '"';
+      color: #ce9178;
+    }
+
+    .log-primitive-boolean {
+      color: #569cd6;
+    }
+
+    .log-more {
+      color: #666;
+      font-style: italic;
+      padding: 2px 0;
+    }
   </style>
 </head>
 <body>
@@ -1339,35 +1419,83 @@ for (i in 0..7) {
     function updateConsoleOutput() {
       if (!consolePaneOpen) return;
 
+      // Clear existing content
+      consoleOutput.innerHTML = '';
+
       if (currentLogs.length === 0) {
-        consoleOutput.innerHTML = '<div class="log-empty">No log output</div>';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'log-empty';
+        emptyDiv.textContent = 'No log output';
+        consoleOutput.appendChild(emptyDiv);
       } else {
-        consoleOutput.innerHTML = currentLogs
-          .map((logEntry) => formatLogEntry(logEntry))
-          .join('');
+        // Append DOM nodes for each log entry
+        for (const logEntry of currentLogs) {
+          const entryNode = formatLogEntry(logEntry);
+          consoleOutput.appendChild(entryNode);
+        }
       }
     }
 
-    // Format a single log entry with line number and labeled values
+    // Format a single log entry with line number and labeled values - returns DOM node
     function formatLogEntry(logEntry) {
-      const linePrefix = logEntry.line !== null
-        ? `<span class="log-line">Line ${logEntry.line}:</span>`
-        : '';
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
 
-      const partsHtml = logEntry.parts.map((part) => {
+      // Add line prefix if present
+      if (logEntry.line !== null) {
+        const lineSpan = document.createElement('span');
+        lineSpan.className = 'log-line';
+        lineSpan.textContent = `Line ${logEntry.line}:`;
+        entry.appendChild(lineSpan);
+      }
+
+      // Process each part
+      for (const part of logEntry.parts) {
         if (part.type === 'string') {
-          return `<span class="log-string">${escapeHtml(part.value)}</span>`;
+          const stringSpan = document.createElement('span');
+          stringSpan.className = 'log-string';
+          stringSpan.textContent = part.value;
+          entry.appendChild(stringSpan);
         } else {
-          // Value with label
-          const label = part.label ? `<span class="log-label">${escapeHtml(part.label)} =</span> ` : '';
-          // Check if value looks like JSON (starts with { or [)
-          const isJson = part.value.trim().startsWith('{') || part.value.trim().startsWith('[');
-          const valueClass = isJson ? 'log-json' : 'log-value';
-          return `<div class="log-labeled-value">${label}<span class="${valueClass}">${escapeHtml(part.value)}</span></div>`;
-        }
-      }).join('');
+          // Value with optional label
+          const labeledValue = document.createElement('div');
+          labeledValue.className = 'log-labeled-value';
 
-      return `<div class="log-entry">${linePrefix}${partsHtml}</div>`;
+          if (part.label) {
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'log-label';
+            labelSpan.textContent = `${part.label} = `;
+            labeledValue.appendChild(labelSpan);
+          }
+
+          // Try to parse JSON for interactive rendering
+          let parsed = null;
+          const trimmed = part.value.trim();
+          if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+              parsed = JSON.parse(trimmed);
+            } catch (e) {
+              // Not valid JSON, fall through to text display
+            }
+          }
+
+          if (parsed !== null && typeof parsed === 'object') {
+            // Render as interactive expandable object
+            const valueNode = renderValue(parsed, 0, part.label || '');
+            labeledValue.appendChild(valueNode);
+          } else {
+            // Render as plain text
+            const valueSpan = document.createElement('span');
+            valueSpan.className = 'log-value';
+            valueSpan.textContent = part.value;
+            labeledValue.appendChild(valueSpan);
+          }
+
+          entry.appendChild(labeledValue);
+        }
+      }
+
+      return entry;
     }
 
     // Escape HTML for safe display
@@ -1375,6 +1503,175 @@ for (i in 0..7) {
       const div = document.createElement('div');
       div.textContent = str;
       return div.innerHTML;
+    }
+
+    // Truncate string for previews
+    function truncate(str, len = 30) {
+      if (str.length <= len) return str;
+      return str.slice(0, len) + '...';
+    }
+
+    // Create a span for primitive values with type-specific colors
+    function createPrimitiveSpan(value) {
+      const span = document.createElement('span');
+      if (value === null) {
+        span.className = 'log-primitive-null';
+        span.textContent = 'null';
+      } else if (value === undefined) {
+        span.className = 'log-primitive-undefined';
+        span.textContent = 'undefined';
+      } else if (typeof value === 'number') {
+        span.className = 'log-primitive-number';
+        span.textContent = String(value);
+      } else if (typeof value === 'boolean') {
+        span.className = 'log-primitive-boolean';
+        span.textContent = String(value);
+      } else if (typeof value === 'string') {
+        span.className = 'log-primitive-string';
+        span.textContent = value;
+      } else {
+        span.textContent = String(value);
+      }
+      return span;
+    }
+
+    // Generate a preview string for collapsed objects/arrays
+    function generatePreview(value, type) {
+      if (type === 'array') {
+        const len = value.length;
+        if (len === 0) return '[]';
+        if (len <= 3) {
+          const items = value.slice(0, 3).map(v => {
+            if (v === null) return 'null';
+            if (typeof v === 'object') return Array.isArray(v) ? `Array(${v.length})` : '{...}';
+            if (typeof v === 'string') return `"${truncate(v, 15)}"`;
+            return String(v);
+          });
+          return `[${items.join(', ')}]`;
+        }
+        return `Array(${len})`;
+      } else {
+        const keys = Object.keys(value);
+        if (keys.length === 0) return '{}';
+        if (keys.length <= 3) {
+          const items = keys.slice(0, 3).map(k => {
+            const v = value[k];
+            if (v === null) return `${k}: null`;
+            if (typeof v === 'object') return `${k}: ${Array.isArray(v) ? `Array(${v.length})` : '{...}'}`;
+            if (typeof v === 'string') return `${k}: "${truncate(v, 10)}"`;
+            return `${k}: ${v}`;
+          });
+          const suffix = keys.length > 3 ? ', ...' : '';
+          return `{${items.join(', ')}${suffix}}`;
+        }
+        const preview = keys.slice(0, 2).map(k => `${k}: ...`).join(', ');
+        return `{${preview}, ...}`;
+      }
+    }
+
+    // Render a value as a DOM element (recursive for objects/arrays)
+    function renderValue(value, depth = 0, path = '') {
+      // Handle primitives
+      if (value === null || value === undefined) {
+        return createPrimitiveSpan(value);
+      }
+      if (typeof value !== 'object') {
+        return createPrimitiveSpan(value);
+      }
+
+      // Handle objects and arrays
+      const type = Array.isArray(value) ? 'array' : 'object';
+      return createExpandableNode(value, type, depth, path);
+    }
+
+    // Create an expandable node for objects/arrays
+    function createExpandableNode(value, type, depth, path) {
+      const container = document.createElement('span');
+      container.className = 'log-expandable';
+      container.dataset.path = path;
+
+      // Toggle arrow
+      const toggle = document.createElement('span');
+      toggle.className = 'log-toggle';
+      toggle.textContent = '▶';
+      toggle.addEventListener('click', handleToggle);
+
+      // Preview text
+      const preview = document.createElement('span');
+      preview.className = 'log-preview';
+      preview.textContent = generatePreview(value, type);
+
+      // Content container (children rendered on expand or pre-rendered for depth < 2)
+      const content = document.createElement('div');
+      content.className = 'log-content';
+
+      container.appendChild(toggle);
+      container.appendChild(preview);
+      container.appendChild(content);
+
+      // Store value for lazy rendering
+      container._value = value;
+      container._type = type;
+      container._depth = depth;
+      container._rendered = false;
+
+      // Pre-render first 2 levels for immediate visibility
+      if (depth < 2) {
+        renderChildren(content, value, type, depth, path);
+        container._rendered = true;
+      }
+
+      return container;
+    }
+
+    // Handle toggle click to expand/collapse
+    function handleToggle(event) {
+      event.stopPropagation();
+      const toggle = event.target;
+      const container = toggle.parentElement;
+
+      container.classList.toggle('expanded');
+
+      // Lazy render children if not already rendered
+      if (!container._rendered && container.classList.contains('expanded')) {
+        const content = container.querySelector('.log-content');
+        renderChildren(content, container._value, container._type, container._depth, container.dataset.path);
+        container._rendered = true;
+      }
+    }
+
+    // Render children of an object/array into the content container
+    function renderChildren(content, value, type, depth, path) {
+      const maxItems = 100;
+      const entries = type === 'array'
+        ? value.map((v, i) => [i, v])
+        : Object.entries(value);
+
+      const displayEntries = entries.slice(0, maxItems);
+
+      for (const [key, val] of displayEntries) {
+        const row = document.createElement('div');
+        row.className = 'log-property';
+
+        const keySpan = document.createElement('span');
+        keySpan.className = type === 'array' ? 'log-index' : 'log-key';
+        keySpan.textContent = type === 'array' ? `${key}: ` : `${key}: `;
+        row.appendChild(keySpan);
+
+        const childPath = path ? `${path}.${key}` : String(key);
+        const valueNode = renderValue(val, depth + 1, childPath);
+        row.appendChild(valueNode);
+
+        content.appendChild(row);
+      }
+
+      // Show "... N more" if truncated
+      if (entries.length > maxItems) {
+        const moreRow = document.createElement('div');
+        moreRow.className = 'log-more';
+        moreRow.textContent = `... ${entries.length - maxItems} more`;
+        content.appendChild(moreRow);
+      }
     }
 
     // Clear console
