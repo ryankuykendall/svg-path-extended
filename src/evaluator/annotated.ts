@@ -10,9 +10,11 @@ import type {
   IfStatement,
   FunctionDefinition,
   FunctionCall,
+  MemberExpression,
   Comment,
 } from '../parser/ast';
 import { stdlib } from '../stdlib';
+import { createPathContext, contextToObject, type PathContext } from './context';
 
 // Types for annotated output
 export type AnnotatedLine =
@@ -30,11 +32,16 @@ export interface AnnotatedOutput {
 }
 
 // Value types (same as main evaluator)
-export type Value = number | string | PathSegment | UserFunction;
+export type Value = number | string | PathSegment | UserFunction | ContextObject;
 
 export interface PathSegment {
   type: 'PathSegment';
   value: string;
+}
+
+export interface ContextObject {
+  type: 'ContextObject';
+  value: Record<string, unknown>;
 }
 
 export interface UserFunction {
@@ -87,7 +94,17 @@ function emitCommentsUpTo(ctx: AnnotatedContext, targetOffset: number): void {
   }
 }
 
+// Helper to format error messages with line numbers
+function formatError(message: string, line?: number): string {
+  if (line !== undefined && line > 0) {
+    return `Line ${line}: ${message}`;
+  }
+  return message;
+}
+
 function evaluateExpression(expr: Expression, scope: Scope): Value {
+  const line = (expr as { loc?: { line: number } }).loc?.line;
+
   switch (expr.type) {
     case 'NumberLiteral':
       return expr.value;
@@ -100,7 +117,7 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
       const right = evaluateExpression(expr.right, scope);
 
       if (typeof left !== 'number' || typeof right !== 'number') {
-        throw new Error(`Binary operator ${expr.operator} requires numeric operands`);
+        throw new Error(formatError(`Binary operator ${expr.operator} requires numeric operands`, line));
       }
 
       switch (expr.operator) {
@@ -123,7 +140,7 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'UnaryExpression': {
       const arg = evaluateExpression(expr.argument, scope);
       if (typeof arg !== 'number') {
-        throw new Error(`Unary operator ${expr.operator} requires numeric operand`);
+        throw new Error(formatError(`Unary operator ${expr.operator} requires numeric operand`, line));
       }
       switch (expr.operator) {
         case '-': return -arg;
@@ -137,12 +154,59 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'FunctionCall':
       return evaluateFunctionCall(expr, scope, null); // No context for nested calls
 
+    case 'StringLiteral':
+      return expr.value;
+
+    case 'MemberExpression':
+      return evaluateMemberExpression(expr, scope);
+
     default:
-      throw new Error(`Unknown expression type: ${(expr as Expression).type}`);
+      throw new Error(formatError(`Unknown expression type: ${(expr as Expression).type}`, line));
   }
 }
 
+function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
+  const line = (expr as { loc?: { line: number } }).loc?.line;
+  const obj = evaluateExpression(expr.object, scope);
+
+  // Handle ContextObject property access
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ContextObject') {
+    const contextObj = obj as ContextObject;
+    const propValue = contextObj.value[expr.property];
+
+    if (propValue === undefined) {
+      throw new Error(formatError(`Property '${expr.property}' does not exist on context object`, line));
+    }
+
+    // If the property is an object (like position or start), wrap it as ContextObject
+    if (typeof propValue === 'object' && propValue !== null && !Array.isArray(propValue)) {
+      return { type: 'ContextObject' as const, value: propValue as Record<string, unknown> };
+    }
+
+    // If it's a number, return it directly
+    if (typeof propValue === 'number') {
+      return propValue;
+    }
+
+    // If it's an array (like commands), wrap it as ContextObject
+    if (Array.isArray(propValue)) {
+      return { type: 'ContextObject' as const, value: { length: propValue.length, items: propValue } };
+    }
+
+    throw new Error(formatError(`Cannot access property '${expr.property}' of type ${typeof propValue}`, line));
+  }
+
+  throw new Error(formatError(`Cannot access property '${expr.property}' on non-object value`, line));
+}
+
 function evaluateFunctionCall(call: FunctionCall, scope: Scope, ctx: AnnotatedContext | null): Value {
+  // Special handling for log() function - just evaluate args and return empty
+  if (call.name === 'log') {
+    // Evaluate args to check for errors, but don't produce output in annotated mode
+    call.args.forEach((arg) => evaluateExpression(arg, scope));
+    return { type: 'PathSegment' as const, value: '' };
+  }
+
   const fn = lookupVariable(scope, call.name);
 
   if (typeof fn === 'function') {
@@ -544,6 +608,14 @@ function evaluateStatementsAnnotated(stmts: Statement[], scope: Scope, ctx: Anno
 
 export function evaluateAnnotated(program: Program, comments: Comment[]): AnnotatedOutput {
   const scope = createScope();
+
+  // Initialize ctx variable with a path context (note: positions won't be accurate in annotated mode)
+  const pathContext = createPathContext();
+  scope.variables.set('ctx', {
+    type: 'ContextObject' as const,
+    value: contextToObject(pathContext),
+  });
+
   const ctx: AnnotatedContext = {
     output: [],
     comments: [...comments], // Copy to avoid mutating original
