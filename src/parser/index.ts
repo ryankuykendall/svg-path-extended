@@ -480,12 +480,16 @@ interface FunctionCallStatement {
   call: FunctionCall;
 }
 
-const functionCallStatement: Parsimmon.Parser<PathCommand> = functionCall.map((call) => ({
-  type: 'PathCommand' as const,
-  command: '',  // Empty command means it's a function call at statement level
-  args: [call],
-  loc: call.loc,
-}));
+const functionCallStatement: Parsimmon.Parser<PathCommand> = P.seqMap(
+  functionCall,
+  word(';').atMost(1),  // Optional semicolon
+  (call) => ({
+    type: 'PathCommand' as const,
+    command: '',  // Empty command means it's a function call at statement level
+    args: [call],
+    loc: call.loc,
+  })
+);
 
 // Statement
 // Important: functionCallStatement must come BEFORE pathCommand to avoid

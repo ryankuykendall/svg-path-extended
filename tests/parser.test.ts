@@ -365,6 +365,31 @@ describe('Parser', () => {
     });
   });
 
+  describe('function call statements', () => {
+    it('parses function call without semicolon', () => {
+      const ast = parse('circle(50, 50, 20)');
+      expect(ast.body).toHaveLength(1);
+      expect(ast.body[0]).toMatchObject({
+        type: 'PathCommand',
+        command: '',
+      });
+    });
+
+    it('parses function call with optional semicolon', () => {
+      const ast = parse('circle(50, 50, 20);');
+      expect(ast.body).toHaveLength(1);
+      expect(ast.body[0]).toMatchObject({
+        type: 'PathCommand',
+        command: '',
+      });
+    });
+
+    it('parses multiple function calls with mixed semicolons', () => {
+      const ast = parse('circle(50, 50, 20);\nrect(0, 0, 10, 10)\nlog(ctx);');
+      expect(ast.body).toHaveLength(3);
+    });
+  });
+
   describe('source locations', () => {
     it('captures location for for loops', () => {
       const ast = parse('for (i in 0..5) { M i 0 }');
