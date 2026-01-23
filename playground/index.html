@@ -793,6 +793,83 @@
       font-style: italic;
       padding: 2px 0;
     }
+
+    /* Thumbnail navigator */
+    #zoom-navigator {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 120px;
+      height: 120px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    #navigator-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    #navigator-viewport {
+      cursor: move;
+      fill: rgba(0, 102, 204, 0.1);
+    }
+
+    /* Zoom controls */
+    #zoom-controls {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-primary);
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+    }
+
+    #zoom-controls button {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    #zoom-in,
+    #zoom-out {
+      font-size: 1.4rem;
+      font-weight: 300;
+      line-height: 0;
+    }
+
+    #zoom-fit {
+      font-size: 0.96rem;
+    }
+
+    #zoom-level {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      min-width: 45px;
+      text-align: center;
+    }
+
+    /* Pan cursor */
+    #preview-container.can-pan {
+      cursor: grab;
+    }
+
+    #preview-container.panning {
+      cursor: grabbing;
+    }
   </style>
 </head>
 <body>
@@ -849,6 +926,21 @@
     </div>
     <div id="preview-pane">
       <button id="copy-svg" class="pane-copy-btn">Copy SVG</button>
+      <!-- Thumbnail navigator (top-left corner) -->
+      <div id="zoom-navigator">
+        <svg id="navigator-svg">
+          <rect id="navigator-bg" width="100%" height="100%"></rect>
+          <path id="navigator-path" fill="none"></path>
+          <rect id="navigator-viewport" fill="none" stroke="#0066cc" stroke-width="2"></rect>
+        </svg>
+      </div>
+      <!-- Zoom controls (bottom of preview pane) -->
+      <div id="zoom-controls">
+        <button id="zoom-out" title="Zoom out">&#x2212;</button>
+        <button id="zoom-fit" title="Fit to view">Fit</button>
+        <button id="zoom-in" title="Zoom in">&#x002B;</button>
+        <span id="zoom-level">100%</span>
+      </div>
       <div id="preview-container">
         <svg id="preview" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -1453,6 +1545,16 @@ for (i in 0..7) {
     const consolePane = document.getElementById('console-pane');
     const consoleOutput = document.getElementById('console-output');
     const clearConsoleBtn = document.getElementById('clear-console');
+    const previewContainer = document.getElementById('preview-container');
+    const zoomNavigator = document.getElementById('zoom-navigator');
+    const navigatorSvg = document.getElementById('navigator-svg');
+    const navigatorBg = document.getElementById('navigator-bg');
+    const navigatorPath = document.getElementById('navigator-path');
+    const navigatorViewport = document.getElementById('navigator-viewport');
+    const zoomInBtn = document.getElementById('zoom-in');
+    const zoomOutBtn = document.getElementById('zoom-out');
+    const zoomFitBtn = document.getElementById('zoom-fit');
+    const zoomLevelDisplay = document.getElementById('zoom-level');
 
     // State
     let debounceTimer = null;
@@ -1461,6 +1563,25 @@ for (i in 0..7) {
     let annotatedPaneOpen = false;
     let consolePaneOpen = false;
     let currentLogs = [];
+
+    // Zoom/pan state
+    let zoomLevel = 1;        // 1 = 100%, 2 = 200%, etc.
+    let panX = 0;             // Horizontal pan offset (in SVG units)
+    let panY = 0;             // Vertical pan offset (in SVG units)
+    let isPanning = false;    // Track if user is dragging to pan
+    let panStartX = 0;        // Mouse position at pan start
+    let panStartY = 0;
+
+    // Navigator drag state
+    let isNavigatorDragging = false;
+    let navDragStartX = 0;
+    let navDragStartY = 0;
+    let navDragStartPanX = 0;
+    let navDragStartPanY = 0;
+
+    const MIN_ZOOM = 0.25;    // 25% minimum
+    const MAX_ZOOM = 10;      // 1000% maximum
+    const ZOOM_STEP = 1.5;    // Multiplier for each zoom step
 
     // Initialize editor
     function createEditor(initialCode) {
@@ -1838,6 +1959,232 @@ for (i in 0..7) {
       updateConsoleOutput();
     }
 
+    // ==================== Zoom/Pan Functions ====================
+
+    // Update viewBox for zoom/pan
+    function updateViewBox() {
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Calculate visible area based on zoom and pan
+      const viewWidth = width / zoomLevel;
+      const viewHeight = height / zoomLevel;
+
+      // Clamp pan values to keep SVG in view
+      const maxPanX = Math.max(0, width - viewWidth);
+      const maxPanY = Math.max(0, height - viewHeight);
+      panX = Math.max(0, Math.min(panX, maxPanX));
+      panY = Math.max(0, Math.min(panY, maxPanY));
+
+      // Update main SVG viewBox
+      preview.setAttribute('viewBox', `${panX} ${panY} ${viewWidth} ${viewHeight}`);
+
+      // Update zoom level display
+      zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+
+      // Update navigator viewport rectangle
+      updateNavigatorViewport();
+
+      // Show/hide pan cursor
+      previewContainer.classList.toggle('can-pan', zoomLevel > 1);
+    }
+
+    // Adjust pan so zoom centers on current view center
+    function adjustPanForZoom(oldZoom, newZoom) {
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Current view center in SVG coordinates
+      const oldViewWidth = width / oldZoom;
+      const oldViewHeight = height / oldZoom;
+      const centerX = panX + oldViewWidth / 2;
+      const centerY = panY + oldViewHeight / 2;
+
+      // New view dimensions
+      const newViewWidth = width / newZoom;
+      const newViewHeight = height / newZoom;
+
+      // Pan to keep the same center
+      panX = centerX - newViewWidth / 2;
+      panY = centerY - newViewHeight / 2;
+    }
+
+    function zoomIn() {
+      const oldZoom = zoomLevel;
+      zoomLevel = Math.min(MAX_ZOOM, zoomLevel * ZOOM_STEP);
+      adjustPanForZoom(oldZoom, zoomLevel);
+      updateViewBox();
+    }
+
+    function zoomOut() {
+      const oldZoom = zoomLevel;
+      zoomLevel = Math.max(MIN_ZOOM, zoomLevel / ZOOM_STEP);
+      adjustPanForZoom(oldZoom, zoomLevel);
+      updateViewBox();
+    }
+
+    function zoomFit() {
+      zoomLevel = 1;
+      panX = 0;
+      panY = 0;
+      updateViewBox();
+    }
+
+    // Pan handling
+    function startPan(e) {
+      if (zoomLevel <= 1) return;
+      isPanning = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      previewContainer.classList.add('panning');
+      e.preventDefault();
+    }
+
+    function doPan(e) {
+      if (!isPanning) return;
+
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+      const rect = preview.getBoundingClientRect();
+
+      // Convert pixel delta to SVG units
+      const scaleX = (width / zoomLevel) / rect.width;
+      const scaleY = (height / zoomLevel) / rect.height;
+
+      const dx = (panStartX - e.clientX) * scaleX;
+      const dy = (panStartY - e.clientY) * scaleY;
+
+      panX += dx;
+      panY += dy;
+
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+
+      updateViewBox();
+    }
+
+    function endPan() {
+      isPanning = false;
+      previewContainer.classList.remove('panning');
+    }
+
+    // Navigator viewport
+    function updateNavigatorViewport() {
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Calculate viewport rect position and size in SVG units
+      // (navigator viewBox is already set to SVG coordinate space)
+      const viewWidth = width / zoomLevel;
+      const viewHeight = height / zoomLevel;
+
+      navigatorViewport.setAttribute('x', panX);
+      navigatorViewport.setAttribute('y', panY);
+      navigatorViewport.setAttribute('width', viewWidth);
+      navigatorViewport.setAttribute('height', viewHeight);
+    }
+
+    function updateNavigatorContent() {
+      // Copy path data to navigator
+      navigatorPath.setAttribute('d', previewPath.getAttribute('d') || '');
+      navigatorPath.setAttribute('stroke', strokeInput.value);
+      navigatorPath.setAttribute('stroke-width', 1);  // Thin lines for thumbnail
+
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Navigator dimensions
+      const navWidth = 120;
+      const navHeight = 120;
+      const scale = Math.min(navWidth / width, navHeight / height) * 0.9;
+      const offsetX = (navWidth - width * scale) / 2;
+      const offsetY = (navHeight - height * scale) / 2;
+
+      // Set navigator viewBox to show full image with proper scaling
+      navigatorSvg.setAttribute('viewBox', `${-offsetX / scale} ${-offsetY / scale} ${navWidth / scale} ${navHeight / scale}`);
+      navigatorBg.setAttribute('fill', bgInput.value);
+      navigatorBg.setAttribute('x', 0);
+      navigatorBg.setAttribute('y', 0);
+      navigatorBg.setAttribute('width', width);
+      navigatorBg.setAttribute('height', height);
+
+      updateNavigatorViewport();
+    }
+
+    // Navigator drag to reposition
+    function screenToNavigatorSVG(clientX, clientY) {
+      // Use SVG's native coordinate transformation
+      const pt = navigatorSvg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const svgPt = pt.matrixTransform(navigatorSvg.getScreenCTM().inverse());
+      return { x: svgPt.x, y: svgPt.y };
+    }
+
+    function navigatorMouseDown(e) {
+      e.preventDefault();
+      const { x: svgX, y: svgY } = screenToNavigatorSVG(e.clientX, e.clientY);
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Check if click is inside the viewport rectangle
+      const viewWidth = width / zoomLevel;
+      const viewHeight = height / zoomLevel;
+      const inViewport = svgX >= panX && svgX <= panX + viewWidth &&
+                         svgY >= panY && svgY <= panY + viewHeight;
+
+      if (inViewport) {
+        // Start dragging the viewport
+        isNavigatorDragging = true;
+        navDragStartX = svgX;
+        navDragStartY = svgY;
+        navDragStartPanX = panX;
+        navDragStartPanY = panY;
+      } else {
+        // Click outside viewport - center on click position
+        panX = svgX - viewWidth / 2;
+        panY = svgY - viewHeight / 2;
+        updateViewBox();
+      }
+    }
+
+    function navigatorMouseMove(e) {
+      if (!isNavigatorDragging) return;
+
+      const { x: svgX, y: svgY } = screenToNavigatorSVG(e.clientX, e.clientY);
+
+      // Calculate delta in SVG units
+      const dx = svgX - navDragStartX;
+      const dy = svgY - navDragStartY;
+
+      panX = navDragStartPanX + dx;
+      panY = navDragStartPanY + dy;
+
+      updateViewBox();
+    }
+
+    function navigatorMouseUp() {
+      isNavigatorDragging = false;
+    }
+
+    function navigatorDoubleClick(e) {
+      e.preventDefault();
+      const { x: svgX, y: svgY } = screenToNavigatorSVG(e.clientX, e.clientY);
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Center the viewport on double-click position
+      const viewWidth = width / zoomLevel;
+      const viewHeight = height / zoomLevel;
+
+      panX = svgX - viewWidth / 2;
+      panY = svgY - viewHeight / 2;
+
+      updateViewBox();
+    }
+
+    // ==================== End Zoom/Pan Functions ====================
+
     // Update preview
     function updatePreview() {
       const code = editor.state.doc.toString();
@@ -1855,6 +2202,7 @@ for (i in 0..7) {
       }
 
       updateSvgStyles();
+      updateNavigatorContent();
     }
 
     function debouncedUpdate() {
@@ -1872,7 +2220,9 @@ for (i in 0..7) {
 
       preview.setAttribute('width', width);
       preview.setAttribute('height', height);
-      preview.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      // Update viewBox based on zoom/pan state
+      updateViewBox();
 
       previewPath.setAttribute('stroke', strokeInput.value);
       previewPath.setAttribute('stroke-width', strokeWidthSelect.value);
@@ -1884,6 +2234,11 @@ for (i in 0..7) {
       }
 
       previewBg.setAttribute('fill', bgInput.value);
+      // Set background rect to cover full coordinate space
+      previewBg.setAttribute('x', 0);
+      previewBg.setAttribute('y', 0);
+      previewBg.setAttribute('width', width);
+      previewBg.setAttribute('height', height);
 
       // Update grid
       const gridSize = parseInt(gridSizeSelect.value) || 20;
@@ -1895,6 +2250,14 @@ for (i in 0..7) {
       gridPath.setAttribute('d', `M ${gridSize} 0 L 0 0 0 ${gridSize}`);
       gridPath.setAttribute('stroke', gridColor);
       previewGrid.style.display = gridEnabled ? 'block' : 'none';
+      // Set grid rect to cover full coordinate space (not percentages)
+      previewGrid.setAttribute('x', 0);
+      previewGrid.setAttribute('y', 0);
+      previewGrid.setAttribute('width', width);
+      previewGrid.setAttribute('height', height);
+
+      // Update navigator content when styles change
+      updateNavigatorContent();
     }
 
     // Error handling
@@ -1922,6 +2285,9 @@ for (i in 0..7) {
         gs: gridSizeSelect.value,
         ao: annotatedPaneOpen,
         co: consolePaneOpen,
+        zoom: zoomLevel,
+        panX: panX,
+        panY: panY,
       };
       return btoa(encodeURIComponent(JSON.stringify(state)));
     }
@@ -1969,6 +2335,11 @@ for (i in 0..7) {
         consolePane.classList.add('open');
         consoleToggle.classList.add('active');
       }
+
+      // Restore zoom/pan state
+      if (state.zoom) zoomLevel = state.zoom;
+      if (state.panX) panX = state.panX;
+      if (state.panY) panY = state.panY;
 
       return state.code || null;
     }
@@ -2026,6 +2397,32 @@ for (i in 0..7) {
     // Console pane toggle and clear
     consoleToggle.addEventListener('click', toggleConsolePane);
     clearConsoleBtn.addEventListener('click', clearConsole);
+
+    // Zoom controls
+    zoomInBtn.addEventListener('click', zoomIn);
+    zoomOutBtn.addEventListener('click', zoomOut);
+    zoomFitBtn.addEventListener('click', zoomFit);
+
+    // Mouse wheel zoom
+    previewContainer.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) {
+        zoomIn();
+      } else {
+        zoomOut();
+      }
+    }, { passive: false });
+
+    // Pan via drag
+    previewContainer.addEventListener('mousedown', startPan);
+    document.addEventListener('mousemove', doPan);
+    document.addEventListener('mouseup', endPan);
+
+    // Navigator click/drag
+    navigatorSvg.addEventListener('mousedown', navigatorMouseDown);
+    navigatorSvg.addEventListener('dblclick', navigatorDoubleClick);
+    document.addEventListener('mousemove', navigatorMouseMove);
+    document.addEventListener('mouseup', navigatorMouseUp);
 
     // Copy annotated output
     copyAnnotatedBtn.addEventListener('click', () => {
