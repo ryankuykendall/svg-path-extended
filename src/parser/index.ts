@@ -96,6 +96,7 @@ const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log'];
 // These functions require path context and produce path output
 const contextAwareFunctionNames = [
   'polarPoint',
+  'polarOffset',
   'polarMove',
   'polarLine',
   'arcFromCenter',

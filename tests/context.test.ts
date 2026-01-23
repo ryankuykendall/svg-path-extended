@@ -453,6 +453,59 @@ describe('Path Context Tracking', () => {
     });
   });
 
+  describe('polarOffset', () => {
+    it('returns relative offset at 0 radians', () => {
+      const result = compileWithContext(`
+        M 100 100
+        let off = polarOffset(0, 50);
+        log(off.dx)
+        log(off.dy)
+      `);
+      expect(result.logs).toHaveLength(2);
+      expect(parseFloat(result.logs[0].parts[0].value)).toBeCloseTo(50, 5);
+      expect(parseFloat(result.logs[1].parts[0].value)).toBeCloseTo(0, 5);
+    });
+
+    it('returns relative offset at 90deg', () => {
+      const result = compileWithContext(`
+        M 100 100
+        let off = polarOffset(90deg, 50);
+        log(off.dx)
+        log(off.dy)
+      `);
+      expect(result.logs).toHaveLength(2);
+      expect(parseFloat(result.logs[0].parts[0].value)).toBeCloseTo(0, 5);
+      expect(parseFloat(result.logs[1].parts[0].value)).toBeCloseTo(50, 5);
+    });
+
+    it('can be used with current position for relative movement', () => {
+      const result = compileWithContext(`
+        M 50 50
+        let off = polarOffset(45deg, 50);
+        L calc(ctx.position.x + off.dx) calc(ctx.position.y + off.dy)
+      `);
+      const sqrt2over2 = Math.SQRT2 / 2;
+      expect(result.context.position.x).toBeCloseTo(50 + 50 * sqrt2over2, 5);
+      expect(result.context.position.y).toBeCloseTo(50 + 50 * sqrt2over2, 5);
+    });
+
+    it('is independent of current position', () => {
+      // polarOffset should return the same dx/dy regardless of position
+      const result1 = compileWithContext(`
+        M 0 0
+        let off = polarOffset(0, 30);
+        log(off.dx)
+      `);
+      const result2 = compileWithContext(`
+        M 100 200
+        let off = polarOffset(0, 30);
+        log(off.dx)
+      `);
+      expect(parseFloat(result1.logs[0].parts[0].value)).toBeCloseTo(30, 5);
+      expect(parseFloat(result2.logs[0].parts[0].value)).toBeCloseTo(30, 5);
+    });
+  });
+
   describe('polarMove', () => {
     it('generates L command by default', () => {
       const result = compileWithContext(`

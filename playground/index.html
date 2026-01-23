@@ -1005,10 +1005,16 @@ M sin(45deg) cos(45deg)</code></pre>
         <p>These functions use the current position from <code>ctx.position</code>.</p>
 
         <h4>polarPoint(angle, distance)</h4>
-        <p>Returns a point at angle/distance from current position:</p>
+        <p>Returns absolute point {x, y} at angle/distance from current position:</p>
         <pre><code>M 100 100
 let pt = polarPoint(45deg, 50);
-L pt.x pt.y</code></pre>
+L pt.x pt.y  // Line to (135, 135)</code></pre>
+
+        <h4>polarOffset(angle, distance)</h4>
+        <p>Returns relative offset {dx, dy} - independent of current position:</p>
+        <pre><code>let off = polarOffset(45deg, 50);
+// off.dx ≈ 35.35, off.dy ≈ 35.35
+L calc(ctx.position.x + off.dx) calc(ctx.position.y + off.dy)</code></pre>
 
         <h4>polarMove(angle, distance, isMoveTo?)</h4>
         <p>Moves by angle/distance, drawing a line (or move if isMoveTo=1):</p>

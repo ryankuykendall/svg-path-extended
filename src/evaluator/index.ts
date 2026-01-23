@@ -531,13 +531,25 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
 
   switch (name) {
     case 'polarPoint': {
-      // polarPoint(angle, distance) → ContextObject with {x, y}
+      // polarPoint(angle, distance) → ContextObject with absolute {x, y}
       const [angle, distance] = args as [number, number];
       return {
         type: 'ContextObject' as const,
         value: {
           x: ctx.position.x + Math.cos(angle) * distance,
           y: ctx.position.y + Math.sin(angle) * distance,
+        },
+      };
+    }
+
+    case 'polarOffset': {
+      // polarOffset(angle, distance) → ContextObject with relative {dx, dy}
+      const [angle, distance] = args as [number, number];
+      return {
+        type: 'ContextObject' as const,
+        value: {
+          dx: Math.cos(angle) * distance,
+          dy: Math.sin(angle) * distance,
         },
       };
     }

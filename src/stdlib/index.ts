@@ -12,6 +12,7 @@ export const stdlib = {
  */
 export const contextAwareFunctions = new Set([
   'polarPoint',
+  'polarOffset',
   'polarMove',
   'polarLine',
   'arcFromCenter',
