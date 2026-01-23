@@ -546,6 +546,20 @@ describe('Path Context Tracking', () => {
       const tangent = parseFloat(result.logs[0].parts[0].value);
       expect(tangent).toBeCloseTo(Math.PI, 5);
     });
+
+    it('uses relative coordinates from current position', () => {
+      // Start at (50, 50), center offset (30, 30) means center at (80, 80)
+      // Arc with radius 20 from 0 to 90deg clockwise
+      // Start: (80 + 20, 80) = (100, 80)
+      // End: (80, 80 + 20) = (80, 100)
+      const result = compileWithContext(`
+        M 50 50
+        arcFromCenter(30, 30, 20, 0, 90deg, 1)
+      `);
+      expect(result.path).toContain('M 100 80');
+      expect(result.context.position.x).toBeCloseTo(80, 5);
+      expect(result.context.position.y).toBeCloseTo(100, 5);
+    });
   });
 
   describe('tangentLine', () => {

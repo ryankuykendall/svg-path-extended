@@ -570,14 +570,19 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
     }
 
     case 'arcFromCenter': {
-      // arcFromCenter(cx, cy, radius, startAngle, endAngle, clockwise) → PathWithResult
-      const [cx, cy, radius, startAngle, endAngle, clockwise] = args as number[];
+      // arcFromCenter(dcx, dcy, radius, startAngle, endAngle, clockwise) → PathWithResult
+      // dcx, dcy are relative offsets from current position to the arc center
+      const [dcx, dcy, radius, startAngle, endAngle, clockwise] = args as number[];
 
-      // Calculate start/end points
-      const startX = cx + radius * Math.cos(startAngle);
-      const startY = cy + radius * Math.sin(startAngle);
-      const endX = cx + radius * Math.cos(endAngle);
-      const endY = cy + radius * Math.sin(endAngle);
+      // Calculate absolute center from current position + offset
+      const centerX = ctx.position.x + dcx;
+      const centerY = ctx.position.y + dcy;
+
+      // Calculate start/end points from center
+      const startX = centerX + radius * Math.cos(startAngle);
+      const startY = centerY + radius * Math.sin(startAngle);
+      const endX = centerX + radius * Math.cos(endAngle);
+      const endY = centerY + radius * Math.sin(endAngle);
 
       // Calculate arc flags
       const sweep = clockwise ? 1 : 0;
