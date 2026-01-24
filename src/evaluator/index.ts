@@ -8,6 +8,7 @@ import type {
   ForLoop,
   IfStatement,
   FunctionDefinition,
+  ReturnStatement,
   FunctionCall,
   MemberExpression,
 } from '../parser/ast';
@@ -93,6 +94,14 @@ export interface UserFunction {
   type: 'UserFunction';
   params: string[];
   body: Statement[];
+}
+
+/**
+ * Signal class used to propagate return values up the call stack.
+ * Thrown by return statements and caught by function call evaluation.
+ */
+class ReturnSignal {
+  constructor(public value: Value) {}
 }
 
 /**
@@ -407,12 +416,20 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
       setVariable(fnScope, param, args[i]);
     });
 
-    const result = evaluateStatements(userFn.body, fnScope);
-    // Return as PathSegment if it looks like a path (contains path-like content)
-    if (result) {
-      return { type: 'PathSegment' as const, value: result };
+    try {
+      const result = evaluateStatements(userFn.body, fnScope);
+      // Return as PathSegment if it looks like a path (contains path-like content)
+      if (result) {
+        return { type: 'PathSegment' as const, value: result };
+      }
+      return result;
+    } catch (e) {
+      // Catch ReturnSignal and return its value
+      if (e instanceof ReturnSignal) {
+        return e.value;
+      }
+      throw e;
     }
-    return result;
   }
 
   throw new Error(`${call.name} is not a function`);
@@ -836,6 +853,11 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
 
     case 'PathCommand':
       return evaluatePathCommand(stmt, scope);
+
+    case 'ReturnStatement': {
+      const value = evaluateExpression(stmt.value, scope);
+      throw new ReturnSignal(value);
+    }
 
     default:
       throw new Error(`Unknown statement type: ${(stmt as Statement).type}`);

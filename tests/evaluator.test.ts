@@ -642,4 +642,126 @@ describe('Evaluator', () => {
       expect(compile('fn point(x) { M x 0 } point(1) point(2) point(3)')).toBe('M 1 0 M 2 0 M 3 0');
     });
   });
+
+  describe('return statements', () => {
+    it('returns a computed value from a function', () => {
+      const result = compile(`
+        fn double(x) {
+          return calc(x * 2);
+        }
+        M double(5) 0
+      `);
+      expect(result).toBe('M 10 0');
+    });
+
+    it('returns a value usable in expressions', () => {
+      const result = compile(`
+        fn mpi(radians) {
+          return calc(PI() * radians);
+        }
+        M mpi(0.5) 0
+      `);
+      // PI() * 0.5 ≈ 1.5707963...
+      expect(result).toMatch(/^M 1\.570796\d* 0$/);
+    });
+
+    it('early return stops execution of remaining statements', () => {
+      const result = compile(`
+        fn test() {
+          return 42;
+          M 999 999
+        }
+        M test() 0
+      `);
+      expect(result).toBe('M 42 0');
+    });
+
+    it('functions without explicit return use implicit path accumulation', () => {
+      const result = compile(`
+        fn square() {
+          M 0 0
+          L 10 0
+          L 10 10
+          L 0 10
+          Z
+        }
+        square()
+      `);
+      expect(result).toBe('M 0 0 L 10 0 L 10 10 L 0 10 Z');
+    });
+
+    it('return in path context works correctly', () => {
+      const result = compile(`
+        fn halfPi() {
+          return calc(PI() / 2);
+        }
+        M halfPi() 0
+      `);
+      // PI()/2 ≈ 1.5707963...
+      expect(result).toMatch(/^M 1\.570796\d* 0$/);
+    });
+
+    it('return value can be assigned to a variable', () => {
+      const result = compile(`
+        fn triple(x) {
+          return calc(x * 3);
+        }
+        let y = triple(10);
+        M y 0
+      `);
+      expect(result).toBe('M 30 0');
+    });
+
+    it('return value can be used in calc expression', () => {
+      const result = compile(`
+        fn add(a, b) {
+          return calc(a + b);
+        }
+        M calc(add(3, 4) * 2) 0
+      `);
+      expect(result).toBe('M 14 0');
+    });
+
+    it('nested function calls with return work correctly', () => {
+      const result = compile(`
+        fn square(x) {
+          return calc(x * x);
+        }
+        fn sumOfSquares(a, b) {
+          return calc(square(a) + square(b));
+        }
+        M sumOfSquares(3, 4) 0
+      `);
+      // 3*3 + 4*4 = 9 + 16 = 25
+      expect(result).toBe('M 25 0');
+    });
+
+    it('return inside conditional works correctly', () => {
+      const result = compile(`
+        fn absValue(x) {
+          if (x < 0) {
+            return calc(x * -1);
+          }
+          return x;
+        }
+        M absValue(-5) absValue(3)
+      `);
+      expect(result).toBe('M 5 3');
+    });
+
+    it('return inside loop exits function immediately', () => {
+      const result = compile(`
+        fn findFirst() {
+          for (i in 1..10) {
+            if (i == 3) {
+              return i;
+            }
+          }
+          return 0;
+        }
+        M findFirst() 0
+      `);
+      expect(result).toBe('M 3 0');
+    });
+  });
 });

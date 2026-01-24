@@ -17,6 +17,7 @@ import type {
   ForLoop,
   IfStatement,
   FunctionDefinition,
+  ReturnStatement,
   SourceLocation,
   Comment,
 } from './ast';
@@ -90,7 +91,7 @@ const identifier: Parsimmon.Parser<Identifier> = token(
 }));
 
 // Reserved words that cannot be identifiers
-const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log'];
+const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log', 'return'];
 
 // Context-aware functions that should be parsed as statements, not path arguments
 // These functions require path context and produce path output
@@ -475,6 +476,17 @@ const functionDefinition: Parsimmon.Parser<FunctionDefinition> = P.seqMap(
   })
 );
 
+// return statement: return expr;
+const returnStatement: Parsimmon.Parser<ReturnStatement> = P.seqMap(
+  keyword('return'),
+  expression,
+  word(';'),
+  (_return, value, _semi) => ({
+    type: 'ReturnStatement' as const,
+    value,
+  })
+);
+
 // Statement-level function call (like circle(50, 50, 25))
 interface FunctionCallStatement {
   type: 'FunctionCallStatement';
@@ -500,6 +512,7 @@ const statement: Parsimmon.Parser<Statement> = P.alt(
   forLoop,
   ifStatement,
   functionDefinition,
+  returnStatement,
   functionCallStatement,
   pathCommand
 );

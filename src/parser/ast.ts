@@ -42,6 +42,7 @@ export type Statement =
   | ForLoop
   | IfStatement
   | FunctionDefinition
+  | ReturnStatement
   | PathCommand;
 
 // let x = 10;
@@ -75,6 +76,12 @@ export interface FunctionDefinition {
   name: string;
   params: string[];
   body: Statement[];
+}
+
+// return expr;
+export interface ReturnStatement {
+  type: 'ReturnStatement';
+  value: Expression;
 }
 
 // M x y, L 10 20, etc.
