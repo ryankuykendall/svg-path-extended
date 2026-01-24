@@ -9,12 +9,13 @@ import type {
   ForLoop,
   IfStatement,
   FunctionDefinition,
+  ReturnStatement,
   FunctionCall,
   MemberExpression,
   Comment,
 } from '../parser/ast';
-import { stdlib } from '../stdlib';
-import { createPathContext, contextToObject, type PathContext } from './context';
+import { stdlib, contextAwareFunctions } from '../stdlib';
+import { createPathContext, contextToObject, updateContextForCommand, type PathContext } from './context';
 
 // Types for annotated output
 export type AnnotatedLine =
@@ -32,7 +33,7 @@ export interface AnnotatedOutput {
 }
 
 // Value types (same as main evaluator)
-export type Value = number | string | PathSegment | UserFunction | ContextObject;
+export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult;
 
 export interface PathSegment {
   type: 'PathSegment';
@@ -44,21 +45,48 @@ export interface ContextObject {
   value: Record<string, unknown>;
 }
 
+/**
+ * Represents a function result that includes both path output AND a result value.
+ * Used by functions like arcFromCenter that emit path and return arc info.
+ */
+export interface PathWithResult {
+  type: 'PathWithResult';
+  path: string;      // The path string to emit
+  result: ContextObject;  // The result value (for assignments)
+}
+
 export interface UserFunction {
   type: 'UserFunction';
   params: string[];
   body: Statement[];
 }
 
+/**
+ * Signal class used to propagate return values up the call stack.
+ * Thrown by return statements and caught by function call evaluation.
+ */
+class ReturnSignal {
+  constructor(public value: Value) {}
+}
+
+/**
+ * Evaluation state for context-aware evaluation
+ */
+export interface EvaluationState {
+  pathContext: PathContext;
+}
+
 export interface Scope {
   variables: Map<string, Value>;
   parent: Scope | null;
+  evalState?: EvaluationState;  // Shared across all scopes during evaluation
 }
 
 function createScope(parent: Scope | null = null): Scope {
   return {
     variables: new Map(),
     parent,
+    evalState: parent?.evalState,  // Inherit evaluation state from parent
   };
 }
 
@@ -77,6 +105,284 @@ function lookupVariable(scope: Scope, name: string): Value {
 
 function setVariable(scope: Scope, name: string, value: Value): void {
   scope.variables.set(name, value);
+}
+
+/**
+ * Convert angle value based on unit suffix
+ * - 'deg': converts degrees to radians
+ * - 'rad' or undefined: returns value unchanged (radians are internal standard)
+ */
+function convertAngleUnit(value: number, unit?: 'deg' | 'rad'): number {
+  if (unit === 'deg') {
+    return value * Math.PI / 180;
+  }
+  return value; // rad or no unit = radians (internal standard)
+}
+
+/**
+ * Update the ctx variable in scope with current context state
+ */
+function updateCtxVariable(scope: Scope): void {
+  if (scope.evalState) {
+    // Find the root scope to update ctx
+    let rootScope = scope;
+    while (rootScope.parent) {
+      rootScope = rootScope.parent;
+    }
+    rootScope.variables.set('ctx', {
+      type: 'ContextObject' as const,
+      value: contextToObject(scope.evalState.pathContext),
+    });
+  }
+}
+
+/**
+ * Parse a path string and update context for each command found.
+ * Used for tracking context when stdlib functions return path strings.
+ */
+function parseAndTrackPathString(pathStr: string, scope: Scope): void {
+  if (!scope.evalState) return;
+
+  // Parse path commands from string: M 10 20 L 30 40 A 5 5 0 1 1 50 50 etc.
+  const commandRegex = /([MLHVCSQTAZmlhvcsqtaz])\s*([\d\s.,-]*)/g;
+  let match;
+
+  while ((match = commandRegex.exec(pathStr)) !== null) {
+    const command = match[1];
+    const argsStr = match[2].trim();
+
+    // Parse numeric arguments
+    const args: number[] = [];
+    if (argsStr) {
+      const numMatches = argsStr.match(/-?[\d.]+/g);
+      if (numMatches) {
+        for (const num of numMatches) {
+          args.push(parseFloat(num));
+        }
+      }
+    }
+
+    updateContextForCommand(scope.evalState.pathContext, command, args);
+  }
+
+  updateCtxVariable(scope);
+}
+
+/**
+ * Get numeric arguments from path args for context tracking
+ */
+function getNumericArgs(args: PathArg[], scope: Scope): number[] {
+  const numericArgs: number[] = [];
+  for (const arg of args) {
+    if (arg.type === 'NumberLiteral') {
+      numericArgs.push(arg.value);
+    } else if (arg.type === 'Identifier') {
+      const value = lookupVariable(scope, arg.name);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+    } else if (arg.type === 'CalcExpression') {
+      const value = evaluateExpression(arg.expression, scope);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+    } else if (arg.type === 'MemberExpression') {
+      const value = evaluateMemberExpression(arg, scope);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+    } else if (arg.type === 'FunctionCall') {
+      const value = evaluateFunctionCall(arg, scope, null);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+      // PathSegments don't contribute to numeric args for context tracking
+    }
+  }
+  return numericArgs;
+}
+
+/**
+ * Evaluate a context-aware function that needs access to path context
+ */
+function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope): Value {
+  const ctx = scope.evalState!.pathContext;
+
+  switch (name) {
+    case 'polarPoint': {
+      // polarPoint(angle, distance) → ContextObject with absolute {x, y}
+      const [angle, distance] = args as [number, number];
+      return {
+        type: 'ContextObject' as const,
+        value: {
+          x: ctx.position.x + Math.cos(angle) * distance,
+          y: ctx.position.y + Math.sin(angle) * distance,
+        },
+      };
+    }
+
+    case 'polarOffset': {
+      // polarOffset(angle, distance) → ContextObject with relative {dx, dy}
+      const [angle, distance] = args as [number, number];
+      return {
+        type: 'ContextObject' as const,
+        value: {
+          dx: Math.cos(angle) * distance,
+          dy: Math.sin(angle) * distance,
+        },
+      };
+    }
+
+    case 'polarMove': {
+      // polarMove(angle, distance, isMoveTo?) → PathSegment
+      const [angle, distance, isMoveTo = 0] = args as number[];
+      const x = ctx.position.x + Math.cos(angle) * distance;
+      const y = ctx.position.y + Math.sin(angle) * distance;
+      const command = isMoveTo ? 'M' : 'L';
+
+      updateContextForCommand(ctx, command, [x, y]);
+      ctx.lastTangent = angle;  // Set tangent to movement direction
+      updateCtxVariable(scope);
+
+      return { type: 'PathSegment' as const, value: `${command} ${x} ${y}` };
+    }
+
+    case 'polarLine': {
+      // polarLine(angle, distance) → PathSegment (always L command)
+      const [angle, distance] = args as [number, number];
+      const x = ctx.position.x + Math.cos(angle) * distance;
+      const y = ctx.position.y + Math.sin(angle) * distance;
+
+      updateContextForCommand(ctx, 'L', [x, y]);
+      ctx.lastTangent = angle;
+      updateCtxVariable(scope);
+
+      return { type: 'PathSegment' as const, value: `L ${x} ${y}` };
+    }
+
+    case 'arcFromCenter': {
+      // arcFromCenter(dcx, dcy, radius, startAngle, endAngle, clockwise) → PathWithResult
+      // dcx, dcy are relative offsets from current position to the arc center
+      const [dcx, dcy, radius, startAngle, endAngle, clockwise] = args as number[];
+
+      // Calculate absolute center from current position + offset
+      const centerX = ctx.position.x + dcx;
+      const centerY = ctx.position.y + dcy;
+
+      // Calculate start/end points from center
+      const startX = centerX + radius * Math.cos(startAngle);
+      const startY = centerY + radius * Math.sin(startAngle);
+      const endX = centerX + radius * Math.cos(endAngle);
+      const endY = centerY + radius * Math.sin(endAngle);
+
+      // Calculate arc flags
+      const sweep = clockwise ? 1 : 0;
+      const angleDiff = clockwise ? endAngle - startAngle : startAngle - endAngle;
+      // Normalize angle difference to handle wrap-around
+      const normalizedDiff = ((angleDiff % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const largeArc = normalizedDiff > Math.PI ? 1 : 0;
+
+      // Tangent angle at endpoint (perpendicular to radius)
+      const tangentAngle = clockwise ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
+
+      // Generate path string
+      const pathStr = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+
+      // Update context tracking
+      parseAndTrackPathString(pathStr, scope);
+
+      // Store tangent for tangentLine/tangentArc
+      ctx.lastTangent = tangentAngle;
+      updateCtxVariable(scope);
+
+      // Return both path and result info
+      return {
+        type: 'PathWithResult' as const,
+        path: pathStr,
+        result: {
+          type: 'ContextObject' as const,
+          value: {
+            point: { x: endX, y: endY },
+            angle: tangentAngle,
+          },
+        },
+      };
+    }
+
+    case 'tangentLine': {
+      // tangentLine(length) → PathSegment
+      const [length] = args as [number];
+
+      if (ctx.lastTangent === undefined) {
+        throw new Error('tangentLine requires a previous arc or polar command');
+      }
+
+      const x = ctx.position.x + Math.cos(ctx.lastTangent) * length;
+      const y = ctx.position.y + Math.sin(ctx.lastTangent) * length;
+
+      updateContextForCommand(ctx, 'L', [x, y]);
+      // lastTangent stays the same (continuing in same direction)
+      updateCtxVariable(scope);
+
+      return { type: 'PathSegment' as const, value: `L ${x} ${y}` };
+    }
+
+    case 'tangentArc': {
+      // tangentArc(radius, sweepAngle) → PathWithResult
+      const [radius, sweepAngle] = args as [number, number];
+
+      if (ctx.lastTangent === undefined) {
+        throw new Error('tangentArc requires a previous arc or polar command');
+      }
+
+      // Center is perpendicular to tangent direction
+      // For positive sweep (turning right on screen): center is to the right (+π/2 from heading)
+      // For negative sweep (turning left on screen): center is to the left (-π/2 from heading)
+      const toCenter = ctx.lastTangent + (sweepAngle >= 0 ? Math.PI / 2 : -Math.PI / 2);
+      const cx = ctx.position.x + Math.cos(toCenter) * radius;
+      const cy = ctx.position.y + Math.sin(toCenter) * radius;
+
+      // Start angle is from center to current position
+      const startAngle = Math.atan2(ctx.position.y - cy, ctx.position.x - cx);
+      const endAngle = startAngle + sweepAngle;
+
+      // End point
+      const endX = cx + radius * Math.cos(endAngle);
+      const endY = cy + radius * Math.sin(endAngle);
+
+      // Arc flags
+      const sweep = sweepAngle >= 0 ? 1 : 0;
+      const largeArc = Math.abs(sweepAngle) > Math.PI ? 1 : 0;
+
+      // New tangent at endpoint
+      const newTangent = sweepAngle >= 0 ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
+
+      // Generate path string
+      const pathStr = `A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+
+      // Update context tracking
+      parseAndTrackPathString(pathStr, scope);
+
+      ctx.lastTangent = newTangent;
+      updateCtxVariable(scope);
+
+      // Return both path and result info
+      return {
+        type: 'PathWithResult' as const,
+        path: pathStr,
+        result: {
+          type: 'ContextObject' as const,
+          value: {
+            point: { x: endX, y: endY },
+            angle: newTangent,
+          },
+        },
+      };
+    }
+
+    default:
+      throw new Error(`Unknown context-aware function: ${name}`);
+  }
 }
 
 // Context for annotated evaluation
@@ -107,7 +413,7 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
 
   switch (expr.type) {
     case 'NumberLiteral':
-      return expr.value;
+      return convertAngleUnit(expr.value, expr.unit);
 
     case 'Identifier':
       return lookupVariable(scope, expr.name);
@@ -207,6 +513,15 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope, ctx: AnnotatedCo
     return { type: 'PathSegment' as const, value: '' };
   }
 
+  // Check if it's a context-aware function
+  if (contextAwareFunctions.has(call.name)) {
+    if (!scope.evalState) {
+      throw new Error(`Function '${call.name}' requires evaluation context`);
+    }
+    const args = call.args.map((arg) => evaluateExpression(arg, scope));
+    return evaluateContextAwareFunction(call.name, args, scope);
+  }
+
   const fn = lookupVariable(scope, call.name);
 
   if (typeof fn === 'function') {
@@ -239,22 +554,39 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope, ctx: AnnotatedCo
         line: call.loc?.line ?? 0,
       });
       ctx.indentLevel++;
-      evaluateStatementsAnnotated(userFn.body, fnScope, ctx);
+      try {
+        evaluateStatementsAnnotated(userFn.body, fnScope, ctx);
+      } catch (e) {
+        if (e instanceof ReturnSignal) {
+          // Return statement encountered - return the value
+          ctx.indentLevel--;
+          ctx.output.push({ type: 'function_call_end' });
+          return e.value;
+        }
+        throw e;
+      }
       ctx.indentLevel--;
       ctx.output.push({ type: 'function_call_end' });
       return 0; // Return value not used for annotated output
     }
 
-    const results: string[] = [];
-    for (const stmt of userFn.body) {
-      const result = evaluateStatementPlain(stmt, fnScope);
-      if (result) results.push(result);
+    try {
+      const results: string[] = [];
+      for (const stmt of userFn.body) {
+        const result = evaluateStatementPlain(stmt, fnScope);
+        if (result) results.push(result);
+      }
+      const resultStr = results.join(' ');
+      if (resultStr) {
+        return { type: 'PathSegment' as const, value: resultStr };
+      }
+      return resultStr;
+    } catch (e) {
+      if (e instanceof ReturnSignal) {
+        return e.value;
+      }
+      throw e;
     }
-    const resultStr = results.join(' ');
-    if (resultStr) {
-      return { type: 'PathSegment' as const, value: resultStr };
-    }
-    return resultStr;
   }
 
   throw new Error(`${call.name} is not a function`);
@@ -289,10 +621,24 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
       if (typeof value === 'number') {
         return String(value);
       }
-      if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathSegment') {
-        return value.value;
+      if (typeof value === 'object' && value !== null && 'type' in value) {
+        if (value.type === 'PathSegment') {
+          return value.value;
+        }
+        if (value.type === 'PathWithResult') {
+          // Extract path from compound result (result is stored but path is emitted)
+          return (value as PathWithResult).path;
+        }
       }
       throw new Error(`Function ${arg.name} did not return a valid path value`);
+    }
+
+    case 'MemberExpression': {
+      const value = evaluateMemberExpression(arg, scope);
+      if (typeof value === 'number') {
+        return String(value);
+      }
+      throw new Error(`Member expression did not evaluate to a number`);
     }
 
     default:
@@ -308,6 +654,12 @@ function evaluateStatementPlain(stmt: Statement, scope: Scope): string {
 
     case 'LetDeclaration': {
       const value = evaluateExpression(stmt.value, scope);
+      // Handle PathWithResult: assign the result to variable, emit the path
+      if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathWithResult') {
+        const pwr = value as PathWithResult;
+        setVariable(scope, stmt.name, pwr.result);
+        return pwr.path;  // Emit the path
+      }
       setVariable(scope, stmt.name, value);
       return '';
     }
@@ -392,7 +744,21 @@ function evaluateStatementPlain(stmt: Statement, scope: Scope): string {
         return args.join(' ');
       }
       const args = stmt.args.map((arg) => evaluatePathArg(arg, scope));
-      return stmt.command + (args.length > 0 ? ' ' + args.join(' ') : '');
+      const result = stmt.command + (args.length > 0 ? ' ' + args.join(' ') : '');
+
+      // Update path context if tracking is enabled
+      if (scope.evalState && stmt.command !== '') {
+        const numericArgs = getNumericArgs(stmt.args, scope);
+        updateContextForCommand(scope.evalState.pathContext, stmt.command, numericArgs);
+        updateCtxVariable(scope);
+      }
+
+      return result;
+    }
+
+    case 'ReturnStatement': {
+      const value = evaluateExpression(stmt.value, scope);
+      throw new ReturnSignal(value);
     }
 
     default:
@@ -414,7 +780,15 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
 
     case 'LetDeclaration': {
       const value = evaluateExpression(stmt.value, scope);
-      setVariable(scope, stmt.name, value);
+      // Handle PathWithResult: assign the result to variable, emit the path
+      if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathWithResult') {
+        const pwr = value as PathWithResult;
+        setVariable(scope, stmt.name, pwr.result);
+        // Emit the path commands
+        emitPathString(pwr.path, ctx);
+      } else {
+        setVariable(scope, stmt.name, value);
+      }
       break;
     }
 
@@ -528,6 +902,39 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
       if (stmt.command === '') {
         // Statement-level function call
         const funcCall = stmt.args[0] as FunctionCall;
+
+        // Check for context-aware functions first
+        if (contextAwareFunctions.has(funcCall.name)) {
+          if (!scope.evalState) {
+            throw new Error(`Function '${funcCall.name}' requires evaluation context`);
+          }
+          const args = funcCall.args.map((arg) => evaluateExpression(arg, scope));
+          const result = evaluateContextAwareFunction(funcCall.name, args, scope);
+          const argsStr = args.map(a => String(a)).join(', ');
+          ctx.output.push({
+            type: 'function_call',
+            name: funcCall.name,
+            args: argsStr,
+            line: funcCall.loc?.line ?? 0,
+          });
+          ctx.indentLevel++;
+          // Extract path string from result
+          let pathStr = '';
+          if (typeof result === 'object' && result !== null && 'type' in result) {
+            if (result.type === 'PathSegment') {
+              pathStr = (result as PathSegment).value;
+            } else if (result.type === 'PathWithResult') {
+              pathStr = (result as PathWithResult).path;
+            }
+          }
+          if (pathStr) {
+            emitPathString(pathStr, ctx);
+          }
+          ctx.indentLevel--;
+          ctx.output.push({ type: 'function_call_end' });
+          break;
+        }
+
         const fn = lookupVariable(scope, funcCall.name);
 
         if (typeof fn === 'function') {
@@ -575,8 +982,20 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
           args: args.join(' '),
           line: stmt.loc?.line,
         });
+
+        // Update path context if tracking is enabled
+        if (scope.evalState && stmt.command !== '') {
+          const numericArgs = getNumericArgs(stmt.args, scope);
+          updateContextForCommand(scope.evalState.pathContext, stmt.command, numericArgs);
+          updateCtxVariable(scope);
+        }
       }
       break;
+    }
+
+    case 'ReturnStatement': {
+      const value = evaluateExpression(stmt.value, scope);
+      throw new ReturnSignal(value);
     }
 
     default:
@@ -609,8 +1028,12 @@ function evaluateStatementsAnnotated(stmts: Statement[], scope: Scope, ctx: Anno
 export function evaluateAnnotated(program: Program, comments: Comment[]): AnnotatedOutput {
   const scope = createScope();
 
-  // Initialize ctx variable with a path context (note: positions won't be accurate in annotated mode)
+  // Initialize path context and evaluation state
   const pathContext = createPathContext();
+  const evalState: EvaluationState = { pathContext };
+  scope.evalState = evalState;
+
+  // Initialize ctx variable with a path context
   scope.variables.set('ctx', {
     type: 'ContextObject' as const,
     value: contextToObject(pathContext),

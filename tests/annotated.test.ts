@@ -197,4 +197,70 @@ steps(3, 20, 10)`);
       expect(result).toContain('v 10');
     });
   });
+
+  describe('context-aware functions', () => {
+    it('handles polarLine', () => {
+      const result = compileAnnotated('M 50 50 polarLine(0, 100)');
+      expect(result).toContain('L');
+      expect(result).toContain('150'); // 50 + 100*cos(0) = 150
+    });
+
+    it('handles arcFromCenter', () => {
+      const result = compileAnnotated('arcFromCenter(0, 0, 50, 0, 90deg, 1)');
+      expect(result).toContain('M');
+      expect(result).toContain('A');
+    });
+
+    it('handles tangentLine after arc', () => {
+      const result = compileAnnotated(`
+arcFromCenter(0, 0, 50, 0, 90deg, 1)
+tangentLine(20)`);
+      expect(result).toContain('L');
+    });
+
+    it('handles polarMove', () => {
+      const result = compileAnnotated('M 0 0 polarMove(0, 100)');
+      expect(result).toContain('L');
+      expect(result).toContain('100'); // 0 + 100*cos(0) = 100
+    });
+  });
+
+  describe('return statements', () => {
+    it('handles explicit return in user function', () => {
+      const result = compileAnnotated(`
+fn double(x) { return calc(x * 2); }
+M double(5) 0`);
+      expect(result).toContain('M 10 0');
+    });
+
+    it('handles return in nested function call', () => {
+      const result = compileAnnotated(`
+fn add(a, b) { return calc(a + b); }
+fn triple(x) { return calc(x * 3); }
+M add(triple(2), 4) 0`);
+      expect(result).toContain('M 10 0'); // triple(2)=6, add(6,4)=10
+    });
+  });
+
+  describe('angle units', () => {
+    it('converts deg to radians', () => {
+      const result = compileAnnotated('M calc(sin(90deg)) 0');
+      expect(result).toContain('M 1 0');
+    });
+
+    it('handles degrees in polarLine', () => {
+      // polarLine(90deg, 100) at position (50, 50) should go to (50, 150)
+      const result = compileAnnotated('M 50 50 polarLine(90deg, 100)');
+      expect(result).toContain('L');
+      expect(result).toContain('150'); // 50 + 100*sin(90deg) = 150
+    });
+  });
+
+  describe('member expressions in path args', () => {
+    it('handles ctx.position.x', () => {
+      const result = compileAnnotated('M 100 200 L calc(ctx.position.x + 50) ctx.position.y');
+      expect(result).toContain('M 100 200');
+      expect(result).toContain('L 150 200');
+    });
+  });
 });
