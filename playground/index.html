@@ -856,10 +856,17 @@
     }
 
     #zoom-level {
+      width: 50px;
+      padding: 2px 4px;
+      border: 1px solid var(--border-color);
+      border-radius: 3px;
       font-size: 0.75rem;
-      color: var(--text-secondary);
-      min-width: 45px;
       text-align: center;
+    }
+
+    #zoom-level:focus {
+      outline: none;
+      border-color: var(--accent-color);
     }
 
     /* Pan cursor */
@@ -939,7 +946,7 @@
         <button id="zoom-out" title="Zoom out">&#x2212;</button>
         <button id="zoom-fit" title="Fit to view">Fit</button>
         <button id="zoom-in" title="Zoom in">&#x002B;</button>
-        <span id="zoom-level">100%</span>
+        <input type="text" id="zoom-level" value="100%" title="Enter zoom percentage or use ↑↓ (±5%) / Shift+↑↓ (±25%)">
       </div>
       <div id="preview-container">
         <svg id="preview" xmlns="http://www.w3.org/2000/svg">
@@ -1980,7 +1987,7 @@ for (i in 0..7) {
       preview.setAttribute('viewBox', `${panX} ${panY} ${viewWidth} ${viewHeight}`);
 
       // Update zoom level display
-      zoomLevelDisplay.textContent = `${Math.round(zoomLevel * 100)}%`;
+      zoomLevelDisplay.value = `${Math.round(zoomLevel * 100)}%`;
 
       // Update navigator viewport rectangle
       updateNavigatorViewport();
@@ -2403,14 +2410,47 @@ for (i in 0..7) {
     zoomOutBtn.addEventListener('click', zoomOut);
     zoomFitBtn.addEventListener('click', zoomFit);
 
-    // Mouse wheel zoom
+    // Zoom level input - manual entry
+    zoomLevelDisplay.addEventListener('change', (e) => {
+      const value = parseInt(e.target.value);
+      if (!isNaN(value) && value >= MIN_ZOOM * 100 && value <= MAX_ZOOM * 100) {
+        const oldZoom = zoomLevel;
+        zoomLevel = value / 100;
+        adjustPanForZoom(oldZoom, zoomLevel);
+        updateViewBox();
+      } else {
+        // Reset to current value if invalid
+        e.target.value = `${Math.round(zoomLevel * 100)}%`;
+      }
+    });
+
+    // Zoom level input - arrow key controls
+    zoomLevelDisplay.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const step = e.shiftKey ? 0.25 : 0.05;  // 25% or 5%
+        const direction = e.key === 'ArrowUp' ? 1 : -1;
+
+        const oldZoom = zoomLevel;
+        zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel + (step * direction)));
+        adjustPanForZoom(oldZoom, zoomLevel);
+        updateViewBox();
+      }
+    });
+
+    // Mouse wheel zoom with continuous dampening for smooth trackpad experience
     previewContainer.addEventListener('wheel', (e) => {
       e.preventDefault();
-      if (e.deltaY < 0) {
-        zoomIn();
-      } else {
-        zoomOut();
-      }
+
+      // Dampen the delta for smoother trackpad experience
+      const dampening = 0.002;
+      const delta = -e.deltaY * dampening;
+
+      const oldZoom = zoomLevel;
+      zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel * (1 + delta)));
+
+      adjustPanForZoom(oldZoom, zoomLevel);
+      updateViewBox();
     }, { passive: false });
 
     // Pan via drag
