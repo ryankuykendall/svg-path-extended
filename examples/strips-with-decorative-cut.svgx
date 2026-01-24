@@ -1,0 +1,79 @@
+M 0 0
+m 10 10
+let radius = 15;
+let length = 900;
+let height = calc(2 * radius);
+
+for (i in 1..15) {
+  m radius 0
+  a radius radius 180 0 0 0 calc(radius * 2)
+  h length
+  a radius radius 180 0 0 0 calc(radius * 2 * -1)
+  // Move back to the left and down one item.
+  m calc((length + radius) * -1) calc(radius * 2)
+
+  // log(i, ctx.position)
+}
+
+M 0 0
+m 10 10
+
+fn noOp () {
+  for (j in 1..15) {
+    m calc(length / 15 - 28) calc(2 * radius)
+    l 10 10
+    // a 5 5 calc(180 / 4) 0 0 3 3
+    h 120
+    l 5 -5
+    h 60
+    l 5 -5
+    m -184 0
+  }
+}
+
+
+M 0 0
+m calc(10 + radius + 60) 10
+let posX = ctx.position.x;
+
+for (k in 1..15) {
+  let currentY = ctx.position.y;
+  let nextY = calc(currentY + height);
+
+  let arc = arcFromCenter(0, 10, 10, calc(PI() * -0.5), calc(PI() * -0.25), 1);
+  tangentLine(10)
+  let nextCenter = polarOffset(calc(PI() * -0.25), 10);
+  let arc = arcFromCenter(nextCenter.dx, nextCenter.dy, 10, 
+                          calc(PI() * 0.75), calc(PI() * 0.5), 0);
+  polarLine(0, 80)
+
+  arcFromCenter(0, 
+                -10, 
+                10,
+                calc(PI() * 0.5),
+                calc(PI() * 0.25),
+                0
+               ); 
+  tangentLine(2.5)
+
+  let nextCenter2 = polarOffset(calc(PI() * 0.25), 8);
+  let arc = arcFromCenter(nextCenter2.dx, nextCenter2.dy, 8,
+                          calc(PI() * 1.25),
+                          calc(PI() * 1.5),
+                          1);
+  polarLine(0, 60)
+
+  let arc = arcFromCenter(0, -10, 10,
+                          calc(PI() * 0.5),
+                          calc(PI() * 0.25),
+                          0);
+  let nextCenter3 = polarOffset(calc(PI() * 0.25) , 10);
+  let arc = arcFromCenter(nextCenter3.dx, nextCenter3.dy, 10,
+                          calc(PI() * 1.25),
+                          calc(PI() * 1.5),
+                          1);
+
+  log(currentY, ctx.position.y);
+  
+  m calc(((ctx.position.x - posX) * -1) + (k * 10)) calc(nextY - ctx.position.y)
+}
