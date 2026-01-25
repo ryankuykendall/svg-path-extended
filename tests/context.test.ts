@@ -562,8 +562,9 @@ describe('Path Context Tracking', () => {
       const result = compileWithContext(`
         arcFromCenter(100, 100, 50, 0, 90deg, 1)
       `);
-      // Should start at (150, 100) and end at (100, 150)
-      expect(result.path).toContain('M 150 100');
+      // Should draw line to (150, 100) then arc to (100, 150)
+      // Uses L (not M) to keep path continuous
+      expect(result.path).toContain('L 150 100');
       expect(result.path).toContain('A 50 50');
       expect(result.context.position.x).toBeCloseTo(100, 5);
       expect(result.context.position.y).toBeCloseTo(150, 5);
@@ -573,8 +574,9 @@ describe('Path Context Tracking', () => {
       const result = compileWithContext(`
         arcFromCenter(100, 100, 50, 0, -90deg, 0)
       `);
-      // Should start at (150, 100) and end at (100, 50)
-      expect(result.path).toContain('M 150 100');
+      // Should draw line to (150, 100) then arc to (100, 50)
+      // Uses L (not M) to keep path continuous
+      expect(result.path).toContain('L 150 100');
       expect(result.context.position.x).toBeCloseTo(100, 5);
       expect(result.context.position.y).toBeCloseTo(50, 5);
     });
@@ -609,9 +611,131 @@ describe('Path Context Tracking', () => {
         M 50 50
         arcFromCenter(30, 30, 20, 0, 90deg, 1)
       `);
-      expect(result.path).toContain('M 100 80');
+      // Uses L (not M) to keep path continuous
+      expect(result.path).toContain('L 100 80');
       expect(result.context.position.x).toBeCloseTo(80, 5);
       expect(result.context.position.y).toBeCloseTo(100, 5);
+    });
+
+    it('closes path to original M position with Z (not arc start)', () => {
+      // This test verifies the fix for the original issue:
+      // arcFromCenter now emits L (not M), so Z closes to the original M position
+      // Previously, M commands in arcFromCenter would reset ctx.start, causing
+      // Z to close to the wrong position
+      const result = compileWithContext(`
+        M 10 10
+        L 90 10
+        arcFromCenter(0, 10, 10, -90deg, 0, 1)
+        L 90 90
+        arcFromCenter(-10, 0, 10, 0, 90deg, 1)
+        L 10 90
+        arcFromCenter(0, -10, 10, 90deg, 180deg, 1)
+        L 10 10
+        Z
+      `);
+      // Z should close back to the original M position (10, 10)
+      expect(result.context.position.x).toBeCloseTo(10, 5);
+      expect(result.context.position.y).toBeCloseTo(10, 5);
+      // Path should not contain multiple M commands (only the initial one)
+      const mCount = (result.path.match(/M /g) || []).length;
+      expect(mCount).toBe(1);
+    });
+  });
+
+  describe('arcFromPolarOffset', () => {
+    it('draws arc clockwise with positive angleOfArc', () => {
+      // Start at (0, 0), center direction = 0 (right), radius = 50
+      // Center is at (50, 0)
+      // Current position is at angle π from center (left side)
+      // angleOfArc = 90deg clockwise → endAngle = π + 90deg = 3π/2
+      // End position: (50 + 50*cos(3π/2), 0 + 50*sin(3π/2)) = (50, -50)
+      const result = compileWithContext(`
+        arcFromPolarOffset(0, 50, 90deg)
+      `);
+      expect(result.path).toContain('A 50 50');
+      expect(result.path).not.toContain('L'); // Should only emit A, not L
+      expect(result.context.position.x).toBeCloseTo(50, 5);
+      expect(result.context.position.y).toBeCloseTo(-50, 5);
+    });
+
+    it('draws arc counter-clockwise with negative angleOfArc', () => {
+      // Start at (0, 0), center direction = 0 (right), radius = 50
+      // Center is at (50, 0)
+      // angleOfArc = -90deg counter-clockwise → endAngle = π - 90deg = π/2
+      // End position: (50 + 50*cos(π/2), 0 + 50*sin(π/2)) = (50, 50)
+      const result = compileWithContext(`
+        arcFromPolarOffset(0, 50, -90deg)
+      `);
+      expect(result.path).toContain('A 50 50');
+      expect(result.context.position.x).toBeCloseTo(50, 5);
+      expect(result.context.position.y).toBeCloseTo(50, 5);
+    });
+
+    it('handles large arc (angleOfArc > 180deg)', () => {
+      const result = compileWithContext(`
+        arcFromPolarOffset(0, 50, 270deg)
+      `);
+      // largeArc flag should be 1 for angles > π
+      expect(result.path).toMatch(/A 50 50 0 1/);
+    });
+
+    it('returns correct tangent angle for clockwise arc', () => {
+      const result = compileWithContext(`
+        let arc = arcFromPolarOffset(0, 50, 90deg);
+        log(arc.angle)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const angle = parseFloat(result.logs[0].parts[0].value);
+      // For CW arc: tangent = endAngle + π/2 = 3π/2 + π/2 = 2π ≈ 0
+      expect(Math.cos(angle)).toBeCloseTo(1, 5); // angle ≈ 0 or 2π
+      expect(Math.sin(angle)).toBeCloseTo(0, 5);
+    });
+
+    it('sets lastTangent in context', () => {
+      const result = compileWithContext(`
+        arcFromPolarOffset(0, 50, 90deg)
+        log(ctx.lastTangent)
+      `);
+      expect(result.logs).toHaveLength(1);
+      const tangent = parseFloat(result.logs[0].parts[0].value);
+      // Same as returned angle
+      expect(Math.cos(tangent)).toBeCloseTo(1, 5);
+      expect(Math.sin(tangent)).toBeCloseTo(0, 5);
+    });
+
+    it('works with tangentLine chaining', () => {
+      // Start at (0, 0), arc to (50, -50) with tangent pointing right (angle ≈ 0)
+      // tangentLine(30) should go 30px right: (80, -50)
+      const result = compileWithContext(`
+        arcFromPolarOffset(0, 50, 90deg)
+        tangentLine(30)
+      `);
+      expect(result.context.position.x).toBeCloseTo(80, 5);
+      expect(result.context.position.y).toBeCloseTo(-50, 5);
+    });
+
+    it('emits only A command (no M or L)', () => {
+      const result = compileWithContext(`
+        arcFromPolarOffset(0, 50, 90deg)
+      `);
+      // Path should only be "A ..." with no M or L
+      expect(result.path).toMatch(/^A /);
+      expect(result.path).not.toContain('M');
+      expect(result.path).not.toContain('L');
+    });
+
+    it('works with center in different direction', () => {
+      // Center direction = 90deg (down in SVG coords), radius = 50
+      // Center is at (0, 50)
+      // Current position (0, 0) is at angle -π/2 from center (top)
+      // startAngle = 90deg + 180deg = 270deg = -π/2
+      // For CW 90deg arc: endAngle = -π/2 + π/2 = 0
+      // End position: (0 + 50*cos(0), 50 + 50*sin(0)) = (50, 50)
+      const result = compileWithContext(`
+        arcFromPolarOffset(90deg, 50, 90deg)
+      `);
+      expect(result.context.position.x).toBeCloseTo(50, 5);
+      expect(result.context.position.y).toBeCloseTo(50, 5);
     });
   });
 

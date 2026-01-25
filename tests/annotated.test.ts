@@ -207,8 +207,16 @@ steps(3, 20, 10)`);
 
     it('handles arcFromCenter', () => {
       const result = compileAnnotated('arcFromCenter(0, 0, 50, 0, 90deg, 1)');
-      expect(result).toContain('M');
+      // arcFromCenter now emits L (not M) to keep paths continuous
+      expect(result).toContain('L');
       expect(result).toContain('A');
+    });
+
+    it('handles arcFromPolarOffset', () => {
+      const result = compileAnnotated('arcFromPolarOffset(0, 50, 90deg)');
+      // arcFromPolarOffset emits only A (no L or M)
+      expect(result).toContain('A 50 50');
+      expect(result).not.toContain('L');
     });
 
     it('handles tangentLine after arc', () => {

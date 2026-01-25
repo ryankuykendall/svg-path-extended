@@ -72,6 +72,68 @@ Alternatively, consider a lint/warning in the CLI that detects this pattern and 
 
 ---
 
+## ISSUE-002: M command doesn't update ctx.position before context-aware functions on separate lines
+
+**Discovered:** 2026-01-25 (during arcFromPolarOffset implementation)
+
+**Severity:** Medium
+
+**Description:**
+
+When an `M` (moveto) command and a context-aware function (like `arcFromPolarOffset`, `polarLine`, etc.) are on separate statements, the `M` command doesn't update `ctx.position` before the function evaluates. The function reads the previous position (often the origin `(0, 0)`) instead of the position set by `M`.
+
+**Example:**
+
+```
+M 100 100
+arcFromPolarOffset(0, 50, 90deg)
+```
+
+Expected: `arcFromPolarOffset` uses position `(100, 100)` to calculate the arc center at `(150, 100)`.
+
+Actual: `arcFromPolarOffset` uses position `(0, 0)`, calculating the arc center at `(50, 0)`.
+
+The output path is `M 100 100 A 50 50 0 0 1 50 -50` — the `M` is present but the arc was calculated from the wrong starting position.
+
+**Impact:**
+
+1. **Incorrect arc calculations:** `arcFromPolarOffset` (and potentially other context-aware functions) produce wrong geometry when preceded by `M` on a separate line
+2. **User confusion:** The path contains both the `M` command and the arc, but they don't connect logically
+3. **Workaround required:** Users must structure code to avoid this pattern
+
+**Current Workarounds:**
+
+1. Use context-aware functions from the origin without preceding `M`:
+   ```
+   arcFromPolarOffset(0, 50, 90deg)  // Works correctly from (0, 0)
+   ```
+
+2. Use `arcFromCenter` instead, which calculates positions using offsets rather than absolute ctx.position:
+   ```
+   M 100 100
+   arcFromCenter(50, 0, 50, 180deg, 270deg, 1)  // Uses offset from M position
+   ```
+
+**Potential Solutions:**
+
+1. **Investigate statement evaluation order:** The issue may be in how `evaluateStatements` processes path commands vs function calls — ensure `M` updates context before the next statement evaluates
+   - Pro: Fixes root cause
+   - Con: May have unintended side effects on other statement interactions
+
+2. **Force context sync between statements:** Add explicit context synchronization point after each statement
+   - Pro: Predictable behavior
+   - Con: Performance overhead, may mask other issues
+
+3. **Document as limitation:** Clearly document that context-aware functions should not rely on preceding `M` commands on separate lines
+   - Pro: No code changes needed
+   - Con: Unintuitive restriction for users
+
+**Recommended Long-term Solution:**
+
+Option 1 — investigate and fix the evaluation order. The current behavior is unintuitive: if `M 100 100` appears in the output path, users reasonably expect subsequent context-aware functions to use that position. This likely requires tracing through `evaluateStatements` and `evaluatePathCommand` to find where the context update is being delayed or lost.
+
+---
+
 ## Template for New Issues
 
 ```markdown

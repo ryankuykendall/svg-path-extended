@@ -219,6 +219,113 @@ closePath()
 
 ---
 
+## Context-Aware Functions
+
+These functions use the current path context (position, tangent direction) to generate path segments. They maintain path continuity and are ideal for building complex shapes programmatically.
+
+### Polar Movement
+
+#### polarPoint(angle, distance)
+
+Returns a point at a polar offset from current position. Does not emit any path commands.
+
+```
+M 100 100
+let p = polarPoint(0, 50);
+L p.x p.y  // Line to (150, 100)
+```
+
+#### polarOffset(angle, distance)
+
+Returns `{x, y}` coordinates at a polar offset. Similar to `polarPoint`.
+
+#### polarMove(angle, distance)
+
+Emits a line command (`L`) moving in the specified direction. Updates position but draws a visible line.
+
+```
+M 100 100
+polarMove(0, 50)  // Draws line to (150, 100)
+```
+
+#### polarLine(angle, distance)
+
+Emits a line command (`L`) in the specified direction. Same as `polarMove`.
+
+```
+M 100 100
+polarLine(45deg, 70.7)  // Draws line diagonally
+```
+
+### Arc Functions
+
+#### arcFromCenter(dcx, dcy, radius, startAngle, endAngle, clockwise)
+
+Draws an arc defined by center offset and angles. Returns `{point, angle}` with endpoint and tangent.
+
+- `dcx, dcy`: Offset from current position to arc center
+- `radius`: Arc radius
+- `startAngle, endAngle`: Start and end angles in radians
+- `clockwise`: 1 for clockwise, 0 for counter-clockwise
+
+**Warning:** If current position doesn't match the calculated arc start point, a line segment (`L`) will be drawn to the arc start. For guaranteed continuous arcs, use `arcFromPolarOffset`.
+
+```
+M 50 50
+arcFromCenter(50, 0, 50, 180deg, 270deg, 1)
+// Center at (100, 50), arc from (50, 50) to (100, 100)
+```
+
+#### arcFromPolarOffset(angle, radius, angleOfArc)
+
+Draws an arc where the center is at a polar offset from current position. The current position is guaranteed to be on the circle, so only an `A` command is emitted (no `M` or `L`). Returns `{point, angle}` with endpoint and tangent.
+
+- `angle`: Direction from current position to arc center (radians)
+- `radius`: Arc radius
+- `angleOfArc`: Sweep angle (positive = clockwise, negative = counter-clockwise)
+
+This function is ideal for creating continuous curved paths because it never emits extra line segments.
+
+```
+M 100 100
+arcFromPolarOffset(0, 50, 90deg)
+// Center at (150, 100), sweeps 90° clockwise
+// Ends at (150, 50)
+```
+
+**Comparison with arcFromCenter:**
+
+| Aspect | arcFromCenter | arcFromPolarOffset |
+|--------|---------------|-------------------|
+| Center defined by | Offset from current position | Polar direction from current position |
+| Start point | Calculated from startAngle | Current position (guaranteed) |
+| May emit L command | Yes, if position doesn't match | Never |
+| Best for | Arcs with known center offset | Continuous curved paths |
+
+### Tangent Functions
+
+These functions continue from the previous arc or polar command's direction.
+
+#### tangentLine(length)
+
+Draws a line continuing in the tangent direction from the previous arc or polar command.
+
+```
+arcFromPolarOffset(0, 50, 90deg)
+tangentLine(30)  // Continues in the arc's exit direction
+```
+
+#### tangentArc(radius, sweepAngle)
+
+Draws an arc continuing tangent to the previous arc or polar command.
+
+```
+arcFromPolarOffset(0, 50, 90deg)
+tangentArc(30, 45deg)  // Smooth continuation with a smaller arc
+```
+
+---
+
 ## Using Functions Inside calc()
 
 Math functions can be used inside `calc()`:

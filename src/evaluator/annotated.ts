@@ -263,6 +263,10 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
     case 'arcFromCenter': {
       // arcFromCenter(dcx, dcy, radius, startAngle, endAngle, clockwise) → PathWithResult
       // dcx, dcy are relative offsets from current position to the arc center
+      //
+      // WARNING: If current position doesn't match the calculated arc start point,
+      // a visible line segment (L command) will be drawn to the arc start.
+      // For guaranteed continuous arcs without extra line segments, use arcFromPolarOffset.
       const [dcx, dcy, radius, startAngle, endAngle, clockwise] = args as number[];
 
       // Calculate absolute center from current position + offset
@@ -285,8 +289,77 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       // Tangent angle at endpoint (perpendicular to radius)
       const tangentAngle = clockwise ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
 
-      // Generate path string
-      const pathStr = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+      // Check if current position matches arc start (within tolerance)
+      const tolerance = 1e-10;
+      const positionMatches =
+        Math.abs(ctx.position.x - startX) < tolerance &&
+        Math.abs(ctx.position.y - startY) < tolerance;
+
+      // Generate path string - use L instead of M to keep path continuous
+      let pathStr: string;
+      if (positionMatches) {
+        // Current position is at arc start - just emit arc
+        pathStr = `A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+      } else {
+        // Position mismatch - draw line to arc start, then arc (keeps path continuous)
+        pathStr = `L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+      }
+
+      // Update context tracking
+      parseAndTrackPathString(pathStr, scope);
+
+      // Store tangent for tangentLine/tangentArc
+      ctx.lastTangent = tangentAngle;
+      updateCtxVariable(scope);
+
+      // Return both path and result info
+      return {
+        type: 'PathWithResult' as const,
+        path: pathStr,
+        result: {
+          type: 'ContextObject' as const,
+          value: {
+            point: { x: endX, y: endY },
+            angle: tangentAngle,
+          },
+        },
+      };
+    }
+
+    case 'arcFromPolarOffset': {
+      // arcFromPolarOffset(angle, radius, angleOfArc) → PathWithResult
+      // Creates an arc where the center is at a polar offset from current position.
+      // Current position is guaranteed to be on the circle, so only an A command is emitted.
+      //
+      // Parameters:
+      // - angle: Direction from current position to arc center (radians)
+      // - radius: Arc radius
+      // - angleOfArc: Sweep angle (positive = clockwise, negative = counterclockwise)
+      const [angle, radius, angleOfArc] = args as number[];
+
+      // Center is at polar offset from current position
+      const centerX = ctx.position.x + radius * Math.cos(angle);
+      const centerY = ctx.position.y + radius * Math.sin(angle);
+
+      // Current position is on circle at angle + π from center
+      const startAngle = angle + Math.PI;
+      const endAngle = startAngle + angleOfArc;
+
+      // Calculate endpoint
+      const endX = centerX + radius * Math.cos(endAngle);
+      const endY = centerY + radius * Math.sin(endAngle);
+
+      // Determine arc flags
+      const largeArc = Math.abs(angleOfArc) > Math.PI ? 1 : 0;
+      const sweep = angleOfArc > 0 ? 1 : 0; // positive = CW (sweep=1), negative = CCW (sweep=0)
+
+      // Tangent angle at endpoint (perpendicular to radius)
+      // For CW (positive angleOfArc), tangent is endAngle + π/2
+      // For CCW (negative angleOfArc), tangent is endAngle - π/2
+      const tangentAngle = angleOfArc > 0 ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
+
+      // No M or L command - current position is guaranteed on circle
+      const pathStr = `A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
 
       // Update context tracking
       parseAndTrackPathString(pathStr, scope);

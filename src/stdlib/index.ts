@@ -16,6 +16,7 @@ export const contextAwareFunctions = new Set([
   'polarMove',
   'polarLine',
   'arcFromCenter',
+  'arcFromPolarOffset',
   'tangentLine',
   'tangentArc',
 ]);
