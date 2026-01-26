@@ -81,6 +81,28 @@
       color: var(--text-primary);
     }
 
+    .filename-display {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .filename-display.has-file {
+      color: var(--text-primary);
+    }
+
+    .filename-display.modified::after {
+      content: ' •';
+      color: var(--accent-color);
+    }
+
     .header-controls {
       display: flex;
       align-items: center;
@@ -883,6 +905,9 @@
   <header>
     <div class="header-left">
       <h1><code>svg-path-extended</code> Playground</h1>
+      <span id="filename-display" class="filename-display">Untitled</span>
+      <button id="open-file" class="secondary-btn">Open</button>
+      <button id="save-file" class="secondary-btn">Save</button>
       <button id="annotated-toggle" title="Show annotated output">
         <span class="toggle-icon">&#9654;</span>
         Annotated
@@ -1941,6 +1966,11 @@ for (i in 0..7) {
     let consolePaneOpen = false;
     let currentLogs = [];
 
+    // File state
+    let currentFileName = null;      // Name of currently loaded/saved file
+    let currentFileHandle = null;    // File handle for File System Access API
+    let isModified = false;          // Track if content changed since last save
+
     // Zoom/pan state
     let zoomLevel = 1;        // 1 = 100%, 2 = 200%, etc.
     let panX = 0;             // Horizontal pan offset (in SVG units)
@@ -1964,6 +1994,8 @@ for (i in 0..7) {
     function createEditor(initialCode) {
       const updateExtension = EditorView.updateListener.of((update) => {
         if (update.docChanged) {
+          isModified = true;
+          updateFilenameDisplay();
           debouncedUpdate();
         }
       });
@@ -2338,6 +2370,150 @@ for (i in 0..7) {
     function clearConsole() {
       currentLogs = [];
       updateConsoleOutput();
+    }
+
+    // ==================== File Operations ====================
+
+    // Update the filename display in the header
+    function updateFilenameDisplay() {
+      const display = document.getElementById('filename-display');
+
+      if (currentFileName) {
+        display.textContent = currentFileName;
+        display.classList.add('has-file');
+      } else {
+        display.textContent = 'Untitled';
+        display.classList.remove('has-file');
+      }
+
+      if (isModified) {
+        display.classList.add('modified');
+      } else {
+        display.classList.remove('modified');
+      }
+    }
+
+    // Save the current workspace to a file
+    async function saveFile() {
+      const code = editor.state.doc.toString();
+
+      try {
+        // Try File System Access API (modern browsers)
+        if ('showSaveFilePicker' in window) {
+          const options = {
+            suggestedName: currentFileName || 'untitled.svgx',
+            types: [{
+              description: 'SVG Path Extended Files',
+              accept: { 'text/plain': ['.svgx'] },
+            }],
+          };
+
+          // If we have an existing handle, try to reuse it
+          if (currentFileHandle) {
+            const writable = await currentFileHandle.createWritable();
+            await writable.write(code);
+            await writable.close();
+          } else {
+            const handle = await window.showSaveFilePicker(options);
+            const writable = await handle.createWritable();
+            await writable.write(code);
+            await writable.close();
+            currentFileHandle = handle;
+            currentFileName = handle.name;
+          }
+
+          isModified = false;
+          updateFilenameDisplay();
+        } else {
+          // Fallback: download link
+          const blob = new Blob([code], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = currentFileName || 'untitled.svgx';
+          a.click();
+          URL.revokeObjectURL(url);
+
+          if (!currentFileName) {
+            currentFileName = 'untitled.svgx';
+          }
+          isModified = false;
+          updateFilenameDisplay();
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Save failed:', err);
+        }
+      }
+    }
+
+    // Open a file and load its contents into the editor
+    async function openFile() {
+      try {
+        // Try File System Access API (modern browsers)
+        if ('showOpenFilePicker' in window) {
+          const options = {
+            types: [{
+              description: 'SVG Path Extended Files',
+              accept: { 'text/plain': ['.svgx'] },
+            }],
+            multiple: false,
+          };
+
+          const [handle] = await window.showOpenFilePicker(options);
+          const file = await handle.getFile();
+          const contents = await file.text();
+
+          currentFileHandle = handle;
+          currentFileName = handle.name;
+
+          editor.dispatch({
+            changes: {
+              from: 0,
+              to: editor.state.doc.length,
+              insert: contents,
+            },
+          });
+
+          isModified = false;
+          updateFilenameDisplay();
+          updatePreview();
+          updateAnnotatedOutput();
+        } else {
+          // Fallback: file input
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.svgx';
+
+          input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const contents = await file.text();
+            currentFileName = file.name;
+            currentFileHandle = null;  // No handle in fallback mode
+
+            editor.dispatch({
+              changes: {
+                from: 0,
+                to: editor.state.doc.length,
+                insert: contents,
+              },
+            });
+
+            isModified = false;
+            updateFilenameDisplay();
+            updatePreview();
+            updateAnnotatedOutput();
+          };
+
+          input.click();
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Open failed:', err);
+        }
+      }
     }
 
     // ==================== Zoom/Pan Functions ====================
@@ -2772,6 +2948,10 @@ for (i in 0..7) {
     strokeWidthSelect.addEventListener('change', updateSvgStyles);
     copyUrlBtn.addEventListener('click', copyURL);
 
+    // File operations
+    document.getElementById('open-file').addEventListener('click', openFile);
+    document.getElementById('save-file').addEventListener('click', saveFile);
+
     // Annotated pane toggle
     annotatedToggle.addEventListener('click', toggleAnnotatedPane);
 
@@ -2875,6 +3055,16 @@ for (i in 0..7) {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && docsPanel.classList.contains('open')) {
         docsPanel.classList.remove('open');
+      }
+      // Ctrl/Cmd + S = Save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveFile();
+      }
+      // Ctrl/Cmd + O = Open
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault();
+        openFile();
       }
     });
 
