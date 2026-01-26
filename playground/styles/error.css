@@ -1,0 +1,15 @@
+/* Error panel styles */
+
+#error-panel {
+  background: var(--error-bg);
+  color: var(--error-text);
+  padding: 12px 20px;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  border-top: 1px solid #fcc;
+  display: none;
+}
+
+#error-panel.visible {
+  display: block;
+}

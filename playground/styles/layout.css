@@ -1,0 +1,102 @@
+/* Body and main layout */
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 800px) {
+  main {
+    flex-direction: column;
+    overflow: auto;
+  }
+}
+
+/* Common form elements */
+select, input, button {
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+select {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  cursor: pointer;
+}
+
+input[type="number"] {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+input[type="color"] {
+  width: 36px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+button {
+  padding: 6px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover {
+  background: var(--bg-secondary);
+}
+
+button.primary {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+button.primary:hover {
+  background: #0052a3;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.links {
+  font-size: 0.8125rem;
+}
+
+.links a {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.links a:hover {
+  text-decoration: underline;
+}

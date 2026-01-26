@@ -1,0 +1,185 @@
+/* Console pane styles */
+
+#console-pane {
+  flex: 0 0 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+  transition: flex-basis 0.3s ease;
+}
+
+#console-pane.open {
+  flex: 1 1 0;
+}
+
+#console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+#console-header span {
+  font-weight: 500;
+}
+
+#console-output {
+  flex: 1;
+  overflow: auto;
+  background: #1e1e1e;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #d4d4d4;
+}
+
+.log-entry {
+  padding: 8px 0;
+  border-bottom: 1px solid #333;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-line {
+  color: #569cd6;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+}
+
+.log-string {
+  color: #ce9178;
+  margin-right: 8px;
+}
+
+.log-labeled-value {
+  margin: 4px 0;
+}
+
+.log-label {
+  color: #9cdcfe;
+}
+
+.log-value {
+  color: #b5cea8;
+}
+
+.log-json {
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  display: block;
+  margin-left: 12px;
+  background: #1a1a1a;
+  padding: 4px 8px;
+  border-radius: 3px;
+  margin-top: 2px;
+}
+
+.log-empty {
+  color: #666;
+  font-style: italic;
+}
+
+@media (max-width: 800px) {
+  #console-pane {
+    flex-basis: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  #console-pane.open {
+    flex: 0 0 200px;
+  }
+}
+
+/* Expandable object styles */
+.log-expandable {
+  display: inline;
+}
+
+.log-toggle {
+  cursor: pointer;
+  display: inline-block;
+  width: 12px;
+  color: #888;
+  user-select: none;
+  transition: transform 0.1s;
+}
+
+.log-expandable.expanded > .log-toggle {
+  transform: rotate(90deg);
+}
+
+.log-preview {
+  color: #9cdcfe;
+}
+
+.log-content {
+  display: none;
+  margin-left: 16px;
+  padding-left: 8px;
+  border-left: 1px solid #444;
+}
+
+.log-expandable.expanded > .log-content {
+  display: block;
+}
+
+.log-property {
+  display: block;
+  padding: 1px 0;
+}
+
+.log-key {
+  color: #9cdcfe;
+}
+
+.log-index {
+  color: #b5cea8;
+}
+
+.log-primitive-null {
+  color: #569cd6;
+  font-style: italic;
+}
+
+.log-primitive-undefined {
+  color: #569cd6;
+  font-style: italic;
+}
+
+.log-primitive-number {
+  color: #b5cea8;
+}
+
+.log-primitive-string {
+  color: #ce9178;
+}
+
+.log-primitive-string::before,
+.log-primitive-string::after {
+  content: '"';
+  color: #ce9178;
+}
+
+.log-primitive-boolean {
+  color: #569cd6;
+}
+
+.log-more {
+  color: #666;
+  font-style: italic;
+  padding: 2px 0;
+}
