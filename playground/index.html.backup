@@ -1,0 +1,3137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>svg-path-extended Playground</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f5f5f5;
+      --bg-tertiary: #e8e8e8;
+      --text-primary: #1a1a1a;
+      --text-secondary: #666666;
+      --border-color: #ddd;
+      --accent-color: #0066cc;
+      --error-bg: #fee;
+      --error-text: #c00;
+      --success-color: #28a745;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    h1 code {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      background: var(--bg-secondary);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .secondary-btn {
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .secondary-btn:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    .filename-display {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .filename-display.has-file {
+      color: var(--text-primary);
+    }
+
+    .filename-display.modified::after {
+      content: ' •';
+      color: var(--accent-color);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    select, input, button {
+      font-family: inherit;
+      font-size: 0.875rem;
+    }
+
+    select {
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      cursor: pointer;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      gap: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    @media (max-width: 800px) {
+      main {
+        flex-direction: column;
+        overflow: auto;
+      }
+    }
+
+    #editor-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-right: 1px solid var(--border-color);
+      position: relative;
+    }
+
+    @media (max-width: 800px) {
+      #editor-pane {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        min-height: 300px;
+      }
+
+      #preview-pane {
+        min-height: 250px;
+      }
+    }
+
+    #editor-container {
+      flex: 1;
+      overflow: auto;
+    }
+
+    .pane-copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 10;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+
+    .pane-copy-btn:hover {
+      opacity: 1;
+      background: var(--bg-secondary);
+    }
+
+    .pane-copy-btn.copied {
+      background: var(--success-color);
+      border-color: var(--success-color);
+      color: white;
+      opacity: 1;
+    }
+
+    .cm-editor {
+      height: 100%;
+      font-size: 14px;
+    }
+
+    .cm-editor .cm-scroller {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', monospace;
+    }
+
+    .cm-editor.cm-focused {
+      outline: none;
+    }
+
+    #preview-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: var(--bg-primary);
+      min-width: 0;
+      overflow: auto;
+      position: relative;
+    }
+
+    #preview-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #preview {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    #error-panel {
+      background: var(--error-bg);
+      color: var(--error-text);
+      padding: 12px 20px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.875rem;
+      border-top: 1px solid #fcc;
+      display: none;
+    }
+
+    #error-panel.visible {
+      display: block;
+    }
+
+    footer {
+      background: var(--bg-primary);
+      border-top: 1px solid var(--border-color);
+      padding: 12px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .control-group label {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    input[type="number"] {
+      width: 70px;
+      padding: 6px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+    }
+
+    input[type="color"] {
+      width: 36px;
+      height: 30px;
+      padding: 2px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    .control-group select {
+      min-width: 60px;
+    }
+
+    button {
+      padding: 6px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover {
+      background: var(--bg-secondary);
+    }
+
+    button.primary {
+      background: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
+    }
+
+    button.primary:hover {
+      background: #0052a3;
+    }
+
+    #copy-feedback {
+      font-size: 0.75rem;
+      color: var(--success-color);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    #copy-feedback.visible {
+      opacity: 1;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    .links {
+      font-size: 0.8125rem;
+    }
+
+    .links a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+
+    /* Docs Panel */
+    #docs-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 420px;
+      max-width: 100vw;
+      height: 100vh;
+      background: var(--bg-primary);
+      border-left: 1px solid var(--border-color);
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #docs-panel.open {
+      transform: translateX(0);
+    }
+
+    #docs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+    }
+
+    #docs-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    #docs-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      color: var(--text-secondary);
+      line-height: 1;
+    }
+
+    #docs-close:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    #docs-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .docs-tab {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      background: var(--bg-secondary);
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .docs-tab:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .docs-tab.active {
+      background: var(--bg-primary);
+      color: var(--accent-color);
+      border-bottom-color: var(--accent-color);
+    }
+
+    #docs-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    #docs-content h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 20px 0 10px 0;
+      color: var(--text-primary);
+    }
+
+    #docs-content h3:first-child {
+      margin-top: 0;
+    }
+
+    #docs-content h4 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin: 16px 0 8px 0;
+      color: var(--text-primary);
+    }
+
+    #docs-content p {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      margin: 8px 0;
+    }
+
+    #docs-content code {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.75rem;
+      background: var(--bg-secondary);
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+
+    #docs-content pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      margin: 10px 0;
+    }
+
+    #docs-content pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    #docs-content table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+      margin: 10px 0;
+    }
+
+    #docs-content th, #docs-content td {
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    #docs-content th {
+      background: var(--bg-secondary);
+      font-weight: 600;
+    }
+
+    .doc-section {
+      display: none;
+    }
+
+    .doc-section.active {
+      display: block;
+    }
+
+    /* Annotated Panel */
+    #annotated-pane {
+      flex: 0 0 0;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-right: 1px solid var(--border-color);
+      position: relative;
+      overflow: hidden;
+      transition: flex-basis 0.3s ease;
+    }
+
+    #annotated-pane.open {
+      flex: 1 1 0;
+    }
+
+    #annotated-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    #annotated-header span {
+      font-weight: 500;
+    }
+
+    #annotated-container {
+      flex: 1;
+      overflow: auto;
+      background: var(--bg-primary);
+    }
+
+    #annotated-container .cm-editor {
+      height: 100%;
+      font-size: 13px;
+      background: var(--bg-primary);
+    }
+
+    #annotated-container .cm-editor .cm-content {
+      cursor: default;
+    }
+
+    /* Annotated toggle button */
+    #annotated-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    #annotated-toggle:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    #annotated-toggle.active {
+      background: var(--accent-color);
+      border-color: var(--accent-color);
+      color: white;
+    }
+
+    #annotated-toggle .toggle-icon {
+      font-size: 0.875rem;
+      transition: transform 0.2s;
+    }
+
+    #annotated-toggle.active .toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    @media (max-width: 800px) {
+      #annotated-pane {
+        flex-basis: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      #annotated-pane.open {
+        flex: 0 0 200px;
+      }
+    }
+
+    /* Console toggle button */
+    #console-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    #console-toggle:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    #console-toggle.active {
+      background: var(--accent-color);
+      border-color: var(--accent-color);
+      color: white;
+    }
+
+    #console-toggle .toggle-icon {
+      font-size: 0.875rem;
+      transition: transform 0.2s;
+    }
+
+    #console-toggle.active .toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    /* Console Panel */
+    #console-pane {
+      flex: 0 0 0;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-right: 1px solid var(--border-color);
+      position: relative;
+      overflow: hidden;
+      transition: flex-basis 0.3s ease;
+    }
+
+    #console-pane.open {
+      flex: 1 1 0;
+    }
+
+    #console-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    #console-header span {
+      font-weight: 500;
+    }
+
+    #console-output {
+      flex: 1;
+      overflow: auto;
+      background: #1e1e1e;
+      padding: 12px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      color: #d4d4d4;
+    }
+
+    .log-entry {
+      padding: 8px 0;
+      border-bottom: 1px solid #333;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-line {
+      color: #569cd6;
+      font-weight: 500;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.7rem;
+    }
+
+    .log-string {
+      color: #ce9178;
+      margin-right: 8px;
+    }
+
+    .log-labeled-value {
+      margin: 4px 0;
+    }
+
+    .log-label {
+      color: #9cdcfe;
+    }
+
+    .log-value {
+      color: #b5cea8;
+    }
+
+    .log-json {
+      color: #d4d4d4;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: block;
+      margin-left: 12px;
+      background: #1a1a1a;
+      padding: 4px 8px;
+      border-radius: 3px;
+      margin-top: 2px;
+    }
+
+    .log-empty {
+      color: #666;
+      font-style: italic;
+    }
+
+    @media (max-width: 800px) {
+      #console-pane {
+        flex-basis: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      #console-pane.open {
+        flex: 0 0 200px;
+      }
+    }
+
+    /* Expandable object styles */
+    .log-expandable {
+      display: inline;
+    }
+
+    .log-toggle {
+      cursor: pointer;
+      display: inline-block;
+      width: 12px;
+      color: #888;
+      user-select: none;
+      transition: transform 0.1s;
+    }
+
+    .log-expandable.expanded > .log-toggle {
+      transform: rotate(90deg);
+    }
+
+    .log-preview {
+      color: #9cdcfe;
+    }
+
+    .log-content {
+      display: none;
+      margin-left: 16px;
+      padding-left: 8px;
+      border-left: 1px solid #444;
+    }
+
+    .log-expandable.expanded > .log-content {
+      display: block;
+    }
+
+    .log-property {
+      display: block;
+      padding: 1px 0;
+    }
+
+    .log-key {
+      color: #9cdcfe;
+    }
+
+    .log-index {
+      color: #b5cea8;
+    }
+
+    .log-primitive-null {
+      color: #569cd6;
+      font-style: italic;
+    }
+
+    .log-primitive-undefined {
+      color: #569cd6;
+      font-style: italic;
+    }
+
+    .log-primitive-number {
+      color: #b5cea8;
+    }
+
+    .log-primitive-string {
+      color: #ce9178;
+    }
+
+    .log-primitive-string::before,
+    .log-primitive-string::after {
+      content: '"';
+      color: #ce9178;
+    }
+
+    .log-primitive-boolean {
+      color: #569cd6;
+    }
+
+    .log-more {
+      color: #666;
+      font-style: italic;
+      padding: 2px 0;
+    }
+
+    /* Thumbnail navigator */
+    #zoom-navigator {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 120px;
+      height: 120px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      z-index: 10;
+    }
+
+    #navigator-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    #navigator-viewport {
+      cursor: move;
+      fill: rgba(0, 102, 204, 0.1);
+    }
+
+    /* Zoom controls */
+    #zoom-controls {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-primary);
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+    }
+
+    #zoom-controls button {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    #zoom-in,
+    #zoom-out {
+      font-size: 1.4rem;
+      font-weight: 300;
+      line-height: 0;
+    }
+
+    #zoom-fit {
+      font-size: 0.96rem;
+    }
+
+    #zoom-level {
+      width: 50px;
+      padding: 2px 4px;
+      border: 1px solid var(--border-color);
+      border-radius: 3px;
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    #zoom-level:focus {
+      outline: none;
+      border-color: var(--accent-color);
+    }
+
+    /* Pan cursor */
+    #preview-container.can-pan {
+      cursor: grab;
+    }
+
+    #preview-container.panning {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1><code>svg-path-extended</code> Playground</h1>
+      <span id="filename-display" class="filename-display">Untitled</span>
+      <button id="open-file" class="secondary-btn">Open</button>
+      <button id="save-file" class="secondary-btn">Save</button>
+      <button id="annotated-toggle" title="Show annotated output">
+        <span class="toggle-icon">&#9654;</span>
+        Annotated
+      </button>
+      <button id="console-toggle" title="Show console output">
+        <span class="toggle-icon">&#9654;</span>
+        Console
+      </button>
+      <button id="copy-url" class="secondary-btn">Copy URL</button>
+      <span id="copy-feedback">Copied!</span>
+    </div>
+    <div class="header-controls">
+      <label for="examples">Examples:</label>
+      <select id="examples">
+        <option value="">-- Select --</option>
+        <option value="circle">Circle</option>
+        <option value="star">Star</option>
+        <option value="grid">Grid of Dots</option>
+        <option value="spiral">Spiral</option>
+        <option value="flower">Flower</option>
+        <option value="sineWave">Sine Wave</option>
+        <option value="gear">Gear</option>
+        <option value="customFunction">Custom Function</option>
+        <option value="descending">Descending Ranges</option>
+        <option value="polarPath">Polar & Tangent</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <div id="editor-pane">
+      <button id="copy-code" class="pane-copy-btn">Copy Code</button>
+      <div id="editor-container"></div>
+    </div>
+    <div id="annotated-pane">
+      <div id="annotated-header">
+        <span>Annotated Output</span>
+        <button id="copy-annotated" class="pane-copy-btn" style="position: static; opacity: 1;">Copy</button>
+      </div>
+      <div id="annotated-container"></div>
+    </div>
+    <div id="console-pane">
+      <div id="console-header">
+        <span>Console</span>
+        <button id="clear-console" class="pane-copy-btn" style="position: static; opacity: 1;">Clear</button>
+      </div>
+      <div id="console-output"></div>
+    </div>
+    <div id="preview-pane">
+      <button id="copy-svg" class="pane-copy-btn">Copy SVG</button>
+      <!-- Thumbnail navigator (top-left corner) -->
+      <div id="zoom-navigator">
+        <svg id="navigator-svg">
+          <rect id="navigator-bg" width="100%" height="100%"></rect>
+          <path id="navigator-path" fill="none"></path>
+          <rect id="navigator-viewport" fill="none" stroke="#0066cc" stroke-width="2"></rect>
+        </svg>
+      </div>
+      <!-- Zoom controls (bottom of preview pane) -->
+      <div id="zoom-controls">
+        <button id="zoom-out" title="Zoom out">&#x2212;</button>
+        <button id="zoom-fit" title="Fit to view">Fit</button>
+        <button id="zoom-in" title="Zoom in">&#x002B;</button>
+        <input type="text" id="zoom-level" value="100%" title="Enter zoom percentage or use ↑↓ (±5%) / Shift+↑↓ (±25%)">
+      </div>
+      <div id="preview-container">
+        <svg id="preview" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid-pattern" patternUnits="userSpaceOnUse">
+              <path id="grid-path" fill="none" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect id="preview-bg" width="100%" height="100%"></rect>
+          <rect id="preview-grid" width="100%" height="100%" fill="url(#grid-pattern)"></rect>
+          <path id="preview-path" fill="none"></path>
+        </svg>
+      </div>
+    </div>
+  </main>
+
+  <div id="error-panel"></div>
+
+  <!-- Documentation Panel -->
+  <div id="docs-panel">
+    <div id="docs-header">
+      <h2>Documentation</h2>
+      <button id="docs-close">&times;</button>
+    </div>
+    <div id="docs-tabs">
+      <button class="docs-tab active" data-tab="syntax">Syntax</button>
+      <button class="docs-tab" data-tab="stdlib">Stdlib</button>
+      <button class="docs-tab" data-tab="debug">Debug</button>
+      <button class="docs-tab" data-tab="cli">CLI</button>
+    </div>
+    <div id="docs-content">
+      <!-- Syntax Tab -->
+      <div class="doc-section active" id="doc-syntax">
+        <h3>Path Commands</h3>
+        <table>
+          <tr><th>Command</th><th>Name</th><th>Parameters</th></tr>
+          <tr><td><code>M</code> / <code>m</code></td><td>Move to</td><td>x y</td></tr>
+          <tr><td><code>L</code> / <code>l</code></td><td>Line to</td><td>x y</td></tr>
+          <tr><td><code>H</code> / <code>h</code></td><td>Horizontal line</td><td>x</td></tr>
+          <tr><td><code>V</code> / <code>v</code></td><td>Vertical line</td><td>y</td></tr>
+          <tr><td><code>C</code> / <code>c</code></td><td>Cubic bezier</td><td>x1 y1 x2 y2 x y</td></tr>
+          <tr><td><code>Q</code> / <code>q</code></td><td>Quadratic bezier</td><td>x1 y1 x y</td></tr>
+          <tr><td><code>A</code> / <code>a</code></td><td>Arc</td><td>rx ry rot large sweep x y</td></tr>
+          <tr><td><code>Z</code> / <code>z</code></td><td>Close path</td><td>(none)</td></tr>
+        </table>
+
+        <h3>Variables</h3>
+        <p>Declare variables with <code>let</code>:</p>
+        <pre><code>let width = 200;
+let centerX = 100;
+M centerX 50</code></pre>
+
+        <h3>Expressions with calc()</h3>
+        <p>Use <code>calc()</code> for math expressions:</p>
+        <pre><code>let r = 50;
+M calc(100 - r) 100
+L calc(100 + r) 100</code></pre>
+
+        <h4>Operators</h4>
+        <table>
+          <tr><td><code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>%</code></td><td>Arithmetic</td></tr>
+          <tr><td><code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code> <code>==</code> <code>!=</code></td><td>Comparison</td></tr>
+          <tr><td><code>&&</code> <code>||</code> <code>!</code></td><td>Logical</td></tr>
+        </table>
+
+        <h3>For Loops</h3>
+        <pre><code>for (i in 0..10) {
+  L calc(i * 20) calc(i * 10)
+}</code></pre>
+        <p>Range <code>0..10</code> includes 0-9 (exclusive end).</p>
+
+        <h3>Conditionals</h3>
+        <pre><code>if (size > 50) {
+  circle(100, 100, size)
+} else {
+  rect(50, 50, 100, 100)
+}</code></pre>
+
+        <h3>Functions</h3>
+        <pre><code>fn square(x, y, size) {
+  rect(x, y, size, size)
+}
+
+square(10, 10, 50)</code></pre>
+
+        <h3>Comments</h3>
+        <pre><code>// This is a comment
+let x = 50;  // inline comment</code></pre>
+      </div>
+
+      <!-- Stdlib Tab -->
+      <div class="doc-section" id="doc-stdlib">
+        <h3>Math Functions</h3>
+
+        <h4>Trigonometry</h4>
+        <p><code>sin(x)</code> <code>cos(x)</code> <code>tan(x)</code> <code>asin(x)</code> <code>acos(x)</code> <code>atan(x)</code> <code>atan2(y, x)</code></p>
+
+        <h4>Angle Conversion</h4>
+        <p><code>rad(degrees)</code> <code>deg(radians)</code></p>
+
+        <h4>Exponential</h4>
+        <p><code>exp(x)</code> <code>log(x)</code> <code>log10(x)</code> <code>pow(x, y)</code> <code>sqrt(x)</code> <code>cbrt(x)</code></p>
+
+        <h4>Rounding</h4>
+        <p><code>floor(x)</code> <code>ceil(x)</code> <code>round(x)</code> <code>trunc(x)</code></p>
+
+        <h4>Utility</h4>
+        <p><code>abs(x)</code> <code>sign(x)</code> <code>min(a, b)</code> <code>max(a, b)</code></p>
+
+        <h4>Interpolation</h4>
+        <table>
+          <tr><td><code>lerp(a, b, t)</code></td><td>Linear interpolation</td></tr>
+          <tr><td><code>clamp(val, min, max)</code></td><td>Constrain to range</td></tr>
+          <tr><td><code>map(val, inMin, inMax, outMin, outMax)</code></td><td>Map between ranges</td></tr>
+        </table>
+
+        <h4>Constants</h4>
+        <p><code>PI()</code> <code>E()</code> <code>TAU()</code></p>
+
+        <h4>Random</h4>
+        <p><code>random()</code> <code>randomRange(min, max)</code></p>
+
+        <h3>Path Functions</h3>
+
+        <h4>Shapes</h4>
+        <table>
+          <tr><td><code>circle(cx, cy, r)</code></td><td>Circle</td></tr>
+          <tr><td><code>rect(x, y, w, h)</code></td><td>Rectangle</td></tr>
+          <tr><td><code>roundRect(x, y, w, h, r)</code></td><td>Rounded rectangle</td></tr>
+          <tr><td><code>polygon(cx, cy, r, sides)</code></td><td>Regular polygon</td></tr>
+          <tr><td><code>star(cx, cy, outer, inner, points)</code></td><td>Star shape</td></tr>
+        </table>
+
+        <h4>Curves</h4>
+        <table>
+          <tr><td><code>line(x1, y1, x2, y2)</code></td><td>Line segment</td></tr>
+          <tr><td><code>arc(rx, ry, rot, lg, sw, x, y)</code></td><td>Arc</td></tr>
+          <tr><td><code>quadratic(x1, y1, cx, cy, x2, y2)</code></td><td>Quadratic bezier</td></tr>
+          <tr><td><code>cubic(x1, y1, c1x, c1y, c2x, c2y, x2, y2)</code></td><td>Cubic bezier</td></tr>
+        </table>
+
+        <h4>Commands</h4>
+        <p><code>moveTo(x, y)</code> <code>lineTo(x, y)</code> <code>closePath()</code></p>
+
+        <h3>Angle Units</h3>
+        <p>Numbers can have angle unit suffixes:</p>
+        <table>
+          <tr><td><code>45deg</code></td><td>Degrees (converted to radians)</td></tr>
+          <tr><td><code>1.5rad</code></td><td>Radians (no conversion)</td></tr>
+        </table>
+        <pre><code>let angle = 90deg;
+M sin(45deg) cos(45deg)</code></pre>
+
+        <h3>Polar Coordinate Functions</h3>
+        <p>These functions use the current position from <code>ctx.position</code>.</p>
+
+        <h4>polarPoint(angle, distance)</h4>
+        <p>Returns absolute point {x, y} at angle/distance from current position:</p>
+        <pre><code>M 100 100
+let pt = polarPoint(45deg, 50);
+L pt.x pt.y  // Line to (135, 135)</code></pre>
+
+        <h4>polarOffset(angle, distance)</h4>
+        <p>Returns relative offset {dx, dy} - independent of current position:</p>
+        <pre><code>let off = polarOffset(45deg, 50);
+// off.dx ≈ 35.35, off.dy ≈ 35.35
+L calc(ctx.position.x + off.dx) calc(ctx.position.y + off.dy)</code></pre>
+
+        <h4>polarMove(angle, distance, isMoveTo?)</h4>
+        <p>Moves by angle/distance, drawing a line (or move if isMoveTo=1):</p>
+        <pre><code>M 50 50
+polarMove(0, 30)        // L 80 50 (line east)
+polarMove(90deg, 30, 1) // M 80 80 (move south)</code></pre>
+
+        <h4>polarLine(angle, distance)</h4>
+        <p>Always draws a line by angle/distance:</p>
+        <pre><code>M 100 100
+polarLine(45deg, 50)    // L 135.35 135.35</code></pre>
+
+        <h3>Arc & Tangent Functions</h3>
+
+        <h4>arcFromCenter(dcx, dcy, r, startAngle, endAngle, clockwise)</h4>
+        <p>Draws an arc with center at offset (dcx, dcy) from current position. Returns object with endpoint and tangent:</p>
+        <pre><code>M 50 50
+let arc = arcFromCenter(30, 30, 20, 0, 90deg, 1);
+// Center at (80, 80), arc from (100, 80) to (80, 100)
+// arc.point = {x, y}, arc.angle = tangent angle</code></pre>
+
+        <h4>tangentLine(length)</h4>
+        <p>Draws a line continuing in the last tangent direction (from polarLine, polarMove, arcFromCenter, or tangentArc):</p>
+        <pre><code>M 50 50
+polarLine(0, 40)        // Going east
+tangentLine(30)         // Continue east 30px</code></pre>
+
+        <h4>tangentArc(radius, sweepAngle)</h4>
+        <p>Draws an arc that starts tangent to the previous direction:</p>
+        <pre><code>M 50 100
+polarLine(0, 40)        // Going east
+tangentArc(20, 90deg)   // Smooth 90° curve
+tangentLine(30)         // Continue in new direction</code></pre>
+
+        <h3>Example</h3>
+        <pre><code>// 8 points around a circle
+let cx = 100;
+let cy = 100;
+let r = 60;
+
+for (i in 0..7) {
+  let angle = calc(i / 8 * TAU());
+  let x = calc(cx + cos(angle) * r);
+  let y = calc(cy + sin(angle) * r);
+  circle(x, y, 5)
+}</code></pre>
+      </div>
+
+      <!-- Debug Tab -->
+      <div class="doc-section" id="doc-debug">
+        <h3>Console Output</h3>
+        <p>Click the <strong>Console</strong> button in the header to view debug output.</p>
+
+        <h3>log() Function</h3>
+        <p>Use <code>log()</code> to inspect values during execution:</p>
+        <pre><code>log("message")           // String message
+log(myVar)               // Variable with label
+log("pos:", ctx.position) // Multiple args
+log(ctx)                 // Full context object</code></pre>
+
+        <h4>Output Format</h4>
+        <p>String arguments display as-is. Other expressions show a label with the source:</p>
+        <pre><code>log("radius is", r)
+// Output:
+// radius is
+// r = 50</code></pre>
+
+        <p>Objects are expandable in the console - click the arrow to explore nested properties.</p>
+
+        <h3>ctx Object</h3>
+        <p>The <code>ctx</code> object tracks path state during evaluation:</p>
+
+        <h4>ctx.position</h4>
+        <p>Current pen position after the last command.</p>
+        <table>
+          <tr><td><code>ctx.position.x</code></td><td>X coordinate</td></tr>
+          <tr><td><code>ctx.position.y</code></td><td>Y coordinate</td></tr>
+        </table>
+        <pre><code>M 100 50
+log(ctx.position)  // {x: 100, y: 50}
+L 150 75
+log(ctx.position)  // {x: 150, y: 75}</code></pre>
+
+        <h4>ctx.start</h4>
+        <p>Subpath start position (set by <code>M</code>/<code>m</code>, used by <code>Z</code>).</p>
+        <table>
+          <tr><td><code>ctx.start.x</code></td><td>X coordinate</td></tr>
+          <tr><td><code>ctx.start.y</code></td><td>Y coordinate</td></tr>
+        </table>
+
+        <h4>ctx.commands</h4>
+        <p>Array of all executed commands with their positions:</p>
+        <pre><code>// Each entry contains:
+{
+  command: "L",        // Command letter
+  args: [150, 75],     // Evaluated arguments
+  start: {x: 100, y: 50},
+  end: {x: 150, y: 75}
+}</code></pre>
+
+        <h3>Using ctx in Paths</h3>
+        <p>Access position values with <code>calc()</code>:</p>
+        <pre><code>M 50 50
+// Draw relative to current position
+L calc(ctx.position.x + 30) ctx.position.y
+circle(ctx.position.x, ctx.position.y, 5)</code></pre>
+
+        <h3>Example: Debug a Loop</h3>
+        <pre><code>M 20 100
+for (i in 0..4) {
+  log("iteration", i, ctx.position)
+  L calc(ctx.position.x + 40) 100
+}</code></pre>
+      </div>
+
+      <!-- CLI Tab -->
+      <div class="doc-section" id="doc-cli">
+        <h3>Installation</h3>
+        <pre><code>npm install -g svg-path-extended</code></pre>
+        <p>Or use with npx:</p>
+        <pre><code>npx svg-path-extended [options]</code></pre>
+
+        <h3>Basic Usage</h3>
+        <table>
+          <tr><td><code>svg-path-extended input.svgx</code></td><td>Compile a file</td></tr>
+          <tr><td><code>svg-path-extended -e 'code'</code></td><td>Compile inline code</td></tr>
+          <tr><td><code>echo 'code' | svg-path-extended -</code></td><td>Read from stdin</td></tr>
+        </table>
+
+        <h3>Output Options</h3>
+        <table>
+          <tr><td><code>-o file.txt</code></td><td>Output path data to file</td></tr>
+          <tr><td><code>--output-svg-file=out.svg</code></td><td>Output complete SVG file</td></tr>
+          <tr><td><code>--annotated</code></td><td>Debug output with comments</td></tr>
+        </table>
+
+        <h3>SVG Styling</h3>
+        <p>Use with <code>--output-svg-file</code>:</p>
+        <table>
+          <tr><td><code>--stroke=color</code></td><td>Stroke color (default: #000)</td></tr>
+          <tr><td><code>--fill=color</code></td><td>Fill color (default: none)</td></tr>
+          <tr><td><code>--stroke-width=n</code></td><td>Stroke width (default: 2)</td></tr>
+          <tr><td><code>--viewBox=box</code></td><td>SVG viewBox</td></tr>
+          <tr><td><code>--width=w</code></td><td>SVG width</td></tr>
+          <tr><td><code>--height=h</code></td><td>SVG height</td></tr>
+        </table>
+
+        <h3>Examples</h3>
+        <pre><code># Red circle SVG
+svg-path-extended -e 'circle(100, 100, 50)' \
+  --output-svg-file=circle.svg \
+  --stroke=red --stroke-width=3
+
+# Blue filled hexagon
+svg-path-extended -e 'polygon(100, 100, 80, 6)' \
+  --output-svg-file=hex.svg \
+  --stroke=navy --fill=lightblue</code></pre>
+
+        <h3>Annotated Output</h3>
+        <p>Shows loop iterations and function expansions:</p>
+        <pre><code>svg-path-extended -e 'for (i in 0..3) { M i 0 }' --annotated
+
+# Output:
+//--- for (i in 0..3) from line 1
+  //--- iteration 0
+  M 0 0
+  //--- iteration 1
+  M 1 0
+  ...</code></pre>
+
+        <h3>Help</h3>
+        <pre><code>svg-path-extended --help
+svg-path-extended --version</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="control-group">
+      <label for="width">Width:</label>
+      <input type="number" id="width" value="200" min="50" max="1000">
+    </div>
+    <div class="control-group">
+      <label for="height">Height:</label>
+      <input type="number" id="height" value="200" min="50" max="1000">
+    </div>
+    <div class="control-group">
+      <label for="stroke">Stroke:</label>
+      <input type="color" id="stroke" value="#000000">
+    </div>
+    <div class="control-group">
+      <label for="fill-enabled">Fill:</label>
+      <input type="checkbox" id="fill-enabled">
+      <input type="color" id="fill" value="#3498db" disabled>
+    </div>
+    <div class="control-group">
+      <label for="bg">Background:</label>
+      <input type="color" id="bg" value="#f5f5f5">
+    </div>
+    <div class="control-group">
+      <label for="grid-enabled">Grid:</label>
+      <input type="checkbox" id="grid-enabled" checked>
+      <input type="color" id="grid-color" value="#cccccc">
+      <select id="grid-size">
+        <option value="10">10px</option>
+        <option value="20" selected>20px</option>
+        <option value="25">25px</option>
+        <option value="50">50px</option>
+        <option value="100">100px</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label for="stroke-width">Stroke:</label>
+      <select id="stroke-width">
+        <option value="1">1px</option>
+        <option value="2" selected>2px</option>
+        <option value="3">3px</option>
+        <option value="4">4px</option>
+        <option value="5">5px</option>
+        <option value="6">6px</option>
+        <option value="8">8px</option>
+        <option value="10">10px</option>
+      </select>
+    </div>
+    <div class="spacer"></div>
+    <button id="docs-btn">Docs</button>
+  </footer>
+
+  <!-- CodeMirror 6 from CDN -->
+  <script type="module">
+    import { EditorState } from 'https://esm.sh/@codemirror/state@6';
+    import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, rectangularSelection, highlightActiveLine } from 'https://esm.sh/@codemirror/view@6';
+    import { defaultKeymap, history, historyKeymap, indentWithTab } from 'https://esm.sh/@codemirror/commands@6';
+    import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from 'https://esm.sh/@codemirror/language@6';
+    import { javascript } from 'https://esm.sh/@codemirror/lang-javascript@6';
+    import { autocompletion, completionKeymap } from 'https://esm.sh/@codemirror/autocomplete@6';
+
+    // Examples
+    const examples = {
+      circle: `// Simple circle
+circle(100, 100, 50)`,
+
+      star: `// 5-pointed star
+let cx = 100;
+let cy = 100;
+let outerR = 60;
+let innerR = 25;
+let points = 5;
+
+star(cx, cy, outerR, innerR, points)`,
+
+      grid: `// Grid of dots using nested loops (5x5)
+for (row in 0..4) {
+  for (col in 0..4) {
+    circle(calc(20 + col * 40), calc(20 + row * 40), 5)
+  }
+}`,
+
+      spiral: `// Spiral using trigonometry
+M 100 100
+for (i in 1..100) {
+  let angle = calc(i * 0.2);
+  let r = calc(i * 0.8);
+  L calc(100 + cos(angle) * r) calc(100 + sin(angle) * r)
+}`,
+
+      flower: `// Flower with petals
+let cx = 100;
+let cy = 100;
+let petalCount = 6;
+let petalRadius = 25;
+let centerRadius = 15;
+
+// Petals (0 to petalCount-1 for correct count)
+for (i in 0..calc(petalCount - 1)) {
+  let angle = calc(i / petalCount * TAU());
+  let px = calc(cx + cos(angle) * 35);
+  let py = calc(cy + sin(angle) * 35);
+  circle(px, py, petalRadius)
+}
+
+// Center
+circle(cx, cy, centerRadius)`,
+
+      sineWave: `// Sine wave
+M 0 100
+for (i in 1..40) {
+  let x = calc(i * 5);
+  let y = calc(100 + sin(i * 0.3) * 30);
+  L x y
+}`,
+
+      gear: `// Gear shape
+let cx = 100;
+let cy = 100;
+let innerR = 30;
+let outerR = 50;
+let teeth = 12;
+
+M calc(cx + outerR) cy
+
+for (i in 0..calc(teeth - 1)) {
+  let a1 = calc(i / teeth * TAU());
+  let a2 = calc((i + 0.3) / teeth * TAU());
+  let a3 = calc((i + 0.5) / teeth * TAU());
+  let a4 = calc((i + 0.8) / teeth * TAU());
+
+  L calc(cx + cos(a1) * outerR) calc(cy + sin(a1) * outerR)
+  L calc(cx + cos(a2) * outerR) calc(cy + sin(a2) * outerR)
+  L calc(cx + cos(a3) * innerR) calc(cy + sin(a3) * innerR)
+  L calc(cx + cos(a4) * innerR) calc(cy + sin(a4) * innerR)
+}
+
+Z
+
+// Center hole
+circle(cx, cy, 10)`,
+
+      customFunction: `// Custom function: diamond shape
+fn diamond(cx, cy, size) {
+  M cx calc(cy - size)
+  L calc(cx + size) cy
+  L cx calc(cy + size)
+  L calc(cx - size) cy
+  Z
+}
+
+// Draw diamonds in a row
+for (i in 0..4) {
+  diamond(calc(40 + i * 45), 100, 20)
+}`,
+
+      descending: `// Descending ranges: shrinking circles
+let cx = 100;
+let cy = 100;
+
+// Circles shrink from radius 80 down to 10
+for (r in 80..10) {
+  if (calc(r % 10) == 0) {
+    circle(cx, cy, r)
+  }
+}
+
+// Staircase going down (right to left)
+M 180 20
+for (i in 8..1) {
+  h -20
+  v 20
+}
+h -20`,
+
+      polarPath: `// Polar coordinates and tangent functions
+// Create an S-curve with smooth arcs
+
+M 20 100
+
+// Start going right
+polarLine(0, 40)
+
+// Smooth 90° turn downward
+tangentArc(25, 90deg)
+
+// Short straight segment
+tangentLine(20)
+
+// Smooth 90° turn back (negative = opposite curve)
+tangentArc(25, -90deg)
+
+// Finish going right
+tangentLine(40)
+
+// Draw reference points using polarPoint
+M 100 50
+let pt1 = polarPoint(45deg, 30);
+circle(pt1.x, pt1.y, 5)
+let pt2 = polarPoint(135deg, 30);
+circle(pt2.x, pt2.y, 5)
+let pt3 = polarPoint(225deg, 30);
+circle(pt3.x, pt3.y, 5)
+let pt4 = polarPoint(315deg, 30);
+circle(pt4.x, pt4.y, 5)
+circle(100, 50, 3)`
+    };
+
+    // Stdlib completions for autocomplete (ordered by priority)
+    const stdlibCompletions = [
+      // ctx object (used with polar/tangent functions)
+      { label: 'ctx', type: 'variable', info: 'ctx - Path context object' },
+
+      // 1. Polar Coordinate functions
+      { label: 'polarPoint', type: 'function', info: 'polarPoint(angle, distance) - Point at polar offset' },
+      { label: 'polarOffset', type: 'function', info: 'polarOffset(angle, distance) - Relative polar offset' },
+      { label: 'polarMove', type: 'function', info: 'polarMove(angle, distance, isMoveTo?) - Move in polar direction' },
+      { label: 'polarLine', type: 'function', info: 'polarLine(angle, distance) - Line in polar direction' },
+
+      // 2. Arc and Tangent functions
+      { label: 'arcFromCenter', type: 'function', info: 'arcFromCenter(dcx, dcy, r, start, end, cw) - Arc from center offset' },
+      { label: 'arcFromPolarOffset', type: 'function', info: 'arcFromPolarOffset(angle, radius, sweepAngle) - Arc from polar center' },
+      { label: 'tangentLine', type: 'function', info: 'tangentLine(length) - Line following tangent' },
+      { label: 'tangentArc', type: 'function', info: 'tangentArc(radius, sweepAngle) - Arc from tangent' },
+
+      // 3. Path functions (shapes, curves, commands)
+      { label: 'circle', type: 'function', info: 'circle(cx, cy, r) - Draw circle' },
+      { label: 'rect', type: 'function', info: 'rect(x, y, w, h) - Draw rectangle' },
+      { label: 'roundRect', type: 'function', info: 'roundRect(x, y, w, h, r) - Rounded rectangle' },
+      { label: 'polygon', type: 'function', info: 'polygon(cx, cy, r, sides) - Regular polygon' },
+      { label: 'star', type: 'function', info: 'star(cx, cy, outer, inner, points) - Star shape' },
+      { label: 'quadratic', type: 'function', info: 'quadratic(x1, y1, cx, cy, x2, y2) - Quadratic bezier' },
+      { label: 'cubic', type: 'function', info: 'cubic(x1, y1, c1x, c1y, c2x, c2y, x2, y2) - Cubic bezier' },
+      { label: 'arc', type: 'function', info: 'arc(rx, ry, rot, large, sweep, x, y) - Arc command' },
+      { label: 'line', type: 'function', info: 'line(x1, y1, x2, y2) - Line segment' },
+      { label: 'moveTo', type: 'function', info: 'moveTo(x, y) - Move command' },
+      { label: 'lineTo', type: 'function', info: 'lineTo(x, y) - Line command' },
+      { label: 'closePath', type: 'function', info: 'closePath() - Close path (Z)' },
+
+      // 4. Constants
+      { label: 'PI', type: 'function', info: 'PI() - Returns π' },
+      { label: 'E', type: 'function', info: 'E() - Returns e' },
+      { label: 'TAU', type: 'function', info: 'TAU() - Returns 2π' },
+
+      // 5. Angle Conversion
+      { label: 'deg', type: 'function', info: 'deg(radians) - Convert radians to degrees' },
+      { label: 'rad', type: 'function', info: 'rad(degrees) - Convert degrees to radians' },
+
+      // 6. Interpolation
+      { label: 'lerp', type: 'function', info: 'lerp(a, b, t) - Linear interpolation' },
+      { label: 'clamp', type: 'function', info: 'clamp(value, min, max) - Constrain to range' },
+      { label: 'map', type: 'function', info: 'map(val, inMin, inMax, outMin, outMax) - Map between ranges' },
+
+      // 7. Trigonometry
+      { label: 'sin', type: 'function', info: 'sin(x) - Sine' },
+      { label: 'cos', type: 'function', info: 'cos(x) - Cosine' },
+      { label: 'tan', type: 'function', info: 'tan(x) - Tangent' },
+      { label: 'asin', type: 'function', info: 'asin(x) - Arc sine' },
+      { label: 'acos', type: 'function', info: 'acos(x) - Arc cosine' },
+      { label: 'atan', type: 'function', info: 'atan(x) - Arc tangent' },
+      { label: 'atan2', type: 'function', info: 'atan2(y, x) - Two-argument arc tangent' },
+      { label: 'sinh', type: 'function', info: 'sinh(x) - Hyperbolic sine' },
+      { label: 'cosh', type: 'function', info: 'cosh(x) - Hyperbolic cosine' },
+      { label: 'tanh', type: 'function', info: 'tanh(x) - Hyperbolic tangent' },
+
+      // 8. Rounding
+      { label: 'floor', type: 'function', info: 'floor(x) - Round down' },
+      { label: 'ceil', type: 'function', info: 'ceil(x) - Round up' },
+      { label: 'round', type: 'function', info: 'round(x) - Round to nearest integer' },
+      { label: 'trunc', type: 'function', info: 'trunc(x) - Truncate decimal' },
+
+      // 9. Utility
+      { label: 'abs', type: 'function', info: 'abs(x) - Absolute value' },
+      { label: 'sign', type: 'function', info: 'sign(x) - Sign (-1, 0, or 1)' },
+      { label: 'min', type: 'function', info: 'min(a, b, ...) - Minimum value' },
+      { label: 'max', type: 'function', info: 'max(a, b, ...) - Maximum value' },
+
+      // 10. Random
+      { label: 'random', type: 'function', info: 'random() - Random number 0-1' },
+      { label: 'randomRange', type: 'function', info: 'randomRange(min, max) - Random in range' },
+
+      // 11. Exponential/Log
+      { label: 'exp', type: 'function', info: 'exp(x) - e raised to power x' },
+      { label: 'log', type: 'function', info: 'log(...) - Natural logarithm or debug logging' },
+      { label: 'log10', type: 'function', info: 'log10(x) - Base-10 logarithm' },
+      { label: 'log2', type: 'function', info: 'log2(x) - Base-2 logarithm' },
+      { label: 'pow', type: 'function', info: 'pow(x, y) - x raised to power y' },
+      { label: 'sqrt', type: 'function', info: 'sqrt(x) - Square root' },
+      { label: 'cbrt', type: 'function', info: 'cbrt(x) - Cube root' },
+
+      // Special - ctx object (high priority, used with polar/tangent functions)
+      { label: 'ctx', type: 'variable', info: 'ctx - Path context object' },
+    ];
+
+    // Snippet templates for autocomplete
+    const snippetTemplates = [
+      {
+        label: 'for',
+        type: 'keyword',
+        info: 'for loop - iterate over a range',
+        template: 'for (i in 0..10) {\n  \n}',
+        cursorOffset: 16, // Position after "for (i in 0..10) {\n  "
+      },
+      {
+        label: 'fn',
+        type: 'keyword',
+        info: 'function definition',
+        template: 'fn name() {\n  \n}',
+        cursorOffset: 3, // Position at "name" to let user type function name
+      },
+      {
+        label: 'if',
+        type: 'keyword',
+        info: 'if statement - conditional execution',
+        template: 'if (condition) {\n  \n}',
+        cursorOffset: 4, // Position at "condition"
+      },
+      {
+        label: 'ifelse',
+        type: 'keyword',
+        info: 'if-else statement',
+        template: 'if (condition) {\n  \n} else {\n  \n}',
+        cursorOffset: 4, // Position at "condition"
+      },
+      {
+        label: 'let',
+        type: 'keyword',
+        info: 'variable declaration',
+        template: 'let name = ;',
+        cursorOffset: 4, // Position at "name"
+      },
+      {
+        label: 'forangle',
+        type: 'keyword',
+        info: 'radial loop - iterate angles around a circle',
+        template: 'for (i in 0..count) {\n  let angle = calc(i / count * TAU());\n  \n}',
+        cursorOffset: 14, // Position at "count" (first occurrence)
+      },
+      {
+        label: 'forgrid',
+        type: 'keyword',
+        info: 'grid loop - nested rows and columns',
+        template: 'for (row in 0..rows) {\n  for (col in 0..cols) {\n    \n  }\n}',
+        cursorOffset: 13, // Position at "rows"
+      },
+    ];
+
+    // Completion source for svg-path-extended
+    function svgPathCompletions(context) {
+      // Check for nested property access (e.g., ctx.position.x, arc.point.x)
+      const nestedProp = context.matchBefore(/(\w+)\.(\w+)\.(\w*)$/);
+      if (nestedProp) {
+        const match = nestedProp.text.match(/(\w+)\.(\w+)\.(\w*)$/);
+        if (match) {
+          const [, obj, prop] = match;
+          const from = nestedProp.from + obj.length + 1 + prop.length + 1;
+
+          // ctx.position.x/y or ctx.start.x/y
+          if (obj === 'ctx' && (prop === 'position' || prop === 'start')) {
+            return {
+              from,
+              options: [
+                { label: 'x', type: 'property', info: `${prop}.x - X coordinate`, boost: 2 },
+                { label: 'y', type: 'property', info: `${prop}.y - Y coordinate`, boost: 1 },
+              ],
+              validFor: /^\w*$/,
+            };
+          }
+
+          // arc.point.x/y (for arcFromCenter, arcFromPolarOffset, tangentArc results)
+          if (prop === 'point') {
+            const doc = context.state.doc.toString();
+            const arcVarRegex = new RegExp(`let\\s+${obj}\\s*=\\s*(arcFromCenter|arcFromPolarOffset|tangentArc)\\s*\\(`);
+            if (arcVarRegex.test(doc)) {
+              return {
+                from,
+                options: [
+                  { label: 'x', type: 'property', info: `${obj}.point.x - Endpoint X coordinate`, boost: 2 },
+                  { label: 'y', type: 'property', info: `${obj}.point.y - Endpoint Y coordinate`, boost: 1 },
+                ],
+                validFor: /^\w*$/,
+              };
+            }
+          }
+        }
+      }
+
+      // Check for single property access (e.g., ctx.position)
+      const singleProp = context.matchBefore(/(\w+)\.(\w*)$/);
+      if (singleProp) {
+        const match = singleProp.text.match(/(\w+)\.(\w*)$/);
+        if (match) {
+          const [, obj] = match;
+          if (obj === 'ctx') {
+            const from = singleProp.from + obj.length + 1;
+            return {
+              from,
+              options: [
+                { label: 'position', type: 'property', info: 'ctx.position - Current pen position {x, y}', boost: 4 },
+                { label: 'start', type: 'property', info: 'ctx.start - Subpath start position {x, y}', boost: 3 },
+                { label: 'tangentAngle', type: 'property', info: 'ctx.tangentAngle - Current tangent direction (radians)', boost: 2 },
+                { label: 'commands', type: 'property', info: 'ctx.commands - Array of executed commands', boost: 1 },
+              ],
+              validFor: /^\w*$/,
+            };
+          }
+          // Check for user-defined object variables
+          const doc = context.state.doc.toString();
+          const from = singleProp.from + obj.length + 1;
+
+          // Check for polarOffset which returns dx, dy
+          const offsetVarRegex = new RegExp(`let\\s+${obj}\\s*=\\s*polarOffset\\s*\\(`);
+          if (offsetVarRegex.test(doc)) {
+            return {
+              from,
+              options: [
+                { label: 'dx', type: 'property', info: `${obj}.dx - X offset`, boost: 2 },
+                { label: 'dy', type: 'property', info: `${obj}.dy - Y offset`, boost: 1 },
+              ],
+              validFor: /^\w*$/,
+            };
+          }
+
+          // Check for polarPoint which returns x, y
+          const pointVarRegex = new RegExp(`let\\s+${obj}\\s*=\\s*polarPoint\\s*\\(`);
+          if (pointVarRegex.test(doc)) {
+            return {
+              from,
+              options: [
+                { label: 'x', type: 'property', info: `${obj}.x - X coordinate`, boost: 2 },
+                { label: 'y', type: 'property', info: `${obj}.y - Y coordinate`, boost: 1 },
+              ],
+              validFor: /^\w*$/,
+            };
+          }
+
+          // Check for arcFromCenter/arcFromPolarOffset which return {point: {x, y}, angle}
+          const arcVarRegex = new RegExp(`let\\s+${obj}\\s*=\\s*(arcFromCenter|arcFromPolarOffset|tangentArc)\\s*\\(`);
+          if (arcVarRegex.test(doc)) {
+            return {
+              from,
+              options: [
+                { label: 'point', type: 'property', info: `${obj}.point - Endpoint {x, y}`, boost: 3 },
+                { label: 'angle', type: 'property', info: `${obj}.angle - Tangent angle (radians)`, boost: 2 },
+              ],
+              validFor: /^\w*$/,
+            };
+          }
+        }
+      }
+
+      // Regular word completion
+      const word = context.matchBefore(/\w*/);
+      if (!word || (word.from === word.to && !context.explicit)) return null;
+
+      const doc = context.state.doc.toString();
+      const options = [];
+      let boost = 200; // Start with high boost for priority items
+
+      // 1. calc() - highest priority
+      options.push({
+        label: 'calc',
+        type: 'function',
+        info: 'calc(expr) - Evaluate math expression',
+        boost: boost--,
+        apply: (view, completion, from, to) => {
+          view.dispatch({
+            changes: { from, to, insert: 'calc()' },
+            selection: { anchor: from + 5 },
+          });
+        },
+      });
+
+      // 2. Snippet templates - high priority
+      for (const snippet of snippetTemplates) {
+        options.push({
+          label: snippet.label,
+          type: snippet.type,
+          info: snippet.info,
+          boost: boost--,
+          apply: (view, completion, from, to) => {
+            view.dispatch({
+              changes: { from, to, insert: snippet.template },
+              selection: { anchor: from + snippet.cursorOffset },
+            });
+          },
+        });
+      }
+
+      // 3. User-defined variables (let name = ...)
+      const varRegex = /let\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=/g;
+      const seenVars = new Set();
+      let match;
+      while ((match = varRegex.exec(doc)) !== null) {
+        const name = match[1];
+        if (!seenVars.has(name)) {
+          seenVars.add(name);
+          options.push({
+            label: name,
+            type: 'variable',
+            info: 'User variable',
+            boost: boost--,
+          });
+        }
+      }
+
+      // 4. User-defined functions (fn name(...) { ... })
+      const fnRegex = /fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
+      const seenFns = new Set();
+      while ((match = fnRegex.exec(doc)) !== null) {
+        const name = match[1];
+        if (!seenFns.has(name)) {
+          seenFns.add(name);
+          options.push({
+            label: name,
+            type: 'function',
+            info: 'User function',
+            boost: boost--,
+            apply: (view, completion, from, to) => {
+              view.dispatch({
+                changes: { from, to, insert: name + '()' },
+                selection: { anchor: from + name.length + 1 },
+              });
+            },
+          });
+        }
+      }
+
+      // 5. Loop variables (for (name in ...))
+      const loopVarRegex = /for\s*\(\s*([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b/g;
+      const seenLoopVars = new Set();
+      while ((match = loopVarRegex.exec(doc)) !== null) {
+        const name = match[1];
+        if (!seenLoopVars.has(name) && !seenVars.has(name)) {
+          seenLoopVars.add(name);
+          options.push({
+            label: name,
+            type: 'variable',
+            info: 'Loop variable',
+            boost: boost--,
+          });
+        }
+      }
+
+      // 6. Stdlib items (lowest priority)
+      for (const item of stdlibCompletions) {
+        // Skip if user already defined something with same name
+        if (seenVars.has(item.label) || seenFns.has(item.label) || seenLoopVars.has(item.label)) continue;
+
+        const completion = {
+          label: item.label,
+          type: item.type,
+          info: item.info,
+          boost: boost--,
+        };
+
+        // For functions, add parentheses and cursor positioning
+        if (item.type === 'function') {
+          completion.apply = (view, completion, from, to) => {
+            const insert = item.label + '()';
+            view.dispatch({
+              changes: { from, to, insert },
+              selection: { anchor: from + item.label.length + 1 },
+            });
+          };
+        }
+
+        options.push(completion);
+      }
+
+      return {
+        from: word.from,
+        options,
+        validFor: /^\w*$/,
+      };
+    }
+
+    // Default code
+    const defaultCode = `// Welcome to svg-path-extended!
+// Try editing this code or select an example above.
+
+let cx = 100;
+let cy = 100;
+
+// Draw a circle
+circle(cx, cy, 40)
+
+// Draw 8 points around it
+for (i in 0..7) {
+  let angle = calc(i / 8 * TAU());
+  let x = calc(cx + cos(angle) * 70);
+  let y = calc(cy + sin(angle) * 70);
+  circle(x, y, 8)
+}`;
+
+    // DOM elements
+    const editorContainer = document.getElementById('editor-container');
+    const preview = document.getElementById('preview');
+    const previewPath = document.getElementById('preview-path');
+    const previewBg = document.getElementById('preview-bg');
+    const previewGrid = document.getElementById('preview-grid');
+    const gridPattern = document.getElementById('grid-pattern');
+    const gridPath = document.getElementById('grid-path');
+    const errorPanel = document.getElementById('error-panel');
+    const examplesSelect = document.getElementById('examples');
+    const widthInput = document.getElementById('width');
+    const heightInput = document.getElementById('height');
+    const strokeInput = document.getElementById('stroke');
+    const fillEnabledInput = document.getElementById('fill-enabled');
+    const fillInput = document.getElementById('fill');
+    const bgInput = document.getElementById('bg');
+    const gridEnabledInput = document.getElementById('grid-enabled');
+    const gridColorInput = document.getElementById('grid-color');
+    const gridSizeSelect = document.getElementById('grid-size');
+    const strokeWidthSelect = document.getElementById('stroke-width');
+    const copyUrlBtn = document.getElementById('copy-url');
+    const copyFeedback = document.getElementById('copy-feedback');
+    const docsBtn = document.getElementById('docs-btn');
+    const docsPanel = document.getElementById('docs-panel');
+    const docsClose = document.getElementById('docs-close');
+    const docsTabs = document.querySelectorAll('.docs-tab');
+    const docSections = document.querySelectorAll('.doc-section');
+    const copyCodeBtn = document.getElementById('copy-code');
+    const copySvgBtn = document.getElementById('copy-svg');
+    const annotatedToggle = document.getElementById('annotated-toggle');
+    const annotatedPane = document.getElementById('annotated-pane');
+    const annotatedContainer = document.getElementById('annotated-container');
+    const copyAnnotatedBtn = document.getElementById('copy-annotated');
+    const consoleToggle = document.getElementById('console-toggle');
+    const consolePane = document.getElementById('console-pane');
+    const consoleOutput = document.getElementById('console-output');
+    const clearConsoleBtn = document.getElementById('clear-console');
+    const previewContainer = document.getElementById('preview-container');
+    const zoomNavigator = document.getElementById('zoom-navigator');
+    const navigatorSvg = document.getElementById('navigator-svg');
+    const navigatorBg = document.getElementById('navigator-bg');
+    const navigatorPath = document.getElementById('navigator-path');
+    const navigatorViewport = document.getElementById('navigator-viewport');
+    const zoomInBtn = document.getElementById('zoom-in');
+    const zoomOutBtn = document.getElementById('zoom-out');
+    const zoomFitBtn = document.getElementById('zoom-fit');
+    const zoomLevelDisplay = document.getElementById('zoom-level');
+
+    // State
+    let debounceTimer = null;
+    let editor = null;
+    let annotatedEditor = null;
+    let annotatedPaneOpen = false;
+    let consolePaneOpen = false;
+    let currentLogs = [];
+
+    // File state
+    let currentFileName = null;      // Name of currently loaded/saved file
+    let currentFileHandle = null;    // File handle for File System Access API
+    let isModified = false;          // Track if content changed since last save
+
+    // Zoom/pan state
+    let zoomLevel = 1;        // 1 = 100%, 2 = 200%, etc.
+    let panX = 0;             // Horizontal pan offset (in SVG units)
+    let panY = 0;             // Vertical pan offset (in SVG units)
+    let isPanning = false;    // Track if user is dragging to pan
+    let panStartX = 0;        // Mouse position at pan start
+    let panStartY = 0;
+
+    // Navigator drag state
+    let isNavigatorDragging = false;
+    let navDragStartX = 0;
+    let navDragStartY = 0;
+    let navDragStartPanX = 0;
+    let navDragStartPanY = 0;
+
+    const MIN_ZOOM = 0.25;    // 25% minimum
+    const MAX_ZOOM = 10;      // 1000% maximum
+    const ZOOM_STEP = 1.5;    // Multiplier for each zoom step
+
+    // Initialize editor
+    function createEditor(initialCode) {
+      const updateExtension = EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          isModified = true;
+          updateFilenameDisplay();
+          debouncedUpdate();
+        }
+      });
+
+      const state = EditorState.create({
+        doc: initialCode,
+        extensions: [
+          lineNumbers(),
+          highlightActiveLineGutter(),
+          highlightSpecialChars(),
+          history(),
+          drawSelection(),
+          rectangularSelection(),
+          highlightActiveLine(),
+          indentOnInput(),
+          bracketMatching(),
+          syntaxHighlighting(defaultHighlightStyle),
+          javascript(),
+          keymap.of([
+            ...defaultKeymap,
+            ...historyKeymap,
+            ...completionKeymap,
+            indentWithTab,
+          ]),
+          autocompletion({
+            override: [svgPathCompletions],
+          }),
+          updateExtension,
+          EditorView.lineWrapping,
+        ],
+      });
+
+      return new EditorView({
+        state,
+        parent: editorContainer,
+      });
+    }
+
+    // Create read-only editor for annotated output
+    function createAnnotatedEditor() {
+      const state = EditorState.create({
+        doc: '// Click "Annotated" to view debug output',
+        extensions: [
+          lineNumbers(),
+          highlightSpecialChars(),
+          drawSelection(),
+          highlightActiveLine(),
+          syntaxHighlighting(defaultHighlightStyle),
+          javascript(),
+          EditorView.lineWrapping,
+          EditorState.readOnly.of(true),
+          EditorView.editable.of(false),
+        ],
+      });
+
+      return new EditorView({
+        state,
+        parent: annotatedContainer,
+      });
+    }
+
+    // Update annotated output
+    function updateAnnotatedOutput() {
+      if (!annotatedPaneOpen || !annotatedEditor) return;
+
+      const code = editor.state.doc.toString();
+      try {
+        const annotated = window.SvgPathExtended.compileAnnotated(code);
+        annotatedEditor.dispatch({
+          changes: {
+            from: 0,
+            to: annotatedEditor.state.doc.length,
+            insert: annotated,
+          },
+        });
+      } catch (e) {
+        annotatedEditor.dispatch({
+          changes: {
+            from: 0,
+            to: annotatedEditor.state.doc.length,
+            insert: `// Error: ${e.message}`,
+          },
+        });
+      }
+    }
+
+    // Toggle annotated pane
+    function toggleAnnotatedPane() {
+      annotatedPaneOpen = !annotatedPaneOpen;
+      annotatedPane.classList.toggle('open', annotatedPaneOpen);
+      annotatedToggle.classList.toggle('active', annotatedPaneOpen);
+
+      if (annotatedPaneOpen) {
+        if (!annotatedEditor) {
+          annotatedEditor = createAnnotatedEditor();
+        }
+        updateAnnotatedOutput();
+      }
+    }
+
+    // Toggle console pane
+    function toggleConsolePane() {
+      consolePaneOpen = !consolePaneOpen;
+      consolePane.classList.toggle('open', consolePaneOpen);
+      consoleToggle.classList.toggle('active', consolePaneOpen);
+
+      if (consolePaneOpen) {
+        updateConsoleOutput();
+      }
+    }
+
+    // Update console output
+    function updateConsoleOutput() {
+      if (!consolePaneOpen) return;
+
+      // Clear existing content
+      consoleOutput.innerHTML = '';
+
+      if (currentLogs.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'log-empty';
+        emptyDiv.textContent = 'No log output';
+        consoleOutput.appendChild(emptyDiv);
+      } else {
+        // Append DOM nodes for each log entry
+        for (const logEntry of currentLogs) {
+          const entryNode = formatLogEntry(logEntry);
+          consoleOutput.appendChild(entryNode);
+        }
+      }
+    }
+
+    // Format a single log entry with line number and labeled values - returns DOM node
+    function formatLogEntry(logEntry) {
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+
+      // Add line prefix if present
+      if (logEntry.line !== null) {
+        const lineSpan = document.createElement('span');
+        lineSpan.className = 'log-line';
+        lineSpan.textContent = `Line ${logEntry.line}:`;
+        entry.appendChild(lineSpan);
+      }
+
+      // Process each part
+      for (const part of logEntry.parts) {
+        if (part.type === 'string') {
+          const stringSpan = document.createElement('span');
+          stringSpan.className = 'log-string';
+          stringSpan.textContent = part.value;
+          entry.appendChild(stringSpan);
+        } else {
+          // Value with optional label
+          const labeledValue = document.createElement('div');
+          labeledValue.className = 'log-labeled-value';
+
+          if (part.label) {
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'log-label';
+            labelSpan.textContent = `${part.label} = `;
+            labeledValue.appendChild(labelSpan);
+          }
+
+          // Try to parse JSON for interactive rendering
+          let parsed = null;
+          const trimmed = part.value.trim();
+          if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+              parsed = JSON.parse(trimmed);
+            } catch (e) {
+              // Not valid JSON, fall through to text display
+            }
+          }
+
+          if (parsed !== null && typeof parsed === 'object') {
+            // Render as interactive expandable object
+            const valueNode = renderValue(parsed, 0, part.label || '');
+            labeledValue.appendChild(valueNode);
+          } else {
+            // Render as plain text
+            const valueSpan = document.createElement('span');
+            valueSpan.className = 'log-value';
+            valueSpan.textContent = part.value;
+            labeledValue.appendChild(valueSpan);
+          }
+
+          entry.appendChild(labeledValue);
+        }
+      }
+
+      return entry;
+    }
+
+    // Escape HTML for safe display
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Truncate string for previews
+    function truncate(str, len = 30) {
+      if (str.length <= len) return str;
+      return str.slice(0, len) + '...';
+    }
+
+    // Create a span for primitive values with type-specific colors
+    function createPrimitiveSpan(value) {
+      const span = document.createElement('span');
+      if (value === null) {
+        span.className = 'log-primitive-null';
+        span.textContent = 'null';
+      } else if (value === undefined) {
+        span.className = 'log-primitive-undefined';
+        span.textContent = 'undefined';
+      } else if (typeof value === 'number') {
+        span.className = 'log-primitive-number';
+        span.textContent = String(value);
+      } else if (typeof value === 'boolean') {
+        span.className = 'log-primitive-boolean';
+        span.textContent = String(value);
+      } else if (typeof value === 'string') {
+        span.className = 'log-primitive-string';
+        span.textContent = value;
+      } else {
+        span.textContent = String(value);
+      }
+      return span;
+    }
+
+    // Generate a preview string for collapsed objects/arrays
+    function generatePreview(value, type) {
+      if (type === 'array') {
+        const len = value.length;
+        if (len === 0) return '[]';
+        if (len <= 3) {
+          const items = value.slice(0, 3).map(v => {
+            if (v === null) return 'null';
+            if (typeof v === 'object') return Array.isArray(v) ? `Array(${v.length})` : '{...}';
+            if (typeof v === 'string') return `"${truncate(v, 15)}"`;
+            return String(v);
+          });
+          return `[${items.join(', ')}]`;
+        }
+        return `Array(${len})`;
+      } else {
+        const keys = Object.keys(value);
+        if (keys.length === 0) return '{}';
+        if (keys.length <= 3) {
+          const items = keys.slice(0, 3).map(k => {
+            const v = value[k];
+            if (v === null) return `${k}: null`;
+            if (typeof v === 'object') return `${k}: ${Array.isArray(v) ? `Array(${v.length})` : '{...}'}`;
+            if (typeof v === 'string') return `${k}: "${truncate(v, 10)}"`;
+            return `${k}: ${v}`;
+          });
+          const suffix = keys.length > 3 ? ', ...' : '';
+          return `{${items.join(', ')}${suffix}}`;
+        }
+        const preview = keys.slice(0, 2).map(k => `${k}: ...`).join(', ');
+        return `{${preview}, ...}`;
+      }
+    }
+
+    // Render a value as a DOM element (recursive for objects/arrays)
+    function renderValue(value, depth = 0, path = '') {
+      // Handle primitives
+      if (value === null || value === undefined) {
+        return createPrimitiveSpan(value);
+      }
+      if (typeof value !== 'object') {
+        return createPrimitiveSpan(value);
+      }
+
+      // Handle objects and arrays
+      const type = Array.isArray(value) ? 'array' : 'object';
+      return createExpandableNode(value, type, depth, path);
+    }
+
+    // Create an expandable node for objects/arrays
+    function createExpandableNode(value, type, depth, path) {
+      const container = document.createElement('span');
+      container.className = 'log-expandable';
+      container.dataset.path = path;
+
+      // Toggle arrow
+      const toggle = document.createElement('span');
+      toggle.className = 'log-toggle';
+      toggle.textContent = '▶';
+      toggle.addEventListener('click', handleToggle);
+
+      // Preview text
+      const preview = document.createElement('span');
+      preview.className = 'log-preview';
+      preview.textContent = generatePreview(value, type);
+
+      // Content container (children rendered on expand or pre-rendered for depth < 2)
+      const content = document.createElement('div');
+      content.className = 'log-content';
+
+      container.appendChild(toggle);
+      container.appendChild(preview);
+      container.appendChild(content);
+
+      // Store value for lazy rendering
+      container._value = value;
+      container._type = type;
+      container._depth = depth;
+      container._rendered = false;
+
+      // Pre-render first 2 levels for immediate visibility
+      if (depth < 2) {
+        renderChildren(content, value, type, depth, path);
+        container._rendered = true;
+      }
+
+      return container;
+    }
+
+    // Handle toggle click to expand/collapse
+    function handleToggle(event) {
+      event.stopPropagation();
+      const toggle = event.target;
+      const container = toggle.parentElement;
+
+      container.classList.toggle('expanded');
+
+      // Lazy render children if not already rendered
+      if (!container._rendered && container.classList.contains('expanded')) {
+        const content = container.querySelector('.log-content');
+        renderChildren(content, container._value, container._type, container._depth, container.dataset.path);
+        container._rendered = true;
+      }
+    }
+
+    // Render children of an object/array into the content container
+    function renderChildren(content, value, type, depth, path) {
+      const maxItems = 100;
+      const entries = type === 'array'
+        ? value.map((v, i) => [i, v])
+        : Object.entries(value);
+
+      const displayEntries = entries.slice(0, maxItems);
+
+      for (const [key, val] of displayEntries) {
+        const row = document.createElement('div');
+        row.className = 'log-property';
+
+        const keySpan = document.createElement('span');
+        keySpan.className = type === 'array' ? 'log-index' : 'log-key';
+        keySpan.textContent = type === 'array' ? `${key}: ` : `${key}: `;
+        row.appendChild(keySpan);
+
+        const childPath = path ? `${path}.${key}` : String(key);
+        const valueNode = renderValue(val, depth + 1, childPath);
+        row.appendChild(valueNode);
+
+        content.appendChild(row);
+      }
+
+      // Show "... N more" if truncated
+      if (entries.length > maxItems) {
+        const moreRow = document.createElement('div');
+        moreRow.className = 'log-more';
+        moreRow.textContent = `... ${entries.length - maxItems} more`;
+        content.appendChild(moreRow);
+      }
+    }
+
+    // Clear console
+    function clearConsole() {
+      currentLogs = [];
+      updateConsoleOutput();
+    }
+
+    // ==================== File Operations ====================
+
+    // Update the filename display in the header
+    function updateFilenameDisplay() {
+      const display = document.getElementById('filename-display');
+
+      if (currentFileName) {
+        display.textContent = currentFileName;
+        display.classList.add('has-file');
+      } else {
+        display.textContent = 'Untitled';
+        display.classList.remove('has-file');
+      }
+
+      if (isModified) {
+        display.classList.add('modified');
+      } else {
+        display.classList.remove('modified');
+      }
+    }
+
+    // Save the current workspace to a file
+    async function saveFile() {
+      const code = editor.state.doc.toString();
+
+      try {
+        // Try File System Access API (modern browsers)
+        if ('showSaveFilePicker' in window) {
+          const options = {
+            suggestedName: currentFileName || 'untitled.svgx',
+            types: [{
+              description: 'SVG Path Extended Files',
+              accept: { 'text/plain': ['.svgx'] },
+            }],
+          };
+
+          // If we have an existing handle, try to reuse it
+          if (currentFileHandle) {
+            const writable = await currentFileHandle.createWritable();
+            await writable.write(code);
+            await writable.close();
+          } else {
+            const handle = await window.showSaveFilePicker(options);
+            const writable = await handle.createWritable();
+            await writable.write(code);
+            await writable.close();
+            currentFileHandle = handle;
+            currentFileName = handle.name;
+          }
+
+          isModified = false;
+          updateFilenameDisplay();
+        } else {
+          // Fallback: download link
+          const blob = new Blob([code], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = currentFileName || 'untitled.svgx';
+          a.click();
+          URL.revokeObjectURL(url);
+
+          if (!currentFileName) {
+            currentFileName = 'untitled.svgx';
+          }
+          isModified = false;
+          updateFilenameDisplay();
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Save failed:', err);
+        }
+      }
+    }
+
+    // Open a file and load its contents into the editor
+    async function openFile() {
+      try {
+        // Try File System Access API (modern browsers)
+        if ('showOpenFilePicker' in window) {
+          const options = {
+            types: [{
+              description: 'SVG Path Extended Files',
+              accept: { 'text/plain': ['.svgx'] },
+            }],
+            multiple: false,
+          };
+
+          const [handle] = await window.showOpenFilePicker(options);
+          const file = await handle.getFile();
+          const contents = await file.text();
+
+          currentFileHandle = handle;
+          currentFileName = handle.name;
+
+          editor.dispatch({
+            changes: {
+              from: 0,
+              to: editor.state.doc.length,
+              insert: contents,
+            },
+          });
+
+          isModified = false;
+          updateFilenameDisplay();
+          updatePreview();
+          updateAnnotatedOutput();
+        } else {
+          // Fallback: file input
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.svgx';
+
+          input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const contents = await file.text();
+            currentFileName = file.name;
+            currentFileHandle = null;  // No handle in fallback mode
+
+            editor.dispatch({
+              changes: {
+                from: 0,
+                to: editor.state.doc.length,
+                insert: contents,
+              },
+            });
+
+            isModified = false;
+            updateFilenameDisplay();
+            updatePreview();
+            updateAnnotatedOutput();
+          };
+
+          input.click();
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Open failed:', err);
+        }
+      }
+    }
+
+    // ==================== Zoom/Pan Functions ====================
+
+    // Update viewBox for zoom/pan
+    function updateViewBox() {
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Calculate visible area based on zoom and pan
+      const viewWidth = width / zoomLevel;
+      const viewHeight = height / zoomLevel;
+
+      // Clamp pan values to keep SVG in view
+      const maxPanX = Math.max(0, width - viewWidth);
+      const maxPanY = Math.max(0, height - viewHeight);
+      panX = Math.max(0, Math.min(panX, maxPanX));
+      panY = Math.max(0, Math.min(panY, maxPanY));
+
+      // Update main SVG viewBox
+      preview.setAttribute('viewBox', `${panX} ${panY} ${viewWidth} ${viewHeight}`);
+
+      // Update zoom level display
+      zoomLevelDisplay.value = `${Math.round(zoomLevel * 100)}%`;
+
+      // Update navigator viewport rectangle
+      updateNavigatorViewport();
+
+      // Show/hide pan cursor
+      previewContainer.classList.toggle('can-pan', zoomLevel > 1);
+    }
+
+    // Adjust pan so zoom centers on current view center
+    function adjustPanForZoom(oldZoom, newZoom) {
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Current view center in SVG coordinates
+      const oldViewWidth = width / oldZoom;
+      const oldViewHeight = height / oldZoom;
+      const centerX = panX + oldViewWidth / 2;
+      const centerY = panY + oldViewHeight / 2;
+
+      // New view dimensions
+      const newViewWidth = width / newZoom;
+      const newViewHeight = height / newZoom;
+
+      // Pan to keep the same center
+      panX = centerX - newViewWidth / 2;
+      panY = centerY - newViewHeight / 2;
+    }
+
+    function zoomIn() {
+      const oldZoom = zoomLevel;
+      zoomLevel = Math.min(MAX_ZOOM, zoomLevel * ZOOM_STEP);
+      adjustPanForZoom(oldZoom, zoomLevel);
+      updateViewBox();
+    }
+
+    function zoomOut() {
+      const oldZoom = zoomLevel;
+      zoomLevel = Math.max(MIN_ZOOM, zoomLevel / ZOOM_STEP);
+      adjustPanForZoom(oldZoom, zoomLevel);
+      updateViewBox();
+    }
+
+    function zoomFit() {
+      zoomLevel = 1;
+      panX = 0;
+      panY = 0;
+      updateViewBox();
+    }
+
+    // Pan handling
+    function startPan(e) {
+      if (zoomLevel <= 1) return;
+      isPanning = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      previewContainer.classList.add('panning');
+      e.preventDefault();
+    }
+
+    function doPan(e) {
+      if (!isPanning) return;
+
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+      const rect = preview.getBoundingClientRect();
+
+      // Convert pixel delta to SVG units
+      const scaleX = (width / zoomLevel) / rect.width;
+      const scaleY = (height / zoomLevel) / rect.height;
+
+      const dx = (panStartX - e.clientX) * scaleX;
+      const dy = (panStartY - e.clientY) * scaleY;
+
+      panX += dx;
+      panY += dy;
+
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+
+      updateViewBox();
+    }
+
+    function endPan() {
+      isPanning = false;
+      previewContainer.classList.remove('panning');
+    }
+
+    // Navigator viewport
+    function updateNavigatorViewport() {
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Calculate viewport rect position and size in SVG units
+      // (navigator viewBox is already set to SVG coordinate space)
+      const viewWidth = width / zoomLevel;
+      const viewHeight = height / zoomLevel;
+
+      navigatorViewport.setAttribute('x', panX);
+      navigatorViewport.setAttribute('y', panY);
+      navigatorViewport.setAttribute('width', viewWidth);
+      navigatorViewport.setAttribute('height', viewHeight);
+    }
+
+    function updateNavigatorContent() {
+      // Copy path data to navigator
+      navigatorPath.setAttribute('d', previewPath.getAttribute('d') || '');
+      navigatorPath.setAttribute('stroke', strokeInput.value);
+      navigatorPath.setAttribute('stroke-width', 1);  // Thin lines for thumbnail
+
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Navigator dimensions
+      const navWidth = 120;
+      const navHeight = 120;
+      const scale = Math.min(navWidth / width, navHeight / height) * 0.9;
+      const offsetX = (navWidth - width * scale) / 2;
+      const offsetY = (navHeight - height * scale) / 2;
+
+      // Set navigator viewBox to show full image with proper scaling
+      navigatorSvg.setAttribute('viewBox', `${-offsetX / scale} ${-offsetY / scale} ${navWidth / scale} ${navHeight / scale}`);
+      navigatorBg.setAttribute('fill', bgInput.value);
+      navigatorBg.setAttribute('x', 0);
+      navigatorBg.setAttribute('y', 0);
+      navigatorBg.setAttribute('width', width);
+      navigatorBg.setAttribute('height', height);
+
+      updateNavigatorViewport();
+    }
+
+    // Navigator drag to reposition
+    function screenToNavigatorSVG(clientX, clientY) {
+      // Use SVG's native coordinate transformation
+      const pt = navigatorSvg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const svgPt = pt.matrixTransform(navigatorSvg.getScreenCTM().inverse());
+      return { x: svgPt.x, y: svgPt.y };
+    }
+
+    function navigatorMouseDown(e) {
+      e.preventDefault();
+      const { x: svgX, y: svgY } = screenToNavigatorSVG(e.clientX, e.clientY);
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Check if click is inside the viewport rectangle
+      const viewWidth = width / zoomLevel;
+      const viewHeight = height / zoomLevel;
+      const inViewport = svgX >= panX && svgX <= panX + viewWidth &&
+                         svgY >= panY && svgY <= panY + viewHeight;
+
+      if (inViewport) {
+        // Start dragging the viewport
+        isNavigatorDragging = true;
+        navDragStartX = svgX;
+        navDragStartY = svgY;
+        navDragStartPanX = panX;
+        navDragStartPanY = panY;
+      } else {
+        // Click outside viewport - center on click position
+        panX = svgX - viewWidth / 2;
+        panY = svgY - viewHeight / 2;
+        updateViewBox();
+      }
+    }
+
+    function navigatorMouseMove(e) {
+      if (!isNavigatorDragging) return;
+
+      const { x: svgX, y: svgY } = screenToNavigatorSVG(e.clientX, e.clientY);
+
+      // Calculate delta in SVG units
+      const dx = svgX - navDragStartX;
+      const dy = svgY - navDragStartY;
+
+      panX = navDragStartPanX + dx;
+      panY = navDragStartPanY + dy;
+
+      updateViewBox();
+    }
+
+    function navigatorMouseUp() {
+      isNavigatorDragging = false;
+    }
+
+    function navigatorDoubleClick(e) {
+      e.preventDefault();
+      const { x: svgX, y: svgY } = screenToNavigatorSVG(e.clientX, e.clientY);
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      // Center the viewport on double-click position
+      const viewWidth = width / zoomLevel;
+      const viewHeight = height / zoomLevel;
+
+      panX = svgX - viewWidth / 2;
+      panY = svgY - viewHeight / 2;
+
+      updateViewBox();
+    }
+
+    // ==================== End Zoom/Pan Functions ====================
+
+    // Update preview
+    function updatePreview() {
+      const code = editor.state.doc.toString();
+
+      try {
+        const result = window.SvgPathExtended.compileWithContext(code);
+        previewPath.setAttribute('d', result.path);
+        currentLogs = result.logs || [];
+        updateConsoleOutput();
+        hideError();
+      } catch (e) {
+        showError(e.message);
+        currentLogs = [];
+        updateConsoleOutput();
+      }
+
+      updateSvgStyles();
+      updateNavigatorContent();
+    }
+
+    function debouncedUpdate() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        updatePreview();
+        updateAnnotatedOutput();
+      }, 150);
+    }
+
+    // Update SVG styles
+    function updateSvgStyles() {
+      const width = parseInt(widthInput.value) || 200;
+      const height = parseInt(heightInput.value) || 200;
+
+      preview.setAttribute('width', width);
+      preview.setAttribute('height', height);
+
+      // Update viewBox based on zoom/pan state
+      updateViewBox();
+
+      previewPath.setAttribute('stroke', strokeInput.value);
+      previewPath.setAttribute('stroke-width', strokeWidthSelect.value);
+
+      if (fillEnabledInput.checked) {
+        previewPath.setAttribute('fill', fillInput.value);
+      } else {
+        previewPath.setAttribute('fill', 'none');
+      }
+
+      previewBg.setAttribute('fill', bgInput.value);
+      // Set background rect to cover full coordinate space
+      previewBg.setAttribute('x', 0);
+      previewBg.setAttribute('y', 0);
+      previewBg.setAttribute('width', width);
+      previewBg.setAttribute('height', height);
+
+      // Update grid
+      const gridSize = parseInt(gridSizeSelect.value) || 20;
+      const gridColor = gridColorInput.value;
+      const gridEnabled = gridEnabledInput.checked;
+
+      gridPattern.setAttribute('width', gridSize);
+      gridPattern.setAttribute('height', gridSize);
+      gridPath.setAttribute('d', `M ${gridSize} 0 L 0 0 0 ${gridSize}`);
+      gridPath.setAttribute('stroke', gridColor);
+      previewGrid.style.display = gridEnabled ? 'block' : 'none';
+      // Set grid rect to cover full coordinate space (not percentages)
+      previewGrid.setAttribute('x', 0);
+      previewGrid.setAttribute('y', 0);
+      previewGrid.setAttribute('width', width);
+      previewGrid.setAttribute('height', height);
+
+      // Update navigator content when styles change
+      updateNavigatorContent();
+    }
+
+    // Error handling
+    function showError(message) {
+      errorPanel.textContent = message;
+      errorPanel.classList.add('visible');
+    }
+
+    function hideError() {
+      errorPanel.classList.remove('visible');
+    }
+
+    // URL state management
+    function encodeState() {
+      const state = {
+        code: editor.state.doc.toString(),
+        w: parseInt(widthInput.value),
+        h: parseInt(heightInput.value),
+        s: strokeInput.value,
+        f: fillEnabledInput.checked ? fillInput.value : null,
+        bg: bgInput.value,
+        sw: strokeWidthSelect.value,
+        ge: gridEnabledInput.checked,
+        gc: gridColorInput.value,
+        gs: gridSizeSelect.value,
+        ao: annotatedPaneOpen,
+        co: consolePaneOpen,
+        zoom: zoomLevel,
+        panX: panX,
+        panY: panY,
+      };
+      return btoa(encodeURIComponent(JSON.stringify(state)));
+    }
+
+    function decodeState(hash) {
+      try {
+        const json = decodeURIComponent(atob(hash));
+        return JSON.parse(json);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function loadFromURL() {
+      const hash = location.hash.slice(1);
+      if (!hash) return null;
+
+      const state = decodeState(hash);
+      if (!state) return null;
+
+      if (state.w) widthInput.value = state.w;
+      if (state.h) heightInput.value = state.h;
+      if (state.s) strokeInput.value = state.s;
+      if (state.f) {
+        fillEnabledInput.checked = true;
+        fillInput.value = state.f;
+        fillInput.disabled = false;
+      }
+      if (state.bg) bgInput.value = state.bg;
+      if (state.sw) strokeWidthSelect.value = state.sw;
+      if (state.ge !== undefined) gridEnabledInput.checked = state.ge;
+      if (state.gc) gridColorInput.value = state.gc;
+      if (state.gs) gridSizeSelect.value = state.gs;
+
+      // Restore annotated pane state
+      if (state.ao) {
+        annotatedPaneOpen = true;
+        annotatedPane.classList.add('open');
+        annotatedToggle.classList.add('active');
+      }
+
+      // Restore console pane state
+      if (state.co) {
+        consolePaneOpen = true;
+        consolePane.classList.add('open');
+        consoleToggle.classList.add('active');
+      }
+
+      // Restore zoom/pan state
+      if (state.zoom) zoomLevel = state.zoom;
+      if (state.panX) panX = state.panX;
+      if (state.panY) panY = state.panY;
+
+      return state.code || null;
+    }
+
+    // Copy URL
+    function copyURL() {
+      const url = location.origin + location.pathname + '#' + encodeState();
+      navigator.clipboard.writeText(url).then(() => {
+        copyFeedback.classList.add('visible');
+        setTimeout(() => copyFeedback.classList.remove('visible'), 2000);
+      });
+    }
+
+    // Load example
+    function loadExample(name) {
+      if (examples[name]) {
+        editor.dispatch({
+          changes: {
+            from: 0,
+            to: editor.state.doc.length,
+            insert: examples[name],
+          },
+        });
+        updatePreview();
+        updateAnnotatedOutput();
+      }
+    }
+
+    // Event listeners
+    examplesSelect.addEventListener('change', (e) => {
+      if (e.target.value) {
+        loadExample(e.target.value);
+        e.target.value = '';
+      }
+    });
+
+    widthInput.addEventListener('input', updateSvgStyles);
+    heightInput.addEventListener('input', updateSvgStyles);
+    strokeInput.addEventListener('input', updateSvgStyles);
+    fillEnabledInput.addEventListener('change', (e) => {
+      fillInput.disabled = !e.target.checked;
+      updateSvgStyles();
+    });
+    fillInput.addEventListener('input', updateSvgStyles);
+    bgInput.addEventListener('input', updateSvgStyles);
+    gridEnabledInput.addEventListener('change', updateSvgStyles);
+    gridColorInput.addEventListener('input', updateSvgStyles);
+    gridSizeSelect.addEventListener('change', updateSvgStyles);
+    strokeWidthSelect.addEventListener('change', updateSvgStyles);
+    copyUrlBtn.addEventListener('click', copyURL);
+
+    // File operations
+    document.getElementById('open-file').addEventListener('click', openFile);
+    document.getElementById('save-file').addEventListener('click', saveFile);
+
+    // Annotated pane toggle
+    annotatedToggle.addEventListener('click', toggleAnnotatedPane);
+
+    // Console pane toggle and clear
+    consoleToggle.addEventListener('click', toggleConsolePane);
+    clearConsoleBtn.addEventListener('click', clearConsole);
+
+    // Zoom controls
+    zoomInBtn.addEventListener('click', zoomIn);
+    zoomOutBtn.addEventListener('click', zoomOut);
+    zoomFitBtn.addEventListener('click', zoomFit);
+
+    // Zoom level input - manual entry
+    zoomLevelDisplay.addEventListener('change', (e) => {
+      const value = parseInt(e.target.value);
+      if (!isNaN(value) && value >= MIN_ZOOM * 100 && value <= MAX_ZOOM * 100) {
+        const oldZoom = zoomLevel;
+        zoomLevel = value / 100;
+        adjustPanForZoom(oldZoom, zoomLevel);
+        updateViewBox();
+      } else {
+        // Reset to current value if invalid
+        e.target.value = `${Math.round(zoomLevel * 100)}%`;
+      }
+    });
+
+    // Zoom level input - arrow key controls
+    zoomLevelDisplay.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const step = e.shiftKey ? 0.25 : 0.05;  // 25% or 5%
+        const direction = e.key === 'ArrowUp' ? 1 : -1;
+
+        const oldZoom = zoomLevel;
+        zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel + (step * direction)));
+        adjustPanForZoom(oldZoom, zoomLevel);
+        updateViewBox();
+      }
+    });
+
+    // Mouse wheel zoom with continuous dampening for smooth trackpad experience
+    previewContainer.addEventListener('wheel', (e) => {
+      e.preventDefault();
+
+      // Dampen the delta for smoother trackpad experience
+      const dampening = 0.002;
+      const delta = -e.deltaY * dampening;
+
+      const oldZoom = zoomLevel;
+      zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel * (1 + delta)));
+
+      adjustPanForZoom(oldZoom, zoomLevel);
+      updateViewBox();
+    }, { passive: false });
+
+    // Pan via drag
+    previewContainer.addEventListener('mousedown', startPan);
+    document.addEventListener('mousemove', doPan);
+    document.addEventListener('mouseup', endPan);
+
+    // Navigator click/drag
+    navigatorSvg.addEventListener('mousedown', navigatorMouseDown);
+    navigatorSvg.addEventListener('dblclick', navigatorDoubleClick);
+    document.addEventListener('mousemove', navigatorMouseMove);
+    document.addEventListener('mouseup', navigatorMouseUp);
+
+    // Copy annotated output
+    copyAnnotatedBtn.addEventListener('click', () => {
+      if (annotatedEditor) {
+        const annotated = annotatedEditor.state.doc.toString();
+        navigator.clipboard.writeText(annotated).then(() => {
+          copyAnnotatedBtn.textContent = 'Copied!';
+          copyAnnotatedBtn.classList.add('copied');
+          setTimeout(() => {
+            copyAnnotatedBtn.textContent = 'Copy';
+            copyAnnotatedBtn.classList.remove('copied');
+          }, 1500);
+        });
+      }
+    });
+
+    // Docs panel
+    docsBtn.addEventListener('click', () => {
+      docsPanel.classList.add('open');
+    });
+
+    docsClose.addEventListener('click', () => {
+      docsPanel.classList.remove('open');
+    });
+
+    docsTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        docsTabs.forEach(t => t.classList.remove('active'));
+        docSections.forEach(s => s.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`doc-${tabName}`).classList.add('active');
+      });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && docsPanel.classList.contains('open')) {
+        docsPanel.classList.remove('open');
+      }
+      // Ctrl/Cmd + S = Save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveFile();
+      }
+      // Ctrl/Cmd + O = Open
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault();
+        openFile();
+      }
+    });
+
+    // Copy buttons
+    function showCopied(btn) {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = btn === copyCodeBtn ? 'Copy Code' : 'Copy SVG';
+        btn.classList.remove('copied');
+      }, 1500);
+    }
+
+    copyCodeBtn.addEventListener('click', () => {
+      const code = editor.state.doc.toString();
+      navigator.clipboard.writeText(code).then(() => showCopied(copyCodeBtn));
+    });
+
+    copySvgBtn.addEventListener('click', () => {
+      // Generate clean SVG with just the path
+      const width = preview.getAttribute('width');
+      const height = preview.getAttribute('height');
+      const viewBox = preview.getAttribute('viewBox');
+      const pathD = previewPath.getAttribute('d') || '';
+
+      const cleanSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
+  <path d="${pathD}"/>
+</svg>`;
+
+      navigator.clipboard.writeText(cleanSvg).then(() => showCopied(copySvgBtn));
+    });
+
+    // Wait for library to load, then initialize
+    function waitForLibrary(callback, maxWait = 5000) {
+      const start = Date.now();
+      function check() {
+        if (window.SvgPathExtended) {
+          callback();
+        } else if (Date.now() - start < maxWait) {
+          setTimeout(check, 50);
+        } else {
+          showError('Failed to load svg-path-extended library');
+        }
+      }
+      check();
+    }
+
+    // Initialize
+    waitForLibrary(() => {
+      const initialCode = loadFromURL() || defaultCode;
+      editor = createEditor(initialCode);
+      updatePreview();
+
+      // If annotated pane was open from URL state, create the editor and update
+      if (annotatedPaneOpen) {
+        annotatedEditor = createAnnotatedEditor();
+        updateAnnotatedOutput();
+      }
+
+      // If console pane was open from URL state, update console output
+      if (consolePaneOpen) {
+        updateConsoleOutput();
+      }
+    });
+  </script>
+
+  <!-- svg-path-extended library -->
+  <script src="../dist/index.global.js"></script>
+</body>
+</html>
