@@ -24,7 +24,7 @@
     "build": "tsup",
     "build:website": "npm run build && node scripts/build-website.js",
     "dev": "tsup --watch",
-    "dev:website": "npm run build:website && npx wrangler pages dev dist/website --port 3000",
+    "dev:website": "npm run build:website && npx wrangler pages dev public --port 3000",
     "test": "vitest",
     "test:run": "vitest run",
     "cli": "tsx src/cli.ts"

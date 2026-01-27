@@ -21,7 +21,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
-const DIST = join(ROOT, 'dist', 'website');
+// Output to 'public' - standard CloudFlare Pages output directory
+const DIST = join(ROOT, 'public');
 
 async function copyDir(src, dest) {
   await fs.mkdir(dest, { recursive: true });
@@ -45,7 +46,7 @@ async function copyFile(src, dest) {
 }
 
 async function build() {
-  console.log('Building website to dist/website/...\n');
+  console.log('Building website to public/...\n');
 
   // Clean dist/website
   try {
