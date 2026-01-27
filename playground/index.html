@@ -1,26 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>svg-path-extended Playground</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>svg-path-extended Playground &mdash; Pedestal Design</title>
 
-  <!-- CSS Custom Properties and Theme -->
-  <link rel="stylesheet" href="styles/theme.css">
-  <link rel="stylesheet" href="styles/layout.css">
-  <link rel="stylesheet" href="styles/shell.css">
-  <link rel="stylesheet" href="styles/views.css">
-</head>
-<body>
-  <!-- Root Application Shell with Router -->
-  <app-shell></app-shell>
+    <!-- CSS Custom Properties and Theme -->
+    <link rel="stylesheet" href="styles/theme.css" />
+    <link rel="stylesheet" href="styles/layout.css" />
+    <link rel="stylesheet" href="styles/shell.css" />
+    <link rel="stylesheet" href="styles/views.css" />
+  </head>
+  <body>
+    <!-- Root Application Shell with Router -->
+    <app-shell></app-shell>
 
-  <!-- svg-path-extended library (must load before app initializes) -->
-  <script src="../dist/index.global.js"></script>
+    <!-- svg-path-extended library (must load before app initializes) -->
+    <script src="../dist/index.global.js"></script>
 
-  <!-- Load the root shell component (imports all other components) -->
-  <script type="module">
-    import './components/app-shell.js';
-  </script>
-</body>
+    <!-- Load the root shell component (imports all other components) -->
+    <script type="module">
+      import "./components/app-shell.js";
+    </script>
+  </body>
 </html>
