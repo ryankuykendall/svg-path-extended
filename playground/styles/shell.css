@@ -1,0 +1,87 @@
+/* App Shell, Header, and Breadcrumb Styles */
+/* Supplementary styles for shell components */
+
+/* CSS Custom Properties for shell */
+:root {
+  --header-height: 48px;
+  --breadcrumb-height: 32px;
+  --shell-bg: var(--bg-primary, #ffffff);
+  --header-bg: var(--bg-secondary, #f5f5f5);
+  --border-color: #e0e0e0;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --accent-hover: #0052a3;
+  --bg-hover: rgba(0, 0, 0, 0.05);
+}
+
+/* Dark mode support (future) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shell-bg: #1a1a1a;
+    --header-bg: #2a2a2a;
+    --border-color: #404040;
+    --text-secondary: #999999;
+    --text-tertiary: #666666;
+    --bg-hover: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Global transitions for route changes */
+app-shell main > * {
+  transition: opacity 0.15s ease;
+}
+
+app-shell main > *.active {
+  opacity: 1;
+}
+
+/* Focus styles for navigation */
+app-header .nav-link:focus,
+app-breadcrumb .breadcrumb-link:focus {
+  outline: 2px solid var(--accent-color, #0066cc);
+  outline-offset: 2px;
+}
+
+/* Skip link for accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--accent-color, #0066cc);
+  color: white;
+  padding: 8px 16px;
+  z-index: 100;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Print styles */
+@media print {
+  app-header,
+  app-breadcrumb {
+    display: none !important;
+  }
+
+  app-shell main {
+    display: block !important;
+  }
+
+  app-shell main > * {
+    display: none !important;
+  }
+
+  app-shell main > *.active {
+    display: block !important;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  :root {
+    --header-height: 44px;
+    --breadcrumb-height: 28px;
+  }
+}

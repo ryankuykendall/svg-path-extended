@@ -65,6 +65,29 @@ function createStore(initialState) {
 
 // Main playground store
 export const store = createStore({
+  // Routing
+  currentRoute: '/',
+  currentView: 'landing',
+  routeParams: {},        // e.g., { id: 'workspace-123' }
+  routeQuery: {},         // e.g., { state: 'base64...' }
+
+  // Workspaces
+  workspaces: [],         // Array of saved workspace metadata
+
+  // User preferences (defaults for new workspaces)
+  preferences: {
+    width: 200,
+    height: 200,
+    stroke: '#000000',
+    strokeWidth: 2,
+    fillEnabled: false,
+    fill: '#3498db',
+    background: '#f5f5f5',
+    gridEnabled: true,
+    gridColor: '#cccccc',
+    gridSize: 20,
+  },
+
   // Editor
   code: '',
   isModified: false,

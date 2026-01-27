@@ -1,4 +1,7 @@
-// URL state encoding/decoding for shareable playground links
+// URL state encoding/decoding for shareable workspace links
+// Uses query params with History API: /svg-path-extended/workspace/:id?state=...
+
+import { navigateTo, getCurrentRoute, routeUrl } from './router.js';
 
 export function encodeState(state) {
   const urlState = {
@@ -21,19 +24,25 @@ export function encodeState(state) {
   return btoa(encodeURIComponent(JSON.stringify(urlState)));
 }
 
-export function decodeState(hash) {
+export function decodeState(encodedState) {
   try {
-    const json = decodeURIComponent(atob(hash));
+    const json = decodeURIComponent(atob(encodedState));
     return JSON.parse(json);
   } catch (e) {
     return null;
   }
 }
 
+// Load state from current URL query params
 export function loadFromURL() {
-  const hash = location.hash.slice(1);
-  if (!hash) return null;
-  return decodeState(hash);
+  const route = getCurrentRoute();
+
+  // State is stored in query param
+  if (route.query?.state) {
+    return decodeState(route.query.state);
+  }
+
+  return null;
 }
 
 export function applyURLState(urlState, store) {
@@ -64,8 +73,35 @@ export function applyURLState(urlState, store) {
   return urlState.code || null;
 }
 
+// Copy shareable URL to clipboard
 export function copyURL(store) {
   const state = store.getAll();
-  const url = location.origin + location.pathname + '#' + encodeState(state);
+  const route = getCurrentRoute();
+  const encodedState = encodeState(state);
+
+  // Build URL with current workspace ID if available
+  const workspaceId = route.params?.id || 'new';
+  const url = location.origin + routeUrl('/workspace/:id', {
+    params: { id: workspaceId },
+    query: { state: encodedState }
+  });
+
   return navigator.clipboard.writeText(url);
+}
+
+// Update URL with current state without adding history entry
+export function updateURLState(store, options = {}) {
+  const { addToHistory = false } = options;
+  const state = store.getAll();
+  const encodedState = encodeState(state);
+  const route = getCurrentRoute();
+
+  // Only update if we're on the workspace route
+  if (route.view === 'workspace') {
+    navigateTo('/workspace/:id', {
+      params: route.params,
+      query: { state: encodedState },
+      replace: !addToHistory
+    });
+  }
 }

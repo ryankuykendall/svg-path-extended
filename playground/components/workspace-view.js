@@ -1,10 +1,11 @@
-// Root application component - orchestrates compilation and state
+// Workspace View - Code editor, preview, and compilation
+// Route: /workspace/:id
 
 import { store } from '../state/store.js';
 import { defaultCode, examples } from '../utils/examples.js';
 import { loadFromURL, applyURLState } from '../utils/url-state.js';
 
-// Import all components
+// Import all sub-components
 import './playground-header.js';
 import './playground-main.js';
 import './playground-footer.js';
@@ -15,18 +16,42 @@ import './svg-preview-pane.js';
 import './docs-panel.js';
 import './shared/error-panel.js';
 
-export class PlaygroundApp extends HTMLElement {
+export class WorkspaceView extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
     this._debounceTimer = null;
     this._fileHandle = null;
+    this._initialized = false;
+    this._routeUnsubscribe = null;
   }
 
   connectedCallback() {
     this.render();
     this.setupEventListeners();
-    this.waitForLibrary();
+
+    // Subscribe to route changes to initialize when becoming active
+    this._routeUnsubscribe = store.subscribe(['currentView'], () => {
+      this.handleRouteChange();
+    });
+
+    // Check if we should initialize immediately (if already on playground route)
+    this.handleRouteChange();
+  }
+
+  disconnectedCallback() {
+    if (this._routeUnsubscribe) {
+      this._routeUnsubscribe();
+    }
+  }
+
+  handleRouteChange() {
+    const currentView = store.get('currentView');
+    const isActive = currentView === 'workspace';
+
+    if (isActive && !this._initialized) {
+      this.waitForLibrary();
+    }
   }
 
   get editorPane() {
@@ -68,7 +93,10 @@ export class PlaygroundApp extends HTMLElement {
   }
 
   initialize() {
-    // Load state from URL or use default
+    if (this._initialized) return;
+    this._initialized = true;
+
+    // Load state from URL (query params) or use default
     const urlState = loadFromURL();
     const initialCode = applyURLState(urlState, store) || defaultCode;
 
@@ -296,11 +324,16 @@ export class PlaygroundApp extends HTMLElement {
         :host {
           display: flex;
           flex-direction: column;
-          height: 100vh;
+          height: 100%;
           overflow: hidden;
           font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
           background: var(--bg-secondary, #f5f5f5);
           color: var(--text-primary, #1a1a1a);
+        }
+
+        /* Hide when not active */
+        :host(:not(.active)) {
+          display: none;
         }
 
         playground-main {
@@ -327,4 +360,4 @@ export class PlaygroundApp extends HTMLElement {
   }
 }
 
-customElements.define('playground-app', PlaygroundApp);
+customElements.define('workspace-view', WorkspaceView);
