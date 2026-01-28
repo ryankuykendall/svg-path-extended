@@ -1,7 +1,7 @@
 // Docs View - Full-page documentation
 // Route: /docs
 
-import { gettingStarted, syntax, stdlib, debug, cli, examples } from '../../utils/docs-content.js';
+import { gettingStarted, syntax, stdlib, debug, cli, examples, hljsThemeDark } from '../../utils/docs-content.js';
 
 const styles = `
   :host {
@@ -117,9 +117,6 @@ const styles = `
   }
 
   pre {
-    background: #1e1e1e;
-    color: #d4d4d4;
-    padding: 1rem;
     border-radius: 8px;
     overflow-x: auto;
     font-family: var(--font-mono, monospace);
@@ -130,15 +127,13 @@ const styles = `
 
   pre code {
     background: none;
-    padding: 0;
-    color: inherit;
+    padding: 1rem;
+    display: block;
+    font-size: inherit;
   }
 
-  .keyword { color: #569cd6; }
-  .function { color: #dcdcaa; }
-  .number { color: #b5cea8; }
-  .string { color: #ce9178; }
-  .comment { color: #6a9955; }
+  /* highlight.js theme */
+  ${hljsThemeDark}
 
   ul, ol {
     margin: 0 0 1rem 0;

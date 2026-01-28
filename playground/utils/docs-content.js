@@ -5,18 +5,17 @@ export const gettingStarted = `<h1>Getting Started</h1>
 <p>svg-path-extended is a language that extends SVG path syntax with variables, expressions, control flow, and functions. It compiles to standard SVG path data that works in any browser or graphics application.</p>
 <h2>Your First Path</h2>
 <p>Try this simple example in the playground:</p>
-<pre><code>// A simple rectangle using variables
-let size = 50
-let x = 10
-let y = 10
+<pre><code class="hljs"><span class="hljs-comment">// A simple rectangle using variables</span>
+<span class="hljs-keyword">let</span> size = <span class="hljs-number">50</span>
+<span class="hljs-keyword">let</span> x = <span class="hljs-number">10</span>
+<span class="hljs-keyword">let</span> y = <span class="hljs-number">10</span>
 
 M x y
 h size
 v size
-h calc(-size)
+h <span class="hljs-title function_">calc</span>(-size)
 Z
-</code></pre>
-<p>This creates a rectangle by:</p>
+</code></pre><p>This creates a rectangle by:</p>
 <ol>
 <li>Moving to position (10, 10)</li>
 <li>Drawing a horizontal line of length 50</li>
@@ -26,54 +25,47 @@ Z
 </ol>
 <h2>Why svg-path-extended?</h2>
 <p>SVG paths are powerful but writing them by hand is tedious:</p>
-<pre><code>// Standard SVG - repetitive coordinates
-M 20 20 L 80 20 L 80 80 L 20 80 Z
-M 100 20 L 160 20 L 160 80 L 100 80 Z
-M 180 20 L 240 20 L 240 80 L 180 80 Z
-</code></pre>
-<p>With svg-path-extended, you can use variables and loops:</p>
-<pre><code>// svg-path-extended - DRY and readable
-let size = 60
-for (i in 0..3) {
-  rect(calc(20 + i * 80), 20, size, size)
+<pre><code class="hljs"><span class="hljs-comment">// Standard SVG - repetitive coordinates</span>
+M <span class="hljs-number">20</span> <span class="hljs-number">20</span> L <span class="hljs-number">80</span> <span class="hljs-number">20</span> L <span class="hljs-number">80</span> <span class="hljs-number">80</span> L <span class="hljs-number">20</span> <span class="hljs-number">80</span> Z
+M <span class="hljs-number">100</span> <span class="hljs-number">20</span> L <span class="hljs-number">160</span> <span class="hljs-number">20</span> L <span class="hljs-number">160</span> <span class="hljs-number">80</span> L <span class="hljs-number">100</span> <span class="hljs-number">80</span> Z
+M <span class="hljs-number">180</span> <span class="hljs-number">20</span> L <span class="hljs-number">240</span> <span class="hljs-number">20</span> L <span class="hljs-number">240</span> <span class="hljs-number">80</span> L <span class="hljs-number">180</span> <span class="hljs-number">80</span> Z
+</code></pre><p>With svg-path-extended, you can use variables and loops:</p>
+<pre><code class="hljs"><span class="hljs-comment">// svg-path-extended - DRY and readable</span>
+<span class="hljs-keyword">let</span> size = <span class="hljs-number">60</span>
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.3</span>) {
+  <span class="hljs-title function_">rect</span>(<span class="hljs-title function_">calc</span>(<span class="hljs-number">20</span> + i * <span class="hljs-number">80</span>), <span class="hljs-number">20</span>, size, size)
 }
-</code></pre>
-<h2>Key Features</h2>
+</code></pre><h2>Key Features</h2>
 <h3>Variables</h3>
 <p>Store and reuse values:</p>
-<pre><code>let width = 200
-let height = 100
-let centerX = calc(width / 2)
-</code></pre>
-<h3>Expressions with calc()</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> width = <span class="hljs-number">200</span>
+<span class="hljs-keyword">let</span> height = <span class="hljs-number">100</span>
+<span class="hljs-keyword">let</span> centerX = <span class="hljs-title function_">calc</span>(width / <span class="hljs-number">2</span>)
+</code></pre><h3>Expressions with calc()</h3>
 <p>Use math in path commands:</p>
-<pre><code>let r = 50
-M calc(100 - r) 100
-L calc(100 + r) 100
-</code></pre>
-<h3>Loops</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> r = <span class="hljs-number">50</span>
+M <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> - r) <span class="hljs-number">100</span>
+L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + r) <span class="hljs-number">100</span>
+</code></pre><h3>Loops</h3>
 <p>Repeat patterns easily:</p>
-<pre><code>for (i in 0..10) {
-  circle(calc(20 + i * 30), 100, 10)
+<pre><code class="hljs"><span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.10</span>) {
+  <span class="hljs-title function_">circle</span>(<span class="hljs-title function_">calc</span>(<span class="hljs-number">20</span> + i * <span class="hljs-number">30</span>), <span class="hljs-number">100</span>, <span class="hljs-number">10</span>)
 }
-</code></pre>
-<h3>Functions</h3>
+</code></pre><h3>Functions</h3>
 <p>Define reusable shapes:</p>
-<pre><code>fn square(x, y, size) {
-  rect(x, y, size, size)
+<pre><code class="hljs">fn <span class="hljs-title function_">square</span>(<span class="hljs-params">x, y, size</span>) {
+  <span class="hljs-title function_">rect</span>(x, y, size, size)
 }
 
-square(10, 10, 50)
-square(70, 10, 50)
-</code></pre>
-<h3>Built-in Shapes</h3>
+<span class="hljs-title function_">square</span>(<span class="hljs-number">10</span>, <span class="hljs-number">10</span>, <span class="hljs-number">50</span>)
+<span class="hljs-title function_">square</span>(<span class="hljs-number">70</span>, <span class="hljs-number">10</span>, <span class="hljs-number">50</span>)
+</code></pre><h3>Built-in Shapes</h3>
 <p>Common shapes are included:</p>
-<pre><code>circle(100, 100, 50)
-rect(10, 10, 80, 60)
-polygon(100, 100, 40, 6)  // hexagon
-star(100, 100, 50, 25, 5)
-</code></pre>
-<h2>Next Steps</h2>
+<pre><code class="hljs"><span class="hljs-title function_">circle</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">50</span>)
+<span class="hljs-title function_">rect</span>(<span class="hljs-number">10</span>, <span class="hljs-number">10</span>, <span class="hljs-number">80</span>, <span class="hljs-number">60</span>)
+<span class="hljs-title function_">polygon</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">40</span>, <span class="hljs-number">6</span>)  <span class="hljs-comment">// hexagon</span>
+<span class="hljs-title function_">star</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">50</span>, <span class="hljs-number">25</span>, <span class="hljs-number">5</span>)
+</code></pre><h2>Next Steps</h2>
 <ul>
 <li><strong>Syntax Reference</strong> - Learn all the language features</li>
 <li><strong>Standard Library</strong> - Explore built-in functions</li>
@@ -145,27 +137,23 @@ export const syntax = `<h1>Syntax Reference</h1>
 </tr>
 </tbody></table>
 <p>Uppercase commands use absolute coordinates; lowercase use relative coordinates.</p>
-<pre><code>M 0 0 L 100 100 Z
-</code></pre>
-<h2>Variables</h2>
+<pre><code class="hljs">M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">100</span> <span class="hljs-number">100</span> Z
+</code></pre><h2>Variables</h2>
 <p>Declare variables with <code>let</code>:</p>
-<pre><code>let width = 200;
-let height = 100;
-let centerX = 100;
-</code></pre>
-<p>Use variables directly in path commands:</p>
-<pre><code>let x = 50;
-let y = 75;
-M x y L 100 100
-</code></pre>
-<p><strong>Note</strong>: Single letters that are path commands (M, L, C, etc.) cannot be used as variable names.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> width = <span class="hljs-number">200</span>;
+<span class="hljs-keyword">let</span> height = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> centerX = <span class="hljs-number">100</span>;
+</code></pre><p>Use variables directly in path commands:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> x = <span class="hljs-number">50</span>;
+<span class="hljs-keyword">let</span> y = <span class="hljs-number">75</span>;
+M x y L <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+</code></pre><p><strong>Note</strong>: Single letters that are path commands (M, L, C, etc.) cannot be used as variable names.</p>
 <h2>Expressions with calc()</h2>
 <p>For mathematical expressions, wrap them in <code>calc()</code>:</p>
-<pre><code>let r = 50;
-M calc(100 - r) 100
-L calc(100 + r) 100
-</code></pre>
-<h3>Supported Operators</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> r = <span class="hljs-number">50</span>;
+M <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> - r) <span class="hljs-number">100</span>
+L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + r) <span class="hljs-number">100</span>
+</code></pre><h3>Supported Operators</h3>
 <table>
 <thead>
 <tr>
@@ -253,73 +241,64 @@ L calc(100 + r) 100
 <td>Radians (no conversion)</td>
 </tr>
 </tbody></table>
-<pre><code>let angle = 90deg;
-M sin(45deg) cos(45deg)
+<pre><code class="hljs"><span class="hljs-keyword">let</span> angle = 90deg;
+M <span class="hljs-title function_">sin</span>(45deg) <span class="hljs-title function_">cos</span>(45deg)
 
-// Equivalent to:
-let angle = rad(90);
-M sin(rad(45)) cos(rad(45))
-</code></pre>
-<p>This is especially useful with trigonometric functions and polar coordinates.</p>
+<span class="hljs-comment">// Equivalent to:</span>
+<span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">rad</span>(<span class="hljs-number">90</span>);
+M <span class="hljs-title function_">sin</span>(<span class="hljs-title function_">rad</span>(<span class="hljs-number">45</span>)) <span class="hljs-title function_">cos</span>(<span class="hljs-title function_">rad</span>(<span class="hljs-number">45</span>))
+</code></pre><p>This is especially useful with trigonometric functions and polar coordinates.</p>
 <h2>For Loops</h2>
 <p>Repeat path commands with <code>for</code>:</p>
-<pre><code>for (i in 0..10) {
-  L calc(i * 20) calc(i * 10)
+<pre><code class="hljs"><span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.10</span>) {
+  L <span class="hljs-title function_">calc</span>(i * <span class="hljs-number">20</span>) <span class="hljs-title function_">calc</span>(i * <span class="hljs-number">10</span>)
 }
-</code></pre>
-<p>The range <code>0..10</code> includes both endpoints (0 through 10, giving 11 iterations).</p>
+</code></pre><p>The range <code>0..10</code> includes both endpoints (0 through 10, giving 11 iterations).</p>
 <h3>Descending Ranges</h3>
 <p>Ranges automatically count down when start &gt; end:</p>
-<pre><code>// Countdown from 5 to 1
-for (i in 5..1) {
-  M calc(i * 20) 0
+<pre><code class="hljs"><span class="hljs-comment">// Countdown from 5 to 1</span>
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">5.</span><span class="hljs-number">.1</span>) {
+  M <span class="hljs-title function_">calc</span>(i * <span class="hljs-number">20</span>) <span class="hljs-number">0</span>
 }
-// Produces: M 100 0 M 80 0 M 60 0 M 40 0 M 20 0
-</code></pre>
-<h3>Nested Loops</h3>
-<pre><code>for (row in 0..2) {
-  for (col in 0..2) {
-    circle(calc(col * 50 + 25), calc(row * 50 + 25), 10)
+<span class="hljs-comment">// Produces: M 100 0 M 80 0 M 60 0 M 40 0 M 20 0</span>
+</code></pre><h3>Nested Loops</h3>
+<pre><code class="hljs"><span class="hljs-keyword">for</span> (row <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.2</span>) {
+  <span class="hljs-keyword">for</span> (col <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.2</span>) {
+    <span class="hljs-title function_">circle</span>(<span class="hljs-title function_">calc</span>(col * <span class="hljs-number">50</span> + <span class="hljs-number">25</span>), <span class="hljs-title function_">calc</span>(row * <span class="hljs-number">50</span> + <span class="hljs-number">25</span>), <span class="hljs-number">10</span>)
   }
 }
-</code></pre>
-<p>This creates a 3x3 grid (rows 0, 1, 2 and cols 0, 1, 2).</p>
+</code></pre><p>This creates a 3x3 grid (rows 0, 1, 2 and cols 0, 1, 2).</p>
 <h2>Conditionals</h2>
 <p>Use <code>if</code> and <code>else</code> for conditional path generation:</p>
-<pre><code>let size = 100;
+<pre><code class="hljs"><span class="hljs-keyword">let</span> size = <span class="hljs-number">100</span>;
 
-if (size &gt; 50) {
-  M 0 0 L 100 100
-} else {
-  M 0 0 L 50 50
+<span class="hljs-keyword">if</span> (size &gt; <span class="hljs-number">50</span>) {
+  M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+} <span class="hljs-keyword">else</span> {
+  M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">50</span> <span class="hljs-number">50</span>
 }
-</code></pre>
-<p>Comparison results are numeric: <code>1</code> for true, <code>0</code> for false.</p>
+</code></pre><p>Comparison results are numeric: <code>1</code> for true, <code>0</code> for false.</p>
 <h2>Functions</h2>
 <h3>Defining Functions</h3>
 <p>Create reusable path generators with <code>fn</code>:</p>
-<pre><code>fn square(x, y, size) {
-  rect(x, y, size, size)
+<pre><code class="hljs">fn <span class="hljs-title function_">square</span>(<span class="hljs-params">x, y, size</span>) {
+  <span class="hljs-title function_">rect</span>(x, y, size, size)
 }
-</code></pre>
-<h3>Calling Functions</h3>
-<pre><code>square(10, 10, 50)
+</code></pre><h3>Calling Functions</h3>
+<pre><code class="hljs">square(10, 10, 50)
 square(70, 10, 50)
-</code></pre>
-<p>Functions can call other functions and use all language features.</p>
+</code></pre><p>Functions can call other functions and use all language features.</p>
 <h2>Comments</h2>
 <p>Line comments start with <code>//</code>:</p>
-<pre><code>// This is a comment
-let x = 50;  // inline comment
-M x 0
-</code></pre>
-<h2>Path Context (ctx)</h2>
+<pre><code class="hljs"><span class="hljs-comment">// This is a comment</span>
+<span class="hljs-keyword">let</span> x = <span class="hljs-number">50</span>;  <span class="hljs-comment">// inline comment</span>
+M x <span class="hljs-number">0</span>
+</code></pre><h2>Path Context (ctx)</h2>
 <p>When using <code>compileWithContext()</code>, a <code>ctx</code> object tracks the current drawing state:</p>
-<pre><code>M 10 20
-L 30 40
-L calc(ctx.position.x + 10) ctx.position.y  // L 40 40
-</code></pre>
-<h3>ctx Properties</h3>
+<pre><code class="hljs">M <span class="hljs-number">10</span> <span class="hljs-number">20</span>
+L <span class="hljs-number">30</span> <span class="hljs-number">40</span>
+L <span class="hljs-title function_">calc</span>(ctx.<span class="hljs-property">position</span>.<span class="hljs-property">x</span> + <span class="hljs-number">10</span>) ctx.<span class="hljs-property">position</span>.<span class="hljs-property">y</span>  <span class="hljs-comment">// L 40 40</span>
+</code></pre><h3>ctx Properties</h3>
 <table>
 <thead>
 <tr>
@@ -365,37 +344,34 @@ L calc(ctx.position.x + 10) ctx.position.y  // L 40 40
 <p>Lowercase (relative) commands add to current position; uppercase (absolute) set it directly.</p>
 <h3>log() Function</h3>
 <p>Use <code>log()</code> to inspect the context during evaluation:</p>
-<pre><code>M 10 20
-log(ctx)           // Logs full context as JSON
-log(ctx.position)  // Logs just position object
-log(ctx.position.x) // Logs just the x value
-L 30 40
-</code></pre>
-<p>The logs are captured in the <code>logs</code> array returned by <code>compileWithContext()</code>.</p>
+<pre><code class="hljs">M <span class="hljs-number">10</span> <span class="hljs-number">20</span>
+<span class="hljs-title function_">log</span>(ctx)           <span class="hljs-comment">// Logs full context as JSON</span>
+<span class="hljs-title function_">log</span>(ctx.<span class="hljs-property">position</span>)  <span class="hljs-comment">// Logs just position object</span>
+<span class="hljs-title function_">log</span>(ctx.<span class="hljs-property">position</span>.<span class="hljs-property">x</span>) <span class="hljs-comment">// Logs just the x value</span>
+L <span class="hljs-number">30</span> <span class="hljs-number">40</span>
+</code></pre><p>The logs are captured in the <code>logs</code> array returned by <code>compileWithContext()</code>.</p>
 <h3>Example: Drawing Relative to Current Position</h3>
-<pre><code>M 100 100
-L 150 150
-// Continue from current position
-L calc(ctx.position.x + 50) ctx.position.y
-L ctx.position.x calc(ctx.position.y + 50)
+<pre><code class="hljs">M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+L <span class="hljs-number">150</span> <span class="hljs-number">150</span>
+<span class="hljs-comment">// Continue from current position</span>
+L <span class="hljs-title function_">calc</span>(ctx.<span class="hljs-property">position</span>.<span class="hljs-property">x</span> + <span class="hljs-number">50</span>) ctx.<span class="hljs-property">position</span>.<span class="hljs-property">y</span>
+L ctx.<span class="hljs-property">position</span>.<span class="hljs-property">x</span> <span class="hljs-title function_">calc</span>(ctx.<span class="hljs-property">position</span>.<span class="hljs-property">y</span> + <span class="hljs-number">50</span>)
 Z
-</code></pre>
-<h2>Complete Example</h2>
-<pre><code>// Draw a grid of circles with varying sizes
-let cols = 5;
-let rows = 5;
-let spacing = 40;
+</code></pre><h2>Complete Example</h2>
+<pre><code class="hljs"><span class="hljs-comment">// Draw a grid of circles with varying sizes</span>
+<span class="hljs-keyword">let</span> cols = <span class="hljs-number">5</span>;
+<span class="hljs-keyword">let</span> rows = <span class="hljs-number">5</span>;
+<span class="hljs-keyword">let</span> spacing = <span class="hljs-number">40</span>;
 
-for (row in 0..rows) {
-  for (col in 0..cols) {
-    let x = calc(col * spacing + 20);
-    let y = calc(row * spacing + 20);
-    let r = calc(5 + col + row);
-    circle(x, y, r)
+<span class="hljs-keyword">for</span> (row <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.<span class="hljs-property">rows</span>) {
+  <span class="hljs-keyword">for</span> (col <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.<span class="hljs-property">cols</span>) {
+    <span class="hljs-keyword">let</span> x = <span class="hljs-title function_">calc</span>(col * spacing + <span class="hljs-number">20</span>);
+    <span class="hljs-keyword">let</span> y = <span class="hljs-title function_">calc</span>(row * spacing + <span class="hljs-number">20</span>);
+    <span class="hljs-keyword">let</span> r = <span class="hljs-title function_">calc</span>(<span class="hljs-number">5</span> + col + row);
+    <span class="hljs-title function_">circle</span>(x, y, r)
   }
 }
-</code></pre>
-`;
+</code></pre>`;
 
 export const stdlib = `<h1>Standard Library Reference</h1>
 <p>svg-path-extended includes built-in functions for math operations and common SVG shapes.</p>
@@ -438,12 +414,11 @@ export const stdlib = `<h1>Standard Library Reference</h1>
 <td>Two-argument arc tangent</td>
 </tr>
 </tbody></table>
-<pre><code>// Draw a point on a circle
-let angle = 0.5;
-let r = 50;
-M calc(100 + cos(angle) * r) calc(100 + sin(angle) * r)
-</code></pre>
-<h3>Angle Conversion</h3>
+<pre><code class="hljs"><span class="hljs-comment">// Draw a point on a circle</span>
+<span class="hljs-keyword">let</span> angle = <span class="hljs-number">0.5</span>;
+<span class="hljs-keyword">let</span> r = <span class="hljs-number">50</span>;
+M <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + <span class="hljs-title function_">cos</span>(angle) * r) <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + <span class="hljs-title function_">sin</span>(angle) * r)
+</code></pre><h3>Angle Conversion</h3>
 <table>
 <thead>
 <tr>
@@ -460,11 +435,10 @@ M calc(100 + cos(angle) * r) calc(100 + sin(angle) * r)
 <td>Convert radians to degrees</td>
 </tr>
 </tbody></table>
-<pre><code>// Use degrees instead of radians
-let angle = rad(45);
-M calc(cos(angle) * 50) calc(sin(angle) * 50)
-</code></pre>
-<h3>Exponential &amp; Logarithmic</h3>
+<pre><code class="hljs"><span class="hljs-comment">// Use degrees instead of radians</span>
+<span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">rad</span>(<span class="hljs-number">45</span>);
+M <span class="hljs-title function_">calc</span>(<span class="hljs-title function_">cos</span>(angle) * <span class="hljs-number">50</span>) <span class="hljs-title function_">calc</span>(<span class="hljs-title function_">sin</span>(angle) * <span class="hljs-number">50</span>)
+</code></pre><h3>Exponential &amp; Logarithmic</h3>
 <table>
 <thead>
 <tr>
@@ -572,14 +546,13 @@ M calc(cos(angle) * 50) calc(sin(angle) * 50)
 <td>Map value from one range to another</td>
 </tr>
 </tbody></table>
-<pre><code>// Interpolate between two positions
-let t = 0.5;
-M calc(lerp(0, 100, t)) calc(lerp(0, 50, t))
+<pre><code class="hljs"><span class="hljs-comment">// Interpolate between two positions</span>
+<span class="hljs-keyword">let</span> t = <span class="hljs-number">0.5</span>;
+M <span class="hljs-title function_">calc</span>(<span class="hljs-title function_">lerp</span>(<span class="hljs-number">0</span>, <span class="hljs-number">100</span>, t)) <span class="hljs-title function_">calc</span>(<span class="hljs-title function_">lerp</span>(<span class="hljs-number">0</span>, <span class="hljs-number">50</span>, t))
 
-// Clamp a value
-let x = clamp(150, 0, 100);  // Result: 100
-</code></pre>
-<h3>Constants</h3>
+<span class="hljs-comment">// Clamp a value</span>
+<span class="hljs-keyword">let</span> x = <span class="hljs-title function_">clamp</span>(<span class="hljs-number">150</span>, <span class="hljs-number">0</span>, <span class="hljs-number">100</span>);  <span class="hljs-comment">// Result: 100</span>
+</code></pre><h3>Constants</h3>
 <table>
 <thead>
 <tr>
@@ -600,14 +573,13 @@ let x = clamp(150, 0, 100);  // Result: 100
 <td>6.28318... (2π)</td>
 </tr>
 </tbody></table>
-<pre><code>// Draw a semicircle
-let r = 50;
-for (i in 0..20) {
-  let angle = calc(i / 20 * PI());
-  L calc(100 + cos(angle) * r) calc(100 + sin(angle) * r)
+<pre><code class="hljs"><span class="hljs-comment">// Draw a semicircle</span>
+<span class="hljs-keyword">let</span> r = <span class="hljs-number">50</span>;
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.20</span>) {
+  <span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">calc</span>(i / <span class="hljs-number">20</span> * <span class="hljs-title function_">PI</span>());
+  L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + <span class="hljs-title function_">cos</span>(angle) * r) <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + <span class="hljs-title function_">sin</span>(angle) * r)
 }
-</code></pre>
-<h3>Random</h3>
+</code></pre><h3>Random</h3>
 <table>
 <thead>
 <tr>
@@ -630,78 +602,63 @@ for (i in 0..20) {
 <p>These functions generate complete path segments.</p>
 <h3>circle(cx, cy, r)</h3>
 <p>Draws a circle centered at (cx, cy) with radius r.</p>
-<pre><code>circle(100, 100, 50)
-</code></pre>
-<p>Output: A full circle using two arc commands.</p>
+<pre><code class="hljs"><span class="hljs-title function_">circle</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">50</span>)
+</code></pre><p>Output: A full circle using two arc commands.</p>
 <h3>rect(x, y, width, height)</h3>
 <p>Draws a rectangle.</p>
-<pre><code>rect(10, 10, 80, 60)
-</code></pre>
-<h3>roundRect(x, y, width, height, radius)</h3>
+<pre><code class="hljs"><span class="hljs-title function_">rect</span>(<span class="hljs-number">10</span>, <span class="hljs-number">10</span>, <span class="hljs-number">80</span>, <span class="hljs-number">60</span>)
+</code></pre><h3>roundRect(x, y, width, height, radius)</h3>
 <p>Draws a rectangle with rounded corners.</p>
-<pre><code>roundRect(10, 10, 80, 60, 10)
-</code></pre>
-<h3>polygon(cx, cy, radius, sides)</h3>
+<pre><code class="hljs">roundRect(10, 10, 80, 60, 10)
+</code></pre><h3>polygon(cx, cy, radius, sides)</h3>
 <p>Draws a regular polygon.</p>
-<pre><code>polygon(100, 100, 50, 6)  // Hexagon
-polygon(100, 100, 50, 8)  // Octagon
-</code></pre>
-<h3>star(cx, cy, outerRadius, innerRadius, points)</h3>
+<pre><code class="hljs"><span class="hljs-title function_">polygon</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">50</span>, <span class="hljs-number">6</span>)  <span class="hljs-comment">// Hexagon</span>
+<span class="hljs-title function_">polygon</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">50</span>, <span class="hljs-number">8</span>)  <span class="hljs-comment">// Octagon</span>
+</code></pre><h3>star(cx, cy, outerRadius, innerRadius, points)</h3>
 <p>Draws a star shape.</p>
-<pre><code>star(100, 100, 50, 25, 5)  // 5-pointed star
-</code></pre>
-<h3>line(x1, y1, x2, y2)</h3>
+<pre><code class="hljs"><span class="hljs-title function_">star</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">50</span>, <span class="hljs-number">25</span>, <span class="hljs-number">5</span>)  <span class="hljs-comment">// 5-pointed star</span>
+</code></pre><h3>line(x1, y1, x2, y2)</h3>
 <p>Draws a line segment.</p>
-<pre><code>line(0, 0, 100, 100)
-</code></pre>
-<h3>arc(rx, ry, rotation, largeArc, sweep, x, y)</h3>
+<pre><code class="hljs">line(0, 0, 100, 100)
+</code></pre><h3>arc(rx, ry, rotation, largeArc, sweep, x, y)</h3>
 <p>Draws an arc to (x, y). This is a direct wrapper around the SVG <code>A</code> command.</p>
-<pre><code>M 50 100
-arc(50, 50, 0, 1, 1, 150, 100)
-</code></pre>
-<h3>quadratic(x1, y1, cx, cy, x2, y2)</h3>
+<pre><code class="hljs">M <span class="hljs-number">50</span> <span class="hljs-number">100</span>
+<span class="hljs-title function_">arc</span>(<span class="hljs-number">50</span>, <span class="hljs-number">50</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">150</span>, <span class="hljs-number">100</span>)
+</code></pre><h3>quadratic(x1, y1, cx, cy, x2, y2)</h3>
 <p>Draws a quadratic bezier curve from (x1, y1) to (x2, y2) with control point (cx, cy).</p>
-<pre><code>quadratic(0, 100, 50, 0, 100, 100)
-</code></pre>
-<h3>cubic(x1, y1, c1x, c1y, c2x, c2y, x2, y2)</h3>
+<pre><code class="hljs">quadratic(0, 100, 50, 0, 100, 100)
+</code></pre><h3>cubic(x1, y1, c1x, c1y, c2x, c2y, x2, y2)</h3>
 <p>Draws a cubic bezier curve.</p>
-<pre><code>cubic(0, 100, 25, 0, 75, 0, 100, 100)
-</code></pre>
-<h3>moveTo(x, y)</h3>
+<pre><code class="hljs">cubic(0, 100, 25, 0, 75, 0, 100, 100)
+</code></pre><h3>moveTo(x, y)</h3>
 <p>Returns a move command. Useful inside functions.</p>
-<pre><code>moveTo(50, 50)
-</code></pre>
-<h3>lineTo(x, y)</h3>
+<pre><code class="hljs">moveTo(50, 50)
+</code></pre><h3>lineTo(x, y)</h3>
 <p>Returns a line command.</p>
-<pre><code>lineTo(100, 100)
-</code></pre>
-<h3>closePath()</h3>
+<pre><code class="hljs">lineTo(100, 100)
+</code></pre><h3>closePath()</h3>
 <p>Returns a close path command.</p>
-<pre><code>closePath()
-</code></pre>
-<hr>
+<pre><code class="hljs">closePath()
+</code></pre><hr>
 <h2>Context-Aware Functions</h2>
 <p>These functions use the current path context (position, tangent direction) to generate path segments. They maintain path continuity and are ideal for building complex shapes programmatically.</p>
 <h3>Polar Movement</h3>
 <h4>polarPoint(angle, distance)</h4>
 <p>Returns a point at a polar offset from current position. Does not emit any path commands.</p>
-<pre><code>M 100 100
-let p = polarPoint(0, 50);
-L p.x p.y  // Line to (150, 100)
-</code></pre>
-<h4>polarOffset(angle, distance)</h4>
+<pre><code class="hljs">M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+<span class="hljs-keyword">let</span> p = <span class="hljs-title function_">polarPoint</span>(<span class="hljs-number">0</span>, <span class="hljs-number">50</span>);
+L p.<span class="hljs-property">x</span> p.<span class="hljs-property">y</span>  <span class="hljs-comment">// Line to (150, 100)</span>
+</code></pre><h4>polarOffset(angle, distance)</h4>
 <p>Returns <code>{x, y}</code> coordinates at a polar offset. Similar to <code>polarPoint</code>.</p>
 <h4>polarMove(angle, distance)</h4>
 <p>Emits a line command (<code>L</code>) moving in the specified direction. Updates position but draws a visible line.</p>
-<pre><code>M 100 100
-polarMove(0, 50)  // Draws line to (150, 100)
-</code></pre>
-<h4>polarLine(angle, distance)</h4>
+<pre><code class="hljs">M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+<span class="hljs-title function_">polarMove</span>(<span class="hljs-number">0</span>, <span class="hljs-number">50</span>)  <span class="hljs-comment">// Draws line to (150, 100)</span>
+</code></pre><h4>polarLine(angle, distance)</h4>
 <p>Emits a line command (<code>L</code>) in the specified direction. Same as <code>polarMove</code>.</p>
-<pre><code>M 100 100
-polarLine(45deg, 70.7)  // Draws line diagonally
-</code></pre>
-<h3>Arc Functions</h3>
+<pre><code class="hljs">M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+<span class="hljs-title function_">polarLine</span>(45deg, <span class="hljs-number">70.7</span>)  <span class="hljs-comment">// Draws line diagonally</span>
+</code></pre><h3>Arc Functions</h3>
 <h4>arcFromCenter(dcx, dcy, radius, startAngle, endAngle, clockwise)</h4>
 <p>Draws an arc defined by center offset and angles. Returns <code>{point, angle}</code> with endpoint and tangent.</p>
 <ul>
@@ -711,11 +668,10 @@ polarLine(45deg, 70.7)  // Draws line diagonally
 <li><code>clockwise</code>: 1 for clockwise, 0 for counter-clockwise</li>
 </ul>
 <p><strong>Warning:</strong> If current position doesn&#39;t match the calculated arc start point, a line segment (<code>L</code>) will be drawn to the arc start. For guaranteed continuous arcs, use <code>arcFromPolarOffset</code>.</p>
-<pre><code>M 50 50
-arcFromCenter(50, 0, 50, 180deg, 270deg, 1)
-// Center at (100, 50), arc from (50, 50) to (100, 100)
-</code></pre>
-<h4>arcFromPolarOffset(angle, radius, angleOfArc)</h4>
+<pre><code class="hljs">M <span class="hljs-number">50</span> <span class="hljs-number">50</span>
+<span class="hljs-title function_">arcFromCenter</span>(<span class="hljs-number">50</span>, <span class="hljs-number">0</span>, <span class="hljs-number">50</span>, 180deg, 270deg, <span class="hljs-number">1</span>)
+<span class="hljs-comment">// Center at (100, 50), arc from (50, 50) to (100, 100)</span>
+</code></pre><h4>arcFromPolarOffset(angle, radius, angleOfArc)</h4>
 <p>Draws an arc where the center is at a polar offset from current position. The current position is guaranteed to be on the circle, so only an <code>A</code> command is emitted (no <code>M</code> or <code>L</code>). Returns <code>{point, angle}</code> with endpoint and tangent.</p>
 <ul>
 <li><code>angle</code>: Direction from current position to arc center (radians)</li>
@@ -723,12 +679,11 @@ arcFromCenter(50, 0, 50, 180deg, 270deg, 1)
 <li><code>angleOfArc</code>: Sweep angle (positive = clockwise, negative = counter-clockwise)</li>
 </ul>
 <p>This function is ideal for creating continuous curved paths because it never emits extra line segments.</p>
-<pre><code>M 100 100
-arcFromPolarOffset(0, 50, 90deg)
-// Center at (150, 100), sweeps 90° clockwise
-// Ends at (150, 50)
-</code></pre>
-<p><strong>Comparison with arcFromCenter:</strong></p>
+<pre><code class="hljs">M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+<span class="hljs-title function_">arcFromPolarOffset</span>(<span class="hljs-number">0</span>, <span class="hljs-number">50</span>, 90deg)
+<span class="hljs-comment">// Center at (150, 100), sweeps 90° clockwise</span>
+<span class="hljs-comment">// Ends at (150, 50)</span>
+</code></pre><p><strong>Comparison with arcFromCenter:</strong></p>
 <table>
 <thead>
 <tr>
@@ -762,24 +717,20 @@ arcFromPolarOffset(0, 50, 90deg)
 <p>These functions continue from the previous arc or polar command&#39;s direction.</p>
 <h4>tangentLine(length)</h4>
 <p>Draws a line continuing in the tangent direction from the previous arc or polar command.</p>
-<pre><code>arcFromPolarOffset(0, 50, 90deg)
-tangentLine(30)  // Continues in the arc&#39;s exit direction
-</code></pre>
-<h4>tangentArc(radius, sweepAngle)</h4>
+<pre><code class="hljs"><span class="hljs-title function_">arcFromPolarOffset</span>(<span class="hljs-number">0</span>, <span class="hljs-number">50</span>, 90deg)
+<span class="hljs-title function_">tangentLine</span>(<span class="hljs-number">30</span>)  <span class="hljs-comment">// Continues in the arc&#x27;s exit direction</span>
+</code></pre><h4>tangentArc(radius, sweepAngle)</h4>
 <p>Draws an arc continuing tangent to the previous arc or polar command.</p>
-<pre><code>arcFromPolarOffset(0, 50, 90deg)
-tangentArc(30, 45deg)  // Smooth continuation with a smaller arc
-</code></pre>
-<hr>
+<pre><code class="hljs"><span class="hljs-title function_">arcFromPolarOffset</span>(<span class="hljs-number">0</span>, <span class="hljs-number">50</span>, 90deg)
+<span class="hljs-title function_">tangentArc</span>(<span class="hljs-number">30</span>, 45deg)  <span class="hljs-comment">// Smooth continuation with a smaller arc</span>
+</code></pre><hr>
 <h2>Using Functions Inside calc()</h2>
 <p>Math functions can be used inside <code>calc()</code>:</p>
-<pre><code>M calc(sin(0.5) * 100) calc(cos(0.5) * 100)
-L calc(lerp(0, 100, 0.5)) calc(clamp(150, 0, 100))
-</code></pre>
-<p>Path functions are called at the statement level:</p>
-<pre><code>circle(100, 100, calc(25 + 25))  // calc() inside arguments
-</code></pre>
-`;
+<pre><code class="hljs">M <span class="hljs-title function_">calc</span>(<span class="hljs-title function_">sin</span>(<span class="hljs-number">0.5</span>) * <span class="hljs-number">100</span>) <span class="hljs-title function_">calc</span>(<span class="hljs-title function_">cos</span>(<span class="hljs-number">0.5</span>) * <span class="hljs-number">100</span>)
+L <span class="hljs-title function_">calc</span>(<span class="hljs-title function_">lerp</span>(<span class="hljs-number">0</span>, <span class="hljs-number">100</span>, <span class="hljs-number">0.5</span>)) <span class="hljs-title function_">calc</span>(<span class="hljs-title function_">clamp</span>(<span class="hljs-number">150</span>, <span class="hljs-number">0</span>, <span class="hljs-number">100</span>))
+</code></pre><p>Path functions are called at the statement level:</p>
+<pre><code class="hljs"><span class="hljs-title function_">circle</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-title function_">calc</span>(<span class="hljs-number">25</span> + <span class="hljs-number">25</span>))  <span class="hljs-comment">// calc() inside arguments</span>
+</code></pre>`;
 
 export const debug = `<h1>Debug &amp; Console</h1>
 <p>The playground includes debugging tools to help you understand how your code executes and inspect values during evaluation.</p>
@@ -787,19 +738,17 @@ export const debug = `<h1>Debug &amp; Console</h1>
 <p>Click the <strong>Console</strong> button in the header to view debug output.</p>
 <h2>log() Function</h2>
 <p>Use <code>log()</code> to inspect values during execution:</p>
-<pre><code>log(&quot;message&quot;)           // String message
-log(myVar)               // Variable with label
-log(&quot;pos:&quot;, ctx.position) // Multiple args
-log(ctx)                 // Full context object
-</code></pre>
-<h3>Output Format</h3>
+<pre><code class="hljs"><span class="hljs-title function_">log</span>(<span class="hljs-string">&quot;message&quot;</span>)           <span class="hljs-comment">// String message</span>
+<span class="hljs-title function_">log</span>(myVar)               <span class="hljs-comment">// Variable with label</span>
+<span class="hljs-title function_">log</span>(<span class="hljs-string">&quot;pos:&quot;</span>, ctx.<span class="hljs-property">position</span>) <span class="hljs-comment">// Multiple args</span>
+<span class="hljs-title function_">log</span>(ctx)                 <span class="hljs-comment">// Full context object</span>
+</code></pre><h3>Output Format</h3>
 <p>String arguments display as-is. Other expressions show a label with the source:</p>
-<pre><code>log(&quot;radius is&quot;, r)
-// Output:
-// radius is
-// r = 50
-</code></pre>
-<p>Objects are expandable in the console - click the arrow to explore nested properties.</p>
+<pre><code class="hljs"><span class="hljs-title function_">log</span>(<span class="hljs-string">&quot;radius is&quot;</span>, r)
+<span class="hljs-comment">// Output:</span>
+<span class="hljs-comment">// radius is</span>
+<span class="hljs-comment">// r = 50</span>
+</code></pre><p>Objects are expandable in the console - click the arrow to explore nested properties.</p>
 <h2>ctx Object</h2>
 <p>The <code>ctx</code> object tracks path state during evaluation:</p>
 <h3>ctx.position</h3>
@@ -820,12 +769,11 @@ log(ctx)                 // Full context object
 <td>Y coordinate</td>
 </tr>
 </tbody></table>
-<pre><code>M 100 50
-log(ctx.position)  // {x: 100, y: 50}
-L 150 75
-log(ctx.position)  // {x: 150, y: 75}
-</code></pre>
-<h3>ctx.start</h3>
+<pre><code class="hljs">M <span class="hljs-number">100</span> <span class="hljs-number">50</span>
+<span class="hljs-title function_">log</span>(ctx.<span class="hljs-property">position</span>)  <span class="hljs-comment">// {x: 100, y: 50}</span>
+L <span class="hljs-number">150</span> <span class="hljs-number">75</span>
+<span class="hljs-title function_">log</span>(ctx.<span class="hljs-property">position</span>)  <span class="hljs-comment">// {x: 150, y: 75}</span>
+</code></pre><h3>ctx.start</h3>
 <p>Subpath start position (set by <code>M</code>/<code>m</code>, used by <code>Z</code>).</p>
 <table>
 <thead>
@@ -845,64 +793,52 @@ log(ctx.position)  // {x: 150, y: 75}
 </tbody></table>
 <h3>ctx.commands</h3>
 <p>Array of all executed commands with their positions:</p>
-<pre><code>// Each entry contains:
+<pre><code class="hljs"><span class="hljs-comment">// Each entry contains:</span>
 {
-  command: &quot;L&quot;,        // Command letter
-  args: [150, 75],     // Evaluated arguments
-  start: {x: 100, y: 50},
-  end: {x: 150, y: 75}
+  <span class="hljs-attr">command</span>: <span class="hljs-string">&quot;L&quot;</span>,        <span class="hljs-comment">// Command letter</span>
+  <span class="hljs-attr">args</span>: [<span class="hljs-number">150</span>, <span class="hljs-number">75</span>],     <span class="hljs-comment">// Evaluated arguments</span>
+  <span class="hljs-attr">start</span>: {<span class="hljs-attr">x</span>: <span class="hljs-number">100</span>, <span class="hljs-attr">y</span>: <span class="hljs-number">50</span>},
+  <span class="hljs-attr">end</span>: {<span class="hljs-attr">x</span>: <span class="hljs-number">150</span>, <span class="hljs-attr">y</span>: <span class="hljs-number">75</span>}
 }
-</code></pre>
-<h2>Using ctx in Paths</h2>
+</code></pre><h2>Using ctx in Paths</h2>
 <p>Access position values with <code>calc()</code>:</p>
-<pre><code>M 50 50
-// Draw relative to current position
-L calc(ctx.position.x + 30) ctx.position.y
-circle(ctx.position.x, ctx.position.y, 5)
-</code></pre>
-<h2>Example: Debug a Loop</h2>
-<pre><code>M 20 100
-for (i in 0..4) {
-  log(&quot;iteration&quot;, i, ctx.position)
-  L calc(ctx.position.x + 40) 100
+<pre><code class="hljs">M <span class="hljs-number">50</span> <span class="hljs-number">50</span>
+<span class="hljs-comment">// Draw relative to current position</span>
+L <span class="hljs-title function_">calc</span>(ctx.<span class="hljs-property">position</span>.<span class="hljs-property">x</span> + <span class="hljs-number">30</span>) ctx.<span class="hljs-property">position</span>.<span class="hljs-property">y</span>
+<span class="hljs-title function_">circle</span>(ctx.<span class="hljs-property">position</span>.<span class="hljs-property">x</span>, ctx.<span class="hljs-property">position</span>.<span class="hljs-property">y</span>, <span class="hljs-number">5</span>)
+</code></pre><h2>Example: Debug a Loop</h2>
+<pre><code class="hljs">M <span class="hljs-number">20</span> <span class="hljs-number">100</span>
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.4</span>) {
+  <span class="hljs-title function_">log</span>(<span class="hljs-string">&quot;iteration&quot;</span>, i, ctx.<span class="hljs-property">position</span>)
+  L <span class="hljs-title function_">calc</span>(ctx.<span class="hljs-property">position</span>.<span class="hljs-property">x</span> + <span class="hljs-number">40</span>) <span class="hljs-number">100</span>
 }
-</code></pre>
-<p>This logs the iteration number and current position at each step, helping you trace how the path is constructed.</p>
+</code></pre><p>This logs the iteration number and current position at each step, helping you trace how the path is constructed.</p>
 `;
 
 export const cli = `<h1>CLI Reference</h1>
 <p>The svg-path-extended CLI compiles extended SVG path syntax into standard SVG path strings or complete SVG files.</p>
 <h2>Installation</h2>
-<pre><code class="language-bash">npm install -g svg-path-extended
-</code></pre>
-<p>Or use with npx:</p>
-<pre><code class="language-bash">npx svg-path-extended [options]
-</code></pre>
-<h2>Basic Usage</h2>
+<pre><code class="hljs language-bash">npm install -g svg-path-extended
+</code></pre><p>Or use with npx:</p>
+<pre><code class="hljs language-bash">npx svg-path-extended [options]
+</code></pre><h2>Basic Usage</h2>
 <h3>Compile a File</h3>
-<pre><code class="language-bash">svg-path-extended input.svgx
-</code></pre>
-<p>Or with the explicit flag:</p>
-<pre><code class="language-bash">svg-path-extended --src=input.svgx
-</code></pre>
-<h3>Compile Inline Code</h3>
-<pre><code class="language-bash">svg-path-extended -e &#39;circle(100, 100, 50)&#39;
-</code></pre>
-<h3>Read from Stdin</h3>
-<pre><code class="language-bash">echo &#39;let x = 50; circle(x, x, 25)&#39; | svg-path-extended -
-</code></pre>
-<pre><code class="language-bash">cat myfile.svgx | svg-path-extended -
-</code></pre>
-<h2>Output Options</h2>
+<pre><code class="hljs language-bash">svg-path-extended input.svgx
+</code></pre><p>Or with the explicit flag:</p>
+<pre><code class="hljs language-bash">svg-path-extended --src=input.svgx
+</code></pre><h3>Compile Inline Code</h3>
+<pre><code class="hljs language-bash">svg-path-extended -e <span class="hljs-string">&#x27;circle(100, 100, 50)&#x27;</span>
+</code></pre><h3>Read from Stdin</h3>
+<pre><code class="hljs language-bash"><span class="hljs-built_in">echo</span> <span class="hljs-string">&#x27;let x = 50; circle(x, x, 25)&#x27;</span> | svg-path-extended -
+</code></pre><pre><code class="hljs language-bash"><span class="hljs-built_in">cat</span> myfile.svgx | svg-path-extended -
+</code></pre><h2>Output Options</h2>
 <h3>Output Path Data to File</h3>
-<pre><code class="language-bash">svg-path-extended --src=input.svgx -o output.txt
+<pre><code class="hljs language-bash">svg-path-extended --src=input.svgx -o output.txt
 svg-path-extended --src=input.svgx --output output.txt
-</code></pre>
-<h3>Output as Complete SVG File</h3>
+</code></pre><h3>Output as Complete SVG File</h3>
 <p>Generate a complete SVG file with the path embedded:</p>
-<pre><code class="language-bash">svg-path-extended --src=input.svgx --output-svg-file=output.svg
-</code></pre>
-<p>This creates a ready-to-use SVG file that can be opened in any browser or image viewer.</p>
+<pre><code class="hljs language-bash">svg-path-extended --src=input.svgx --output-svg-file=output.svg
+</code></pre><p>This creates a ready-to-use SVG file that can be opened in any browser or image viewer.</p>
 <h2>Annotated Output</h2>
 <p>Use <code>--annotated</code> to get a human-readable debug output that shows:</p>
 <ul>
@@ -913,70 +849,61 @@ svg-path-extended --src=input.svgx --output output.txt
 </ul>
 <p>This is useful for debugging complex path generation or understanding how your code produces its output.</p>
 <h3>Basic Usage</h3>
-<pre><code class="language-bash">svg-path-extended -e &#39;for (i in 0..3) { M i 0 }&#39; --annotated
-</code></pre>
-<p>Output:</p>
-<pre><code>//--- for (i in 0..3) from line 1
-  //--- iteration 0
-  M 0 0
-  //--- iteration 1
-  M 1 0
-  //--- iteration 2
-  M 2 0
-  //--- iteration 3
-  M 3 0
-</code></pre>
-<h3>With Comments</h3>
-<pre><code class="language-bash">svg-path-extended -e &#39;// Draw points
-for (i in 0..3) { M i 0 }&#39; --annotated
-</code></pre>
-<p>Output:</p>
-<pre><code>// Draw points
+<pre><code class="hljs language-bash">svg-path-extended -e <span class="hljs-string">&#x27;for (i in 0..3) { M i 0 }&#x27;</span> --annotated
+</code></pre><p>Output:</p>
+<pre><code class="hljs"><span class="hljs-comment">//--- for (i in 0..3) from line 1</span>
+  <span class="hljs-comment">//--- iteration 0</span>
+  M <span class="hljs-number">0</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 1</span>
+  M <span class="hljs-number">1</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 2</span>
+  M <span class="hljs-number">2</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 3</span>
+  M <span class="hljs-number">3</span> <span class="hljs-number">0</span>
+</code></pre><h3>With Comments</h3>
+<pre><code class="hljs language-bash">svg-path-extended -e <span class="hljs-string">&#x27;// Draw points
+for (i in 0..3) { M i 0 }&#x27;</span> --annotated
+</code></pre><p>Output:</p>
+<pre><code class="hljs"><span class="hljs-comment">// Draw points</span>
 
-//--- for (i in 0..3) from line 2
-  //--- iteration 0
-  M 0 0
-  //--- iteration 1
-  M 1 0
-  //--- iteration 2
-  M 2 0
-  //--- iteration 3
-  M 3 0
-</code></pre>
-<h3>Loop Truncation</h3>
+<span class="hljs-comment">//--- for (i in 0..3) from line 2</span>
+  <span class="hljs-comment">//--- iteration 0</span>
+  M <span class="hljs-number">0</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 1</span>
+  M <span class="hljs-number">1</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 2</span>
+  M <span class="hljs-number">2</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 3</span>
+  M <span class="hljs-number">3</span> <span class="hljs-number">0</span>
+</code></pre><h3>Loop Truncation</h3>
 <p>Long loops (&gt;10 iterations) are automatically truncated to show the first 3 and last 3 iterations:</p>
-<pre><code class="language-bash">svg-path-extended -e &#39;for (i in 0..100) { M i 0 }&#39; --annotated
-</code></pre>
-<p>Output:</p>
-<pre><code>//--- for (i in 0..100) from line 1
-  //--- iteration 0
-  M 0 0
-  //--- iteration 1
-  M 1 0
-  //--- iteration 2
-  M 2 0
-  ... 95 more iterations ...
-  //--- iteration 98
-  M 98 0
-  //--- iteration 99
-  M 99 0
-  //--- iteration 100
-  M 100 0
-</code></pre>
-<h3>Function Call Annotations</h3>
+<pre><code class="hljs language-bash">svg-path-extended -e <span class="hljs-string">&#x27;for (i in 0..100) { M i 0 }&#x27;</span> --annotated
+</code></pre><p>Output:</p>
+<pre><code class="hljs"><span class="hljs-comment">//--- for (i in 0..100) from line 1</span>
+  <span class="hljs-comment">//--- iteration 0</span>
+  M <span class="hljs-number">0</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 1</span>
+  M <span class="hljs-number">1</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 2</span>
+  M <span class="hljs-number">2</span> <span class="hljs-number">0</span>
+  ... <span class="hljs-number">95</span> more iterations ...
+  <span class="hljs-comment">//--- iteration 98</span>
+  M <span class="hljs-number">98</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 99</span>
+  M <span class="hljs-number">99</span> <span class="hljs-number">0</span>
+  <span class="hljs-comment">//--- iteration 100</span>
+  M <span class="hljs-number">100</span> <span class="hljs-number">0</span>
+</code></pre><h3>Function Call Annotations</h3>
 <p>Function calls show their name, arguments, and expanded output:</p>
-<pre><code class="language-bash">svg-path-extended -e &#39;circle(50, 50, 25)&#39; --annotated
-</code></pre>
-<p>Output:</p>
-<pre><code>//--- circle(50, 50, 25) called from line 1
-  M 25 50
-  A 25 25 0 1 1 75 50
-  A 25 25 0 1 1 25 50
-</code></pre>
-<h3>Save to File</h3>
-<pre><code class="language-bash">svg-path-extended --src=complex.svgx --annotated -o debug-output.txt
-</code></pre>
-<h2>SVG Styling Options</h2>
+<pre><code class="hljs language-bash">svg-path-extended -e <span class="hljs-string">&#x27;circle(50, 50, 25)&#x27;</span> --annotated
+</code></pre><p>Output:</p>
+<pre><code class="hljs"><span class="hljs-comment">//--- circle(50, 50, 25) called from line 1</span>
+  M <span class="hljs-number">25</span> <span class="hljs-number">50</span>
+  A <span class="hljs-number">25</span> <span class="hljs-number">25</span> <span class="hljs-number">0</span> <span class="hljs-number">1</span> <span class="hljs-number">1</span> <span class="hljs-number">75</span> <span class="hljs-number">50</span>
+  A <span class="hljs-number">25</span> <span class="hljs-number">25</span> <span class="hljs-number">0</span> <span class="hljs-number">1</span> <span class="hljs-number">1</span> <span class="hljs-number">25</span> <span class="hljs-number">50</span>
+</code></pre><h3>Save to File</h3>
+<pre><code class="hljs language-bash">svg-path-extended --src=complex.svgx --annotated -o debug-output.txt
+</code></pre><h2>SVG Styling Options</h2>
 <p>When using <code>--output-svg-file</code>, you can customize the appearance:</p>
 <table>
 <thead>
@@ -1019,33 +946,29 @@ for (i in 0..3) { M i 0 }&#39; --annotated
 </tbody></table>
 <h3>Examples</h3>
 <p>Red circle with no fill:</p>
-<pre><code class="language-bash">svg-path-extended -e &#39;circle(100, 100, 50)&#39; \\
+<pre><code class="hljs language-bash">svg-path-extended -e <span class="hljs-string">&#x27;circle(100, 100, 50)&#x27;</span> \\
   --output-svg-file=circle.svg \\
   --stroke=red \\
   --stroke-width=3
-</code></pre>
-<p>Blue filled polygon:</p>
-<pre><code class="language-bash">svg-path-extended -e &#39;polygon(100, 100, 80, 6)&#39; \\
+</code></pre><p>Blue filled polygon:</p>
+<pre><code class="hljs language-bash">svg-path-extended -e <span class="hljs-string">&#x27;polygon(100, 100, 80, 6)&#x27;</span> \\
   --output-svg-file=hexagon.svg \\
   --stroke=navy \\
   --fill=lightblue \\
   --stroke-width=2
-</code></pre>
-<p>Large canvas with custom viewBox:</p>
-<pre><code class="language-bash">svg-path-extended --src=complex.svgx \\
+</code></pre><p>Large canvas with custom viewBox:</p>
+<pre><code class="hljs language-bash">svg-path-extended --src=complex.svgx \\
   --output-svg-file=output.svg \\
-  --viewBox=&quot;0 0 800 600&quot; \\
+  --viewBox=<span class="hljs-string">&quot;0 0 800 600&quot;</span> \\
   --width=800 \\
   --height=600
-</code></pre>
-<h2>Help and Version</h2>
-<pre><code class="language-bash">svg-path-extended --help
+</code></pre><h2>Help and Version</h2>
+<pre><code class="hljs language-bash">svg-path-extended --<span class="hljs-built_in">help</span>
 svg-path-extended -h
 
 svg-path-extended --version
 svg-path-extended -v
-</code></pre>
-<h2>Exit Codes</h2>
+</code></pre><h2>Exit Codes</h2>
 <table>
 <thead>
 <tr>
@@ -1066,238 +989,216 @@ svg-path-extended -v
 <p>By convention, source files use the <code>.svgx</code> extension, but any text file will work.</p>
 <h2>Examples</h2>
 <h3>Generate a Spiral</h3>
-<pre><code class="language-bash">svg-path-extended -e &#39;
+<pre><code class="hljs language-bash">svg-path-extended -e <span class="hljs-string">&#x27;
 M 100 100
 for (i in 1..50) {
   L calc(100 + cos(i * 0.3) * i * 1.5) calc(100 + sin(i * 0.3) * i * 1.5)
 }
-&#39; --output-svg-file=spiral.svg --stroke=teal --stroke-width=2
-</code></pre>
-<h3>Process Multiple Files</h3>
-<pre><code class="language-bash">for file in examples/*.svgx; do
-  svg-path-extended --src=&quot;$file&quot; --output-svg-file=&quot;\${file%.svgx}.svg&quot;
-done
-</code></pre>
-<h3>Use in a Build Script</h3>
-<pre><code class="language-json">{
-  &quot;scripts&quot;: {
-    &quot;build:icons&quot;: &quot;svg-path-extended --src=src/icons.svgx --output-svg-file=dist/icons.svg&quot;
-  }
-}
-</code></pre>
-`;
+&#x27;</span> --output-svg-file=spiral.svg --stroke=teal --stroke-width=2
+</code></pre><h3>Process Multiple Files</h3>
+<pre><code class="hljs language-bash"><span class="hljs-keyword">for</span> file <span class="hljs-keyword">in</span> examples/*.svgx; <span class="hljs-keyword">do</span>
+  svg-path-extended --src=<span class="hljs-string">&quot;<span class="hljs-variable">$file</span>&quot;</span> --output-svg-file=<span class="hljs-string">&quot;<span class="hljs-variable">\${file%.svgx}</span>.svg&quot;</span>
+<span class="hljs-keyword">done</span>
+</code></pre><h3>Use in a Build Script</h3>
+<pre><code class="hljs language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;scripts&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;build:icons&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;svg-path-extended --src=src/icons.svgx --output-svg-file=dist/icons.svg&quot;</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>`;
 
 export const examples = `<h1>Examples</h1>
 <p>Practical examples showing how to use svg-path-extended for common tasks.</p>
 <h2>Basic Shapes</h2>
 <h3>Simple Rectangle</h3>
-<pre><code>rect(10, 10, 180, 80)
-</code></pre>
-<h3>Circle</h3>
-<pre><code>circle(100, 100, 50)
-</code></pre>
-<h3>Rounded Rectangle</h3>
-<pre><code>roundRect(20, 40, 160, 120, 15)
-</code></pre>
-<h2>Using Variables</h2>
+<pre><code class="hljs"><span class="hljs-title function_">rect</span>(<span class="hljs-number">10</span>, <span class="hljs-number">10</span>, <span class="hljs-number">180</span>, <span class="hljs-number">80</span>)
+</code></pre><h3>Circle</h3>
+<pre><code class="hljs"><span class="hljs-title function_">circle</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">50</span>)
+</code></pre><h3>Rounded Rectangle</h3>
+<pre><code class="hljs">roundRect(20, 40, 160, 120, 15)
+</code></pre><h2>Using Variables</h2>
 <h3>Centered Circle</h3>
-<pre><code>let width = 200;
-let height = 200;
-let cx = calc(width / 2);
-let cy = calc(height / 2);
-let r = 40;
+<pre><code class="hljs"><span class="hljs-keyword">let</span> width = <span class="hljs-number">200</span>;
+<span class="hljs-keyword">let</span> height = <span class="hljs-number">200</span>;
+<span class="hljs-keyword">let</span> cx = <span class="hljs-title function_">calc</span>(width / <span class="hljs-number">2</span>);
+<span class="hljs-keyword">let</span> cy = <span class="hljs-title function_">calc</span>(height / <span class="hljs-number">2</span>);
+<span class="hljs-keyword">let</span> r = <span class="hljs-number">40</span>;
 
-circle(cx, cy, r)
-</code></pre>
-<h3>Configurable Star</h3>
-<pre><code>let centerX = 100;
-let centerY = 100;
-let outerR = 60;
-let innerR = 25;
-let points = 5;
+<span class="hljs-title function_">circle</span>(cx, cy, r)
+</code></pre><h3>Configurable Star</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> centerX = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> centerY = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> outerR = <span class="hljs-number">60</span>;
+<span class="hljs-keyword">let</span> innerR = <span class="hljs-number">25</span>;
+<span class="hljs-keyword">let</span> points = <span class="hljs-number">5</span>;
 
-star(centerX, centerY, outerR, innerR, points)
-</code></pre>
-<h2>Loops and Patterns</h2>
+<span class="hljs-title function_">star</span>(centerX, centerY, outerR, innerR, points)
+</code></pre><h2>Loops and Patterns</h2>
 <h3>Row of Circles</h3>
-<pre><code>for (i in 0..5) {
-  circle(calc(30 + i * 35), 100, 15)
+<pre><code class="hljs"><span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.5</span>) {
+  <span class="hljs-title function_">circle</span>(<span class="hljs-title function_">calc</span>(<span class="hljs-number">30</span> + i * <span class="hljs-number">35</span>), <span class="hljs-number">100</span>, <span class="hljs-number">15</span>)
 }
-</code></pre>
-<h3>Grid of Dots</h3>
-<pre><code>for (row in 0..5) {
-  for (col in 0..5) {
-    circle(calc(20 + col * 40), calc(20 + row * 40), 5)
+</code></pre><h3>Grid of Dots</h3>
+<pre><code class="hljs"><span class="hljs-keyword">for</span> (row <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.5</span>) {
+  <span class="hljs-keyword">for</span> (col <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.5</span>) {
+    <span class="hljs-title function_">circle</span>(<span class="hljs-title function_">calc</span>(<span class="hljs-number">20</span> + col * <span class="hljs-number">40</span>), <span class="hljs-title function_">calc</span>(<span class="hljs-number">20</span> + row * <span class="hljs-number">40</span>), <span class="hljs-number">5</span>)
   }
 }
-</code></pre>
-<h3>Concentric Circles</h3>
-<pre><code>let cx = 100;
-let cy = 100;
+</code></pre><h3>Concentric Circles</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> cx = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> cy = <span class="hljs-number">100</span>;
 
-for (i in 1..6) {
-  circle(cx, cy, calc(i * 15))
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">1.</span><span class="hljs-number">.6</span>) {
+  <span class="hljs-title function_">circle</span>(cx, cy, <span class="hljs-title function_">calc</span>(i * <span class="hljs-number">15</span>))
 }
-</code></pre>
-<h2>Trigonometry</h2>
+</code></pre><h2>Trigonometry</h2>
 <h3>Points on a Circle</h3>
-<pre><code>let cx = 100;
-let cy = 100;
-let r = 60;
-let points = 8;
+<pre><code class="hljs"><span class="hljs-keyword">let</span> cx = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> cy = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> r = <span class="hljs-number">60</span>;
+<span class="hljs-keyword">let</span> points = <span class="hljs-number">8</span>;
 
-for (i in 0..points) {
-  let angle = calc(i / points * TAU());
-  let x = calc(cx + cos(angle) * r);
-  let y = calc(cy + sin(angle) * r);
-  circle(x, y, 5)
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.<span class="hljs-property">points</span>) {
+  <span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">calc</span>(i / points * <span class="hljs-title function_">TAU</span>());
+  <span class="hljs-keyword">let</span> x = <span class="hljs-title function_">calc</span>(cx + <span class="hljs-title function_">cos</span>(angle) * r);
+  <span class="hljs-keyword">let</span> y = <span class="hljs-title function_">calc</span>(cy + <span class="hljs-title function_">sin</span>(angle) * r);
+  <span class="hljs-title function_">circle</span>(x, y, <span class="hljs-number">5</span>)
 }
-</code></pre>
-<h3>Spiral</h3>
-<pre><code>M 100 100
-for (i in 1..100) {
-  let angle = calc(i * 0.2);
-  let r = calc(i * 0.8);
-  L calc(100 + cos(angle) * r) calc(100 + sin(angle) * r)
+</code></pre><h3>Spiral</h3>
+<pre><code class="hljs">M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">1.</span><span class="hljs-number">.100</span>) {
+  <span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">calc</span>(i * <span class="hljs-number">0.2</span>);
+  <span class="hljs-keyword">let</span> r = <span class="hljs-title function_">calc</span>(i * <span class="hljs-number">0.8</span>);
+  L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + <span class="hljs-title function_">cos</span>(angle) * r) <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + <span class="hljs-title function_">sin</span>(angle) * r)
 }
-</code></pre>
-<h3>Sine Wave</h3>
-<pre><code>M 0 100
-for (i in 1..40) {
-  let x = calc(i * 5);
-  let y = calc(100 + sin(i * 0.3) * 30);
+</code></pre><h3>Sine Wave</h3>
+<pre><code class="hljs">M <span class="hljs-number">0</span> <span class="hljs-number">100</span>
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">1.</span><span class="hljs-number">.40</span>) {
+  <span class="hljs-keyword">let</span> x = <span class="hljs-title function_">calc</span>(i * <span class="hljs-number">5</span>);
+  <span class="hljs-keyword">let</span> y = <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> + <span class="hljs-title function_">sin</span>(i * <span class="hljs-number">0.3</span>) * <span class="hljs-number">30</span>);
   L x y
 }
-</code></pre>
-<h3>Flower Pattern</h3>
-<pre><code>let cx = 100;
-let cy = 100;
-let petalCount = 6;
-let petalRadius = 25;
-let centerRadius = 15;
+</code></pre><h3>Flower Pattern</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> cx = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> cy = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> petalCount = <span class="hljs-number">6</span>;
+<span class="hljs-keyword">let</span> petalRadius = <span class="hljs-number">25</span>;
+<span class="hljs-keyword">let</span> centerRadius = <span class="hljs-number">15</span>;
 
-// Petals
-for (i in 0..petalCount) {
-  let angle = calc(i / petalCount * TAU());
-  let px = calc(cx + cos(angle) * 35);
-  let py = calc(cy + sin(angle) * 35);
-  circle(px, py, petalRadius)
+<span class="hljs-comment">// Petals</span>
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.<span class="hljs-property">petalCount</span>) {
+  <span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">calc</span>(i / petalCount * <span class="hljs-title function_">TAU</span>());
+  <span class="hljs-keyword">let</span> px = <span class="hljs-title function_">calc</span>(cx + <span class="hljs-title function_">cos</span>(angle) * <span class="hljs-number">35</span>);
+  <span class="hljs-keyword">let</span> py = <span class="hljs-title function_">calc</span>(cy + <span class="hljs-title function_">sin</span>(angle) * <span class="hljs-number">35</span>);
+  <span class="hljs-title function_">circle</span>(px, py, petalRadius)
 }
 
-// Center
-circle(cx, cy, centerRadius)
-</code></pre>
-<h2>Custom Functions</h2>
+<span class="hljs-comment">// Center</span>
+<span class="hljs-title function_">circle</span>(cx, cy, centerRadius)
+</code></pre><h2>Custom Functions</h2>
 <h3>Reusable Square</h3>
-<pre><code>fn square(x, y, size) {
-  rect(x, y, size, size)
+<pre><code class="hljs">fn <span class="hljs-title function_">square</span>(<span class="hljs-params">x, y, size</span>) {
+  <span class="hljs-title function_">rect</span>(x, y, size, size)
 }
 
-square(10, 10, 50)
-square(70, 10, 50)
-square(130, 10, 50)
-</code></pre>
-<h3>Diamond Shape</h3>
-<pre><code>fn diamond(cx, cy, size) {
-  M cx calc(cy - size)
-  L calc(cx + size) cy
-  L cx calc(cy + size)
-  L calc(cx - size) cy
+<span class="hljs-title function_">square</span>(<span class="hljs-number">10</span>, <span class="hljs-number">10</span>, <span class="hljs-number">50</span>)
+<span class="hljs-title function_">square</span>(<span class="hljs-number">70</span>, <span class="hljs-number">10</span>, <span class="hljs-number">50</span>)
+<span class="hljs-title function_">square</span>(<span class="hljs-number">130</span>, <span class="hljs-number">10</span>, <span class="hljs-number">50</span>)
+</code></pre><h3>Diamond Shape</h3>
+<pre><code class="hljs">fn <span class="hljs-title function_">diamond</span>(<span class="hljs-params">cx, cy, size</span>) {
+  M cx <span class="hljs-title function_">calc</span>(cy - size)
+  L <span class="hljs-title function_">calc</span>(cx + size) cy
+  L cx <span class="hljs-title function_">calc</span>(cy + size)
+  L <span class="hljs-title function_">calc</span>(cx - size) cy
   Z
 }
 
-diamond(100, 100, 40)
-</code></pre>
-<h3>Arrow</h3>
-<pre><code>fn arrow(x1, y1, x2, y2, headSize) {
-  // Line
+<span class="hljs-title function_">diamond</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, <span class="hljs-number">40</span>)
+</code></pre><h3>Arrow</h3>
+<pre><code class="hljs">fn <span class="hljs-title function_">arrow</span>(<span class="hljs-params">x1, y1, x2, y2, headSize</span>) {
+  <span class="hljs-comment">// Line</span>
   M x1 y1
   L x2 y2
 
-  // Arrowhead (simplified)
-  let angle = atan2(calc(y2 - y1), calc(x2 - x1));
-  let a1 = calc(angle + 2.5);
-  let a2 = calc(angle - 2.5);
+  <span class="hljs-comment">// Arrowhead (simplified)</span>
+  <span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">atan2</span>(<span class="hljs-title function_">calc</span>(y2 - y1), <span class="hljs-title function_">calc</span>(x2 - x1));
+  <span class="hljs-keyword">let</span> a1 = <span class="hljs-title function_">calc</span>(angle + <span class="hljs-number">2.5</span>);
+  <span class="hljs-keyword">let</span> a2 = <span class="hljs-title function_">calc</span>(angle - <span class="hljs-number">2.5</span>);
 
   M x2 y2
-  L calc(x2 - cos(a1) * headSize) calc(y2 - sin(a1) * headSize)
+  L <span class="hljs-title function_">calc</span>(x2 - <span class="hljs-title function_">cos</span>(a1) * headSize) <span class="hljs-title function_">calc</span>(y2 - <span class="hljs-title function_">sin</span>(a1) * headSize)
   M x2 y2
-  L calc(x2 - cos(a2) * headSize) calc(y2 - sin(a2) * headSize)
+  L <span class="hljs-title function_">calc</span>(x2 - <span class="hljs-title function_">cos</span>(a2) * headSize) <span class="hljs-title function_">calc</span>(y2 - <span class="hljs-title function_">sin</span>(a2) * headSize)
 }
 
-arrow(20, 100, 180, 100, 15)
-</code></pre>
-<h2>Conditionals</h2>
+<span class="hljs-title function_">arrow</span>(<span class="hljs-number">20</span>, <span class="hljs-number">100</span>, <span class="hljs-number">180</span>, <span class="hljs-number">100</span>, <span class="hljs-number">15</span>)
+</code></pre><h2>Conditionals</h2>
 <h3>Size-Based Shape</h3>
-<pre><code>let size = 80;
+<pre><code class="hljs"><span class="hljs-keyword">let</span> size = <span class="hljs-number">80</span>;
 
-if (size &gt; 50) {
-  circle(100, 100, size)
-} else {
-  rect(calc(100 - size / 2), calc(100 - size / 2), size, size)
+<span class="hljs-keyword">if</span> (size &gt; <span class="hljs-number">50</span>) {
+  <span class="hljs-title function_">circle</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>, size)
+} <span class="hljs-keyword">else</span> {
+  <span class="hljs-title function_">rect</span>(<span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> - size / <span class="hljs-number">2</span>), <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> - size / <span class="hljs-number">2</span>), size, size)
 }
-</code></pre>
-<h3>Alternating Pattern</h3>
-<pre><code>for (i in 0..10) {
-  let x = calc(20 + i * 18);
-  if (calc(i % 2) == 0) {
-    circle(x, 100, 8)
-  } else {
-    rect(calc(x - 6), 94, 12, 12)
+</code></pre><h3>Alternating Pattern</h3>
+<pre><code class="hljs"><span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.10</span>) {
+  <span class="hljs-keyword">let</span> x = <span class="hljs-title function_">calc</span>(<span class="hljs-number">20</span> + i * <span class="hljs-number">18</span>);
+  <span class="hljs-keyword">if</span> (<span class="hljs-title function_">calc</span>(i % <span class="hljs-number">2</span>) == <span class="hljs-number">0</span>) {
+    <span class="hljs-title function_">circle</span>(x, <span class="hljs-number">100</span>, <span class="hljs-number">8</span>)
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-title function_">rect</span>(<span class="hljs-title function_">calc</span>(x - <span class="hljs-number">6</span>), <span class="hljs-number">94</span>, <span class="hljs-number">12</span>, <span class="hljs-number">12</span>)
   }
 }
-</code></pre>
-<h2>Complex Examples</h2>
+</code></pre><h2>Complex Examples</h2>
 <h3>Gear Shape</h3>
-<pre><code>let cx = 100;
-let cy = 100;
-let innerR = 30;
-let outerR = 50;
-let teeth = 12;
+<pre><code class="hljs"><span class="hljs-keyword">let</span> cx = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> cy = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> innerR = <span class="hljs-number">30</span>;
+<span class="hljs-keyword">let</span> outerR = <span class="hljs-number">50</span>;
+<span class="hljs-keyword">let</span> teeth = <span class="hljs-number">12</span>;
 
-M calc(cx + outerR) cy
+M <span class="hljs-title function_">calc</span>(cx + outerR) cy
 
-for (i in 0..teeth) {
-  let a1 = calc(i / teeth * TAU());
-  let a2 = calc((i + 0.3) / teeth * TAU());
-  let a3 = calc((i + 0.5) / teeth * TAU());
-  let a4 = calc((i + 0.8) / teeth * TAU());
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span>.<span class="hljs-property">teeth</span>) {
+  <span class="hljs-keyword">let</span> a1 = <span class="hljs-title function_">calc</span>(i / teeth * <span class="hljs-title function_">TAU</span>());
+  <span class="hljs-keyword">let</span> a2 = <span class="hljs-title function_">calc</span>((i + <span class="hljs-number">0.3</span>) / teeth * <span class="hljs-title function_">TAU</span>());
+  <span class="hljs-keyword">let</span> a3 = <span class="hljs-title function_">calc</span>((i + <span class="hljs-number">0.5</span>) / teeth * <span class="hljs-title function_">TAU</span>());
+  <span class="hljs-keyword">let</span> a4 = <span class="hljs-title function_">calc</span>((i + <span class="hljs-number">0.8</span>) / teeth * <span class="hljs-title function_">TAU</span>());
 
-  L calc(cx + cos(a1) * outerR) calc(cy + sin(a1) * outerR)
-  L calc(cx + cos(a2) * outerR) calc(cy + sin(a2) * outerR)
-  L calc(cx + cos(a3) * innerR) calc(cy + sin(a3) * innerR)
-  L calc(cx + cos(a4) * innerR) calc(cy + sin(a4) * innerR)
+  L <span class="hljs-title function_">calc</span>(cx + <span class="hljs-title function_">cos</span>(a1) * outerR) <span class="hljs-title function_">calc</span>(cy + <span class="hljs-title function_">sin</span>(a1) * outerR)
+  L <span class="hljs-title function_">calc</span>(cx + <span class="hljs-title function_">cos</span>(a2) * outerR) <span class="hljs-title function_">calc</span>(cy + <span class="hljs-title function_">sin</span>(a2) * outerR)
+  L <span class="hljs-title function_">calc</span>(cx + <span class="hljs-title function_">cos</span>(a3) * innerR) <span class="hljs-title function_">calc</span>(cy + <span class="hljs-title function_">sin</span>(a3) * innerR)
+  L <span class="hljs-title function_">calc</span>(cx + <span class="hljs-title function_">cos</span>(a4) * innerR) <span class="hljs-title function_">calc</span>(cy + <span class="hljs-title function_">sin</span>(a4) * innerR)
 }
 
 Z
 
-// Center hole
-circle(cx, cy, 10)
-</code></pre>
-<h3>Recursive-Style Tree (using loops)</h3>
-<pre><code>// Simple branching pattern
-fn branch(x, y, length, angle, depth) {
-  let x2 = calc(x + cos(angle) * length);
-  let y2 = calc(y + sin(angle) * length);
+<span class="hljs-comment">// Center hole</span>
+<span class="hljs-title function_">circle</span>(cx, cy, <span class="hljs-number">10</span>)
+</code></pre><h3>Recursive-Style Tree (using loops)</h3>
+<pre><code class="hljs"><span class="hljs-comment">// Simple branching pattern</span>
+fn <span class="hljs-title function_">branch</span>(<span class="hljs-params">x, y, length, angle, depth</span>) {
+  <span class="hljs-keyword">let</span> x2 = <span class="hljs-title function_">calc</span>(x + <span class="hljs-title function_">cos</span>(angle) * length);
+  <span class="hljs-keyword">let</span> y2 = <span class="hljs-title function_">calc</span>(y + <span class="hljs-title function_">sin</span>(angle) * length);
   M x y
   L x2 y2
 }
 
-let startX = 100;
-let startY = 180;
+<span class="hljs-keyword">let</span> startX = <span class="hljs-number">100</span>;
+<span class="hljs-keyword">let</span> startY = <span class="hljs-number">180</span>;
 
-// Trunk
+<span class="hljs-comment">// Trunk</span>
 M startX startY
-L startX 120
+L startX <span class="hljs-number">120</span>
 
-// Main branches
-for (i in 0..5) {
-  let angle = calc(-1.57 + (i - 2) * 0.4);
-  let len = calc(30 - abs(i - 2) * 5);
-  branch(startX, 120, len, angle, 0)
+<span class="hljs-comment">// Main branches</span>
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.5</span>) {
+  <span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">calc</span>(-<span class="hljs-number">1.57</span> + (i - <span class="hljs-number">2</span>) * <span class="hljs-number">0.4</span>);
+  <span class="hljs-keyword">let</span> len = <span class="hljs-title function_">calc</span>(<span class="hljs-number">30</span> - <span class="hljs-title function_">abs</span>(i - <span class="hljs-number">2</span>) * <span class="hljs-number">5</span>);
+  <span class="hljs-title function_">branch</span>(startX, <span class="hljs-number">120</span>, len, angle, <span class="hljs-number">0</span>)
 }
-</code></pre>
-<h2>Tips</h2>
+</code></pre><h2>Tips</h2>
 <ol>
 <li><strong>Start simple</strong>: Build complex shapes from simple parts</li>
 <li><strong>Use variables</strong>: Makes code readable and adjustable</li>
@@ -1316,3 +1217,242 @@ export const sections = {
   cli,
   examples,
 };
+
+// Syntax highlighting themes (GitHub light/dark)
+export const hljsThemeLight = `pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em
+}
+code.hljs {
+  padding: 3px 5px
+}
+/*!
+  Theme: GitHub
+  Description: Light theme as seen on github.com
+  Author: github.com
+  Maintainer: @Hirse
+  Updated: 2021-05-15
+
+  Outdated base version: https://github.com/primer/github-syntax-light
+  Current colors taken from GitHub's CSS
+*/
+.hljs {
+  color: #24292e;
+  background: #ffffff
+}
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+  /* prettylights-syntax-keyword */
+  color: #d73a49
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+  /* prettylights-syntax-entity */
+  color: #6f42c1
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+  /* prettylights-syntax-constant */
+  color: #005cc5
+}
+.hljs-regexp,
+.hljs-string,
+.hljs-meta .hljs-string {
+  /* prettylights-syntax-string */
+  color: #032f62
+}
+.hljs-built_in,
+.hljs-symbol {
+  /* prettylights-syntax-variable */
+  color: #e36209
+}
+.hljs-comment,
+.hljs-code,
+.hljs-formula {
+  /* prettylights-syntax-comment */
+  color: #6a737d
+}
+.hljs-name,
+.hljs-quote,
+.hljs-selector-tag,
+.hljs-selector-pseudo {
+  /* prettylights-syntax-entity-tag */
+  color: #22863a
+}
+.hljs-subst {
+  /* prettylights-syntax-storage-modifier-import */
+  color: #24292e
+}
+.hljs-section {
+  /* prettylights-syntax-markup-heading */
+  color: #005cc5;
+  font-weight: bold
+}
+.hljs-bullet {
+  /* prettylights-syntax-markup-list */
+  color: #735c0f
+}
+.hljs-emphasis {
+  /* prettylights-syntax-markup-italic */
+  color: #24292e;
+  font-style: italic
+}
+.hljs-strong {
+  /* prettylights-syntax-markup-bold */
+  color: #24292e;
+  font-weight: bold
+}
+.hljs-addition {
+  /* prettylights-syntax-markup-inserted */
+  color: #22863a;
+  background-color: #f0fff4
+}
+.hljs-deletion {
+  /* prettylights-syntax-markup-deleted */
+  color: #b31d28;
+  background-color: #ffeef0
+}
+.hljs-char.escape_,
+.hljs-link,
+.hljs-params,
+.hljs-property,
+.hljs-punctuation,
+.hljs-tag {
+  /* purposely ignored */
+  
+}`;
+
+export const hljsThemeDark = `pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em
+}
+code.hljs {
+  padding: 3px 5px
+}
+/*!
+  Theme: GitHub Dark
+  Description: Dark theme as seen on github.com
+  Author: github.com
+  Maintainer: @Hirse
+  Updated: 2021-05-15
+
+  Outdated base version: https://github.com/primer/github-syntax-dark
+  Current colors taken from GitHub's CSS
+*/
+.hljs {
+  color: #c9d1d9;
+  background: #0d1117
+}
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+  /* prettylights-syntax-keyword */
+  color: #ff7b72
+}
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+  /* prettylights-syntax-entity */
+  color: #d2a8ff
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+  /* prettylights-syntax-constant */
+  color: #79c0ff
+}
+.hljs-regexp,
+.hljs-string,
+.hljs-meta .hljs-string {
+  /* prettylights-syntax-string */
+  color: #a5d6ff
+}
+.hljs-built_in,
+.hljs-symbol {
+  /* prettylights-syntax-variable */
+  color: #ffa657
+}
+.hljs-comment,
+.hljs-code,
+.hljs-formula {
+  /* prettylights-syntax-comment */
+  color: #8b949e
+}
+.hljs-name,
+.hljs-quote,
+.hljs-selector-tag,
+.hljs-selector-pseudo {
+  /* prettylights-syntax-entity-tag */
+  color: #7ee787
+}
+.hljs-subst {
+  /* prettylights-syntax-storage-modifier-import */
+  color: #c9d1d9
+}
+.hljs-section {
+  /* prettylights-syntax-markup-heading */
+  color: #1f6feb;
+  font-weight: bold
+}
+.hljs-bullet {
+  /* prettylights-syntax-markup-list */
+  color: #f2cc60
+}
+.hljs-emphasis {
+  /* prettylights-syntax-markup-italic */
+  color: #c9d1d9;
+  font-style: italic
+}
+.hljs-strong {
+  /* prettylights-syntax-markup-bold */
+  color: #c9d1d9;
+  font-weight: bold
+}
+.hljs-addition {
+  /* prettylights-syntax-markup-inserted */
+  color: #aff5b4;
+  background-color: #033a16
+}
+.hljs-deletion {
+  /* prettylights-syntax-markup-deleted */
+  color: #ffdcd7;
+  background-color: #67060c
+}
+.hljs-char.escape_,
+.hljs-link,
+.hljs-params,
+.hljs-property,
+.hljs-punctuation,
+.hljs-tag {
+  /* purposely ignored */
+  
+}`;

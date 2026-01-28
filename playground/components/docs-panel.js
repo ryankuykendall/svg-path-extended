@@ -1,5 +1,5 @@
 // Documentation slide-out panel component
-import { syntax, stdlib, debug, cli } from '../utils/docs-content.js';
+import { syntax, stdlib, debug, cli, hljsThemeDark } from '../utils/docs-content.js';
 
 export class DocsPanel extends HTMLElement {
   constructor() {
@@ -209,11 +209,7 @@ export class DocsPanel extends HTMLElement {
         }
 
         pre {
-          background: #1e1e1e;
-          color: #d4d4d4;
-          padding: 12px;
           border-radius: 6px;
-          overflow-x: auto;
           font-size: 0.75rem;
           line-height: 1.5;
           margin: 10px 0;
@@ -221,9 +217,13 @@ export class DocsPanel extends HTMLElement {
 
         pre code {
           background: none;
-          padding: 0;
-          color: inherit;
+          padding: 12px;
+          display: block;
+          font-size: inherit;
         }
+
+        /* highlight.js theme */
+        ${hljsThemeDark}
 
         table {
           width: 100%;
