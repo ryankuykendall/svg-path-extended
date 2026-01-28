@@ -77,6 +77,26 @@ L calc(100 + r) 100
 
 Operator precedence follows standard mathematical conventions.
 
+## Angle Units
+
+Numbers can have angle unit suffixes for convenience:
+
+| Suffix | Description |
+|--------|-------------|
+| `45deg` | Degrees (converted to radians internally) |
+| `1.5rad` | Radians (no conversion) |
+
+```
+let angle = 90deg;
+M sin(45deg) cos(45deg)
+
+// Equivalent to:
+let angle = rad(90);
+M sin(rad(45)) cos(rad(45))
+```
+
+This is especially useful with trigonometric functions and polar coordinates.
+
 ## For Loops
 
 Repeat path commands with `for`:
