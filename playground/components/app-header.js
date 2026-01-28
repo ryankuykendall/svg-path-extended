@@ -184,6 +184,7 @@ class AppHeader extends HTMLElement {
       '/': 'landing',
       '/workspace/:id': 'workspace',
       '/docs': 'docs',
+      '/blog': 'blog',
       '/preferences': 'preferences'
     };
     return routeToView[route] === currentView;
@@ -207,6 +208,9 @@ class AppHeader extends HTMLElement {
           </button>
           <button class="nav-link ${currentView === 'docs' ? 'active' : ''}" data-route="/docs">
             Docs
+          </button>
+          <button class="nav-link ${currentView === 'blog' ? 'active' : ''}" data-route="/blog">
+            Blog
           </button>
           <button class="nav-link ${currentView === 'preferences' ? 'active' : ''}" data-route="/preferences">
             Preferences

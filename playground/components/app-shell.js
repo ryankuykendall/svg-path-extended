@@ -9,6 +9,8 @@ import './views/landing-view.js';
 import './views/preferences-view.js';
 import './views/docs-view.js';
 import './views/storybook-view.js';
+import './views/blog-view.js';
+import './views/blog-post-view.js';
 import './workspace-view.js';
 
 const styles = `
@@ -125,7 +127,9 @@ class AppShell extends HTMLElement {
       'workspace-view': 'workspace',
       'preferences-view': 'preferences',
       'docs-view': 'docs',
-      'storybook-view': 'storybook'
+      'storybook-view': 'storybook',
+      'blog-view': 'blog',
+      'blog-post-view': 'blog-post'
     };
     return mappings[tagName] === currentView;
   }
@@ -144,6 +148,8 @@ class AppShell extends HTMLElement {
         <preferences-view></preferences-view>
         <docs-view></docs-view>
         <storybook-view></storybook-view>
+        <blog-view></blog-view>
+        <blog-post-view></blog-post-view>
       </main>
     `;
   }

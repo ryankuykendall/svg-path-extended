@@ -1,3 +1,10 @@
+---
+title: "The CloudFlare Pages SPA Routing Odyssey"
+date: "2026-01-28"
+slug: "cloudflare-pages-spa-routing-struggle"
+description: "A developer's journey through documentation gaps when trying to make SPA routing work on CloudFlare Pages with subdirectory deployments."
+---
+
 # The CloudFlare Pages SPA Routing Odyssey: A Developer's Journey Through Documentation Gaps
 
 ## The Problem

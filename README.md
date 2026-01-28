@@ -145,6 +145,49 @@ npm test         # Run tests
 npm run dev      # Build with watch mode
 ```
 
+### Website Development
+
+```bash
+npm run build:website   # Build docs, blog, and playground
+npm run dev:website     # Build and serve locally
+```
+
+### Blog
+
+Create a new blog post:
+
+```bash
+npm run new:blog
+```
+
+This prompts for title, slug, date, and description. You can also pass arguments:
+
+```bash
+npm run new:blog -- --title="My Post" --slug="my-post" --description="About this post"
+```
+
+Blog posts are markdown files in `website/blog/` with YAML frontmatter:
+
+```yaml
+---
+title: "Post Title"
+date: "2026-01-28"
+slug: "post-slug"
+description: "Brief description for the listing."
+---
+
+# Post Title
+
+Content goes here...
+```
+
+After editing, rebuild and preview:
+
+```bash
+npm run build:blog      # Regenerate blog content
+npm run dev:website     # Preview locally
+```
+
 ## License
 
 MIT

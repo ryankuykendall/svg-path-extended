@@ -102,6 +102,16 @@ const viewConfig = {
     label: 'Component Storybook',
     parent: 'landing',
     showBreadcrumb: true
+  },
+  blog: {
+    label: 'Blog',
+    parent: 'landing',
+    showBreadcrumb: true
+  },
+  'blog-post': {
+    label: 'Blog Post',
+    parent: 'blog',
+    showBreadcrumb: true
   }
 };
 
@@ -145,27 +155,49 @@ class AppBreadcrumb extends HTMLElement {
 
     // Add current view if not landing
     if (currentView !== 'landing') {
-      let label = config.label;
+      // For blog-post, add Blog as intermediate crumb
+      if (currentView === 'blog-post') {
+        crumbs.push({
+          label: 'Blog',
+          route: '/blog',
+          isCurrent: false
+        });
 
-      // For workspace, show workspace name if available
-      if (currentView === 'workspace') {
-        if (routeParams.id && routeParams.id !== 'new') {
-          // Try to find workspace name from workspaces list
-          const workspaces = store.get('workspaces') || [];
-          const workspace = workspaces.find(w => w.id === routeParams.id);
-          label = workspace?.name || routeParams.id;
-        } else if (currentFileName) {
-          label = currentFileName;
-        } else {
-          label = 'New Workspace';
+        // Get post title from slug (we'll show a readable version)
+        const slug = routeParams.slug || 'Post';
+        // Convert slug to title case (e.g., "my-post" -> "My Post")
+        const label = slug.split('-').map(word =>
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+
+        crumbs.push({
+          label,
+          route: null,
+          isCurrent: true
+        });
+      } else {
+        let label = config.label;
+
+        // For workspace, show workspace name if available
+        if (currentView === 'workspace') {
+          if (routeParams.id && routeParams.id !== 'new') {
+            // Try to find workspace name from workspaces list
+            const workspaces = store.get('workspaces') || [];
+            const workspace = workspaces.find(w => w.id === routeParams.id);
+            label = workspace?.name || routeParams.id;
+          } else if (currentFileName) {
+            label = currentFileName;
+          } else {
+            label = 'New Workspace';
+          }
         }
-      }
 
-      crumbs.push({
-        label,
-        route: null, // Current page, no link
-        isCurrent: true
-      });
+        crumbs.push({
+          label,
+          route: null, // Current page, no link
+          isCurrent: true
+        });
+      }
     }
 
     return crumbs;

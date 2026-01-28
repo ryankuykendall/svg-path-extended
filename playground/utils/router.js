@@ -13,6 +13,8 @@ export const routes = [
   { path: '/preferences', view: 'preferences' },
   { path: '/docs', view: 'docs' },
   { path: '/storybook', view: 'storybook' },
+  { path: '/blog', view: 'blog' },
+  { path: '/blog/:slug', view: 'blog-post' },
 ];
 
 // Parse current URL into path and query params
