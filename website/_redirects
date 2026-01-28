@@ -1,8 +1,0 @@
-# CloudFlare Pages SPA routing
-# All routes under /svg-path-extended/* serve the playground SPA
-
-# SPA fallback for playground app routes (workspace, preferences, docs, storybook)
-/svg-path-extended/workspace/*  /svg-path-extended/index.html  200
-/svg-path-extended/preferences  /svg-path-extended/index.html  200
-/svg-path-extended/docs  /svg-path-extended/index.html  200
-/svg-path-extended/storybook  /svg-path-extended/index.html  200

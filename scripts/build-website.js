@@ -3,11 +3,13 @@
 /**
  * Build script for website deployment to CloudFlare Pages
  *
- * Output structure (dist/website/):
+ * Output structure (public/):
  * ├── index.html                    # Root landing page
- * ├── _redirects                    # CloudFlare SPA routing
+ * ├── _worker.js                    # CloudFlare Worker for SPA routing
+ * ├── blog/                         # Blog posts (markdown)
  * └── svg-path-extended/
  *     ├── index.html                # Playground SPA entry
+ *     ├── 404.html                  # Fallback for SPA routes
  *     ├── styles/
  *     ├── components/
  *     ├── state/
@@ -59,18 +61,24 @@ async function build() {
   // Copy website root files
   console.log('Copying website root...');
   await copyFile(join(ROOT, 'website', 'index.html'), join(DIST, 'index.html'));
-  await copyFile(join(ROOT, 'website', '_redirects'), join(DIST, '_redirects'));
+  await copyFile(join(ROOT, 'website', '_worker.js'), join(DIST, '_worker.js'));
 
   // Copy playground to svg-path-extended/
   const playgroundDest = join(DIST, 'svg-path-extended');
   console.log('Copying playground...');
 
-  // Copy and modify playground index.html (fix library path)
+  // Copy and modify playground index.html for production
   let indexHtml = await fs.readFile(join(ROOT, 'playground', 'index.html'), 'utf-8');
-  // Update library path from ../dist/ to dist/ (production structure)
-  indexHtml = indexHtml.replace('../dist/index.global.js', 'dist/index.global.js');
+  // Add <base> tag to make all relative URLs resolve from /svg-path-extended/
+  // This is required for SPA routing - when browser loads /svg-path-extended/workspace/new,
+  // relative paths would otherwise resolve incorrectly (e.g., styles/theme.css -> /svg-path-extended/workspace/styles/theme.css)
+  indexHtml = indexHtml
+    .replace('<head>', '<head>\n    <base href="/svg-path-extended/">')
+    .replace('../dist/index.global.js', 'dist/index.global.js');
   await fs.mkdir(playgroundDest, { recursive: true });
   await fs.writeFile(join(playgroundDest, 'index.html'), indexHtml);
+  // Also copy as 404.html for SPA fallback routing in subdirectory
+  await fs.writeFile(join(playgroundDest, '404.html'), indexHtml);
 
   // Copy playground directories
   const playgroundDirs = ['styles', 'components', 'state', 'utils'];
@@ -97,6 +105,17 @@ async function build() {
     );
   } catch (e) {
     // Map file doesn't exist, that's fine
+  }
+
+  // Copy blog if it exists
+  try {
+    const blogSrc = join(ROOT, 'website', 'blog');
+    const blogDest = join(DIST, 'blog');
+    await fs.access(blogSrc);
+    console.log('Copying blog...');
+    await copyDir(blogSrc, blogDest);
+  } catch (e) {
+    // Blog directory doesn't exist, that's fine
   }
 
   console.log('\nBuild complete!');
