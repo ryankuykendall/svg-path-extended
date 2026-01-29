@@ -1,0 +1,915 @@
+// Storybook component registry
+// Defines all components available in the storybook with their stories and controls
+
+export const componentRegistry = [
+  // === Editor Core ===
+  {
+    id: 'code-editor-pane',
+    name: 'Code Editor',
+    category: 'Editor',
+    description: 'CodeMirror 6-based code editor with syntax highlighting and autocomplete',
+    stories: [
+      {
+        name: 'Default',
+        props: { code: 'let r = 50;\ncircle(100, 100, r)' }
+      },
+      {
+        name: 'Complex Example',
+        props: { code: '// Star pattern\nlet n = 5;\nlet outer = 80;\nlet inner = 30;\nstar(100, 100, outer, inner, n)' }
+      },
+      {
+        name: 'Empty',
+        props: { code: '' }
+      }
+    ],
+    controls: [
+      { name: 'code', type: 'textarea', label: 'Code', default: 'let r = 50;\ncircle(100, 100, r)' }
+    ],
+    render: (container, props, controls) => {
+      const editor = document.createElement('code-editor-pane');
+      editor.style.height = '300px';
+      editor.style.width = '100%';
+      editor.style.border = '1px solid var(--border-color, #ddd)';
+      editor._initialCode = props.code || '';
+      container.appendChild(editor);
+
+      // Update code when control changes
+      controls.on('code', (value) => {
+        editor.code = value;
+      });
+    }
+  },
+  {
+    id: 'svg-preview-pane',
+    name: 'SVG Preview',
+    category: 'Editor',
+    description: 'SVG preview with zoom/pan controls and navigator',
+    stories: [
+      {
+        name: 'Default',
+        props: { pathData: 'M 50 100 A 50 50 0 1 1 150 100 A 50 50 0 1 1 50 100' }
+      },
+      {
+        name: 'Complex Path',
+        props: { pathData: 'M 100 10 L 40 198 L 190 78 L 10 78 L 160 198 Z' }
+      },
+      {
+        name: 'Empty',
+        props: { pathData: '' }
+      }
+    ],
+    controls: [
+      { name: 'pathData', type: 'textarea', label: 'Path Data', default: 'M 50 100 A 50 50 0 1 1 150 100 A 50 50 0 1 1 50 100' },
+      { name: 'width', type: 'number', label: 'Width', default: 200, min: 50, max: 1000 },
+      { name: 'height', type: 'number', label: 'Height', default: 200, min: 50, max: 1000 }
+    ],
+    render: (container, props, controls) => {
+      // Need to import store for svg-preview-pane
+      import('../state/store.js').then(({ store }) => {
+        store.update({
+          width: props.width || 200,
+          height: props.height || 200,
+          pathData: props.pathData || ''
+        });
+
+        const preview = document.createElement('svg-preview-pane');
+        preview.style.height = '350px';
+        preview.style.width = '100%';
+        preview.style.border = '1px solid var(--border-color, #ddd)';
+        container.appendChild(preview);
+
+        // Give time for component to initialize
+        setTimeout(() => {
+          preview.pathData = props.pathData || '';
+        }, 100);
+
+        controls.on('pathData', (value) => {
+          preview.pathData = value;
+        });
+        controls.on('width', (value) => {
+          store.set('width', value);
+        });
+        controls.on('height', (value) => {
+          store.set('height', value);
+        });
+      });
+    }
+  },
+  {
+    id: 'console-pane',
+    name: 'Console',
+    category: 'Editor',
+    description: 'Console log output display with expandable entries',
+    stories: [
+      {
+        name: 'With Logs',
+        props: {
+          isOpen: true,
+          logs: [
+            { line: 1, parts: [{ type: 'string', value: 'Starting render...' }] },
+            { line: 3, parts: [{ type: 'value', label: 'radius', value: '50' }] },
+            { line: 5, parts: [{ type: 'value', label: 'result', value: '{"x": 100, "y": 100}' }] }
+          ]
+        }
+      },
+      {
+        name: 'Empty',
+        props: { isOpen: true, logs: [] }
+      },
+      {
+        name: 'Collapsed',
+        props: { isOpen: false, logs: [] }
+      }
+    ],
+    controls: [
+      { name: 'isOpen', type: 'toggle', label: 'Open', default: true }
+    ],
+    render: (container, props, controls) => {
+      const consolePane = document.createElement('console-pane');
+      consolePane.style.height = '250px';
+      consolePane.style.width = '100%';
+      consolePane.style.border = '1px solid var(--border-color, #ddd)';
+      container.appendChild(consolePane);
+
+      if (props.isOpen) {
+        consolePane.open();
+      }
+      consolePane.logs = props.logs || [];
+
+      controls.on('isOpen', (value) => {
+        if (value) {
+          consolePane.open();
+        } else {
+          consolePane.close();
+        }
+      });
+    }
+  },
+  {
+    id: 'error-panel',
+    name: 'Error Panel',
+    category: 'Editor',
+    description: 'Error message display banner',
+    stories: [
+      {
+        name: 'With Error',
+        props: { message: 'SyntaxError: Unexpected token at line 5, column 12' }
+      },
+      {
+        name: 'Long Error',
+        props: { message: 'ReferenceError: "myVariable" is not defined. Did you mean "myVar"? Check your variable declarations and ensure all variables are properly initialized before use.' }
+      },
+      {
+        name: 'Hidden',
+        props: { message: '' }
+      }
+    ],
+    controls: [
+      { name: 'message', type: 'text', label: 'Error Message', default: 'SyntaxError: Unexpected token at line 5' }
+    ],
+    render: (container, props, controls) => {
+      const errorPanel = document.createElement('error-panel');
+      errorPanel.style.width = '100%';
+      if (props.message) {
+        errorPanel.message = props.message;
+      }
+      container.appendChild(errorPanel);
+
+      controls.on('message', (value) => {
+        errorPanel.message = value;
+      });
+    }
+  },
+
+  // === Editor Support ===
+  {
+    id: 'annotated-pane',
+    name: 'Annotated Output',
+    category: 'Editor',
+    description: 'Read-only display showing annotated path output',
+    stories: [
+      {
+        name: 'With Content',
+        props: {
+          isOpen: true,
+          content: '// Generated SVG Path\nM 50 100  // Move to start\nA 50 50 0 1 1 150 100  // Arc to right\nA 50 50 0 1 1 50 100   // Arc back to start'
+        }
+      },
+      {
+        name: 'Empty',
+        props: { isOpen: true, content: '' }
+      }
+    ],
+    controls: [
+      { name: 'isOpen', type: 'toggle', label: 'Open', default: true },
+      { name: 'content', type: 'textarea', label: 'Content', default: 'M 50 100\nL 100 50\nL 150 100\nZ' }
+    ],
+    render: (container, props, controls) => {
+      const pane = document.createElement('annotated-pane');
+      pane.style.height = '250px';
+      pane.style.width = '100%';
+      pane.style.border = '1px solid var(--border-color, #ddd)';
+      container.appendChild(pane);
+
+      // Set content before opening (so editor initializes with content)
+      pane._content = props.content || '';
+
+      if (props.isOpen) {
+        pane.open();
+      }
+
+      controls.on('isOpen', (value) => {
+        if (value) pane.open();
+        else pane.close();
+      });
+      controls.on('content', (value) => {
+        pane.content = value;
+      });
+    }
+  },
+  {
+    id: 'playground-header',
+    name: 'Playground Header',
+    category: 'Editor',
+    description: 'Editor header with file controls, pane toggles, and examples dropdown',
+    stories: [
+      {
+        name: 'Default',
+        props: { fileName: null, isModified: false, annotatedOpen: false, consoleOpen: false }
+      },
+      {
+        name: 'With File',
+        props: { fileName: 'my-drawing.svg', isModified: false, annotatedOpen: false, consoleOpen: false }
+      },
+      {
+        name: 'Modified',
+        props: { fileName: 'my-drawing.svg', isModified: true, annotatedOpen: false, consoleOpen: false }
+      },
+      {
+        name: 'Panes Open',
+        props: { fileName: null, isModified: false, annotatedOpen: true, consoleOpen: true }
+      }
+    ],
+    controls: [
+      { name: 'fileName', type: 'text', label: 'File Name', default: '' },
+      { name: 'isModified', type: 'toggle', label: 'Modified', default: false },
+      { name: 'annotatedOpen', type: 'toggle', label: 'Annotated Open', default: false },
+      { name: 'consoleOpen', type: 'toggle', label: 'Console Open', default: false }
+    ],
+    render: (container, props, controls) => {
+      import('../state/store.js').then(({ store }) => {
+        // Set initial store state
+        store.update({
+          currentFileName: props.fileName || null,
+          isModified: props.isModified || false,
+          annotatedOpen: props.annotatedOpen || false,
+          consoleOpen: props.consoleOpen || false
+        });
+
+        const header = document.createElement('playground-header');
+        header.style.width = '100%';
+        header.style.border = '1px solid var(--border-color, #ddd)';
+        container.appendChild(header);
+
+        controls.on('fileName', (value) => {
+          store.set('currentFileName', value || null);
+        });
+        controls.on('isModified', (value) => {
+          store.set('isModified', value);
+        });
+        controls.on('annotatedOpen', (value) => {
+          store.set('annotatedOpen', value);
+        });
+        controls.on('consoleOpen', (value) => {
+          store.set('consoleOpen', value);
+        });
+      });
+    }
+  },
+  {
+    id: 'playground-footer',
+    name: 'Playground Footer',
+    category: 'Editor',
+    description: 'SVG styling controls (dimensions, stroke, fill, background, grid)',
+    stories: [
+      {
+        name: 'Default',
+        props: {}
+      }
+    ],
+    controls: [],
+    render: (container) => {
+      import('../state/store.js').then(({ store }) => {
+        // Reset store to defaults for clean demo
+        store.update({
+          width: 200,
+          height: 200,
+          stroke: '#000000',
+          strokeWidth: 2,
+          fillEnabled: false,
+          fill: '#3498db',
+          background: '#f5f5f5',
+          gridEnabled: true,
+          gridColor: '#cccccc',
+          gridSize: 20
+        });
+
+        const footer = document.createElement('playground-footer');
+        footer.style.width = '100%';
+        footer.style.border = '1px solid var(--border-color, #ddd)';
+        container.appendChild(footer);
+      });
+    }
+  },
+  {
+    id: 'docs-panel',
+    name: 'Docs Panel',
+    category: 'Editor',
+    description: 'Slide-out documentation panel with tabbed content',
+    stories: [
+      {
+        name: 'Open',
+        props: { isOpen: true }
+      },
+      {
+        name: 'Closed',
+        props: { isOpen: false }
+      }
+    ],
+    controls: [
+      { name: 'isOpen', type: 'toggle', label: 'Open', default: true }
+    ],
+    render: (container, props, controls) => {
+      // Create a relative container for the panel
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.width = '100%';
+      wrapper.style.height = '400px';
+      wrapper.style.overflow = 'hidden';
+      wrapper.style.border = '1px solid var(--border-color, #ddd)';
+      wrapper.style.background = 'var(--bg-secondary, #f5f5f5)';
+      container.appendChild(wrapper);
+
+      const panel = document.createElement('docs-panel');
+      // Override fixed positioning for storybook demo
+      panel.style.position = 'absolute';
+      panel.style.width = '100%';
+      panel.style.height = '100%';
+      wrapper.appendChild(panel);
+
+      if (props.isOpen) {
+        setTimeout(() => panel.open(), 50);
+      }
+
+      controls.on('isOpen', (value) => {
+        if (value) panel.open();
+        else panel.close();
+      });
+    }
+  },
+
+  // === Navigation ===
+  {
+    id: 'app-header',
+    name: 'App Header',
+    category: 'Navigation',
+    description: 'Top navigation bar with logo, nav links, and actions',
+    stories: [
+      {
+        name: 'Default',
+        props: {}
+      }
+    ],
+    controls: [],
+    render: (container) => {
+      // Note: We don't modify currentView in the store as it would affect the entire app
+      const header = document.createElement('app-header');
+      header.style.width = '100%';
+      header.style.border = '1px solid var(--border-color, #ddd)';
+      container.appendChild(header);
+
+      // Prevent navigation events from bubbling up in storybook
+      header.addEventListener('navigate', (e) => {
+        e.stopPropagation();
+      });
+
+      const note = document.createElement('div');
+      note.style.padding = '8px';
+      note.style.fontSize = '0.75rem';
+      note.style.color = 'var(--text-secondary, #666)';
+      note.style.fontStyle = 'italic';
+      note.style.marginTop = '8px';
+      note.textContent = 'Note: Navigation links are disabled in this demo. Active state reflects current app view.';
+      container.appendChild(note);
+    }
+  },
+  {
+    id: 'app-breadcrumb',
+    name: 'App Breadcrumb',
+    category: 'Navigation',
+    description: 'Breadcrumb navigation trail showing current location',
+    stories: [
+      {
+        name: 'Default',
+        props: {}
+      }
+    ],
+    controls: [],
+    render: (container) => {
+      // Note: We don't modify currentView in the store as it would affect the entire app
+      const breadcrumb = document.createElement('app-breadcrumb');
+      breadcrumb.style.width = '100%';
+      breadcrumb.style.border = '1px solid var(--border-color, #ddd)';
+      container.appendChild(breadcrumb);
+
+      // Prevent navigation events from bubbling up in storybook
+      breadcrumb.addEventListener('navigate', (e) => {
+        e.stopPropagation();
+      });
+
+      const note = document.createElement('div');
+      note.style.padding = '8px';
+      note.style.fontSize = '0.75rem';
+      note.style.color = 'var(--text-secondary, #666)';
+      note.style.fontStyle = 'italic';
+      note.style.marginTop = '8px';
+      note.textContent = 'Note: Shows breadcrumb for current storybook view. Navigation links are disabled in this demo.';
+      container.appendChild(note);
+    }
+  },
+
+  // === Shared Components ===
+  {
+    id: 'copy-button',
+    name: 'Copy Button',
+    category: 'Shared',
+    description: 'Copy to clipboard button with confirmation feedback',
+    stories: [
+      {
+        name: 'Default',
+        props: { text: 'Hello, World!', label: 'Copy' }
+      },
+      {
+        name: 'Custom Label',
+        props: { text: 'Some code here', label: 'Copy Code' }
+      }
+    ],
+    controls: [
+      { name: 'text', type: 'text', label: 'Text to Copy', default: 'Hello, World!' },
+      { name: 'label', type: 'text', label: 'Button Label', default: 'Copy' }
+    ],
+    render: (container, props, controls) => {
+      const btn = document.createElement('copy-button');
+      btn.setAttribute('text', props.text || '');
+      btn.setAttribute('label', props.label || 'Copy');
+      container.appendChild(btn);
+
+      controls.on('text', (value) => btn.setAttribute('text', value));
+      controls.on('label', (value) => btn.setAttribute('label', value));
+    }
+  },
+  {
+    id: 'log-entry',
+    name: 'Log Entry',
+    category: 'Shared',
+    description: 'Expandable log entry for console output',
+    stories: [
+      {
+        name: 'String Output',
+        props: {
+          data: { line: 1, parts: [{ type: 'string', value: 'Hello from the console!' }] }
+        }
+      },
+      {
+        name: 'Labeled Value',
+        props: {
+          data: { line: 5, parts: [{ type: 'value', label: 'myVar', value: '42' }] }
+        }
+      },
+      {
+        name: 'Object Value',
+        props: {
+          data: {
+            line: 10,
+            parts: [{
+              type: 'value',
+              label: 'config',
+              value: '{"width": 200, "height": 200, "stroke": "#000"}'
+            }]
+          }
+        }
+      },
+      {
+        name: 'Array Value',
+        props: {
+          data: {
+            line: 15,
+            parts: [{
+              type: 'value',
+              label: 'points',
+              value: '[10, 20, 30, 40, 50]'
+            }]
+          }
+        }
+      }
+    ],
+    controls: [],
+    render: (container, props) => {
+      // Dark background to match console
+      container.style.background = '#1e1e1e';
+      container.style.padding = '12px';
+      container.style.borderRadius = '4px';
+
+      const entry = document.createElement('log-entry');
+      entry.data = props.data;
+      container.appendChild(entry);
+    }
+  },
+  {
+    id: 'control-group',
+    name: 'Control Group',
+    category: 'Shared',
+    description: 'Form control wrapper with label',
+    stories: [
+      {
+        name: 'Number Input',
+        props: { label: 'Width', inputType: 'number', value: 200 }
+      },
+      {
+        name: 'Color Input',
+        props: { label: 'Stroke', inputType: 'color', value: '#000000' }
+      },
+      {
+        name: 'Checkbox',
+        props: { label: 'Grid Enabled', inputType: 'checkbox', checked: true }
+      }
+    ],
+    controls: [
+      { name: 'label', type: 'text', label: 'Label', default: 'Width' }
+    ],
+    render: (container, props, controls) => {
+      const group = document.createElement('control-group');
+      group.setAttribute('label', props.label || '');
+
+      let input;
+      if (props.inputType === 'checkbox') {
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = props.checked || false;
+      } else if (props.inputType === 'color') {
+        input = document.createElement('input');
+        input.type = 'color';
+        input.value = props.value || '#000000';
+      } else {
+        input = document.createElement('input');
+        input.type = 'number';
+        input.value = props.value || 0;
+      }
+
+      group.appendChild(input);
+      container.appendChild(group);
+
+      controls.on('label', (value) => group.setAttribute('label', value));
+    }
+  },
+
+  // === UI Patterns (migrated from old storybook) ===
+  {
+    id: 'ui-buttons',
+    name: 'Buttons',
+    category: 'UI Patterns',
+    description: 'Primary and secondary action buttons',
+    stories: [
+      { name: 'All Variants', props: {} }
+    ],
+    controls: [],
+    render: (container) => {
+      container.innerHTML = `
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button class="demo-button primary">Primary</button>
+          <button class="demo-button secondary">Secondary</button>
+          <button class="demo-button primary" disabled>Disabled</button>
+        </div>
+        <style>
+          .demo-button {
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            font-family: inherit;
+          }
+          .demo-button.primary {
+            background: var(--accent-color, #0066cc);
+            color: white;
+            border: none;
+          }
+          .demo-button.primary:hover:not(:disabled) {
+            background: var(--accent-hover, #0052a3);
+          }
+          .demo-button.secondary {
+            background: var(--bg-primary, #ffffff);
+            color: var(--text-primary, #1a1a1a);
+            border: 1px solid var(--border-color, #e0e0e0);
+          }
+          .demo-button.secondary:hover:not(:disabled) {
+            background: var(--bg-secondary, #f5f5f5);
+          }
+          .demo-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        </style>
+      `;
+    }
+  },
+  {
+    id: 'ui-inputs',
+    name: 'Text Inputs',
+    category: 'UI Patterns',
+    description: 'Standard text input fields',
+    stories: [
+      { name: 'All Variants', props: {} }
+    ],
+    controls: [],
+    render: (container) => {
+      container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <input type="text" class="demo-input" placeholder="Enter text...">
+          <input type="text" class="demo-input" value="With value">
+          <input type="text" class="demo-input" disabled placeholder="Disabled">
+        </div>
+        <style>
+          .demo-input {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-family: inherit;
+            width: 200px;
+          }
+          .demo-input:focus {
+            outline: none;
+            border-color: var(--accent-color, #0066cc);
+          }
+          .demo-input:disabled {
+            background: var(--bg-secondary, #f5f5f5);
+            opacity: 0.7;
+          }
+        </style>
+      `;
+    }
+  },
+  {
+    id: 'ui-toggles',
+    name: 'Toggle Groups',
+    category: 'UI Patterns',
+    description: 'Mutually exclusive option selector',
+    stories: [
+      { name: 'Default', props: {} }
+    ],
+    controls: [],
+    render: (container) => {
+      container.innerHTML = `
+        <div class="demo-toggle">
+          <button>List</button>
+          <button class="active">Grid</button>
+          <button>Table</button>
+        </div>
+        <style>
+          .demo-toggle {
+            display: flex;
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 4px;
+            overflow: hidden;
+          }
+          .demo-toggle button {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: var(--bg-primary, #ffffff);
+            cursor: pointer;
+            font-size: 0.8125rem;
+            font-family: inherit;
+          }
+          .demo-toggle button:not(:last-child) {
+            border-right: 1px solid var(--border-color, #e0e0e0);
+          }
+          .demo-toggle button.active {
+            background: var(--accent-color, #0066cc);
+            color: white;
+          }
+          .demo-toggle button:hover:not(.active) {
+            background: var(--bg-secondary, #f5f5f5);
+          }
+        </style>
+      `;
+
+      // Add interactivity
+      container.querySelectorAll('.demo-toggle button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          container.querySelectorAll('.demo-toggle button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+    }
+  },
+  {
+    id: 'ui-colors',
+    name: 'Color Pickers',
+    category: 'UI Patterns',
+    description: 'Color input with value display',
+    stories: [
+      { name: 'Default', props: {} }
+    ],
+    controls: [],
+    render: (container) => {
+      container.innerHTML = `
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <div class="demo-color-group">
+            <input type="color" class="demo-color" value="#0066cc">
+            <span class="color-value">#0066cc</span>
+          </div>
+          <div class="demo-color-group">
+            <input type="color" class="demo-color" value="#28a745">
+            <span class="color-value">#28a745</span>
+          </div>
+        </div>
+        <style>
+          .demo-color-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+          }
+          .demo-color {
+            width: 36px;
+            height: 30px;
+            padding: 2px;
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 4px;
+            cursor: pointer;
+          }
+          .color-value {
+            font-family: var(--font-mono, monospace);
+            font-size: 0.8125rem;
+          }
+        </style>
+      `;
+
+      container.querySelectorAll('.demo-color').forEach(input => {
+        input.addEventListener('input', (e) => {
+          e.target.nextElementSibling.textContent = e.target.value;
+        });
+      });
+    }
+  },
+  {
+    id: 'ui-typography',
+    name: 'Typography',
+    category: 'UI Patterns',
+    description: 'Text styles and hierarchy',
+    stories: [
+      { name: 'Scale', props: {} }
+    ],
+    controls: [],
+    render: (container) => {
+      container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="font-size: 1.5rem; font-weight: 600;">Heading 1 (1.5rem)</div>
+          <div style="font-size: 1.25rem; font-weight: 600;">Heading 2 (1.25rem)</div>
+          <div style="font-size: 1rem; font-weight: 600;">Heading 3 (1rem)</div>
+          <div style="font-size: 0.875rem;">Body text (0.875rem)</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary, #666);">Caption text (0.75rem)</div>
+          <div style="font-family: var(--font-mono, monospace); font-size: 0.875rem;">Monospace text</div>
+        </div>
+      `;
+    }
+  },
+  {
+    id: 'ui-colors-palette',
+    name: 'Color Palette',
+    category: 'UI Patterns',
+    description: 'Theme colors from CSS variables',
+    stories: [
+      { name: 'Default', props: {} }
+    ],
+    controls: [],
+    render: (container) => {
+      const colors = [
+        { name: 'accent', var: '--accent-color', fallback: '#0066cc' },
+        { name: 'text-primary', var: '--text-primary', fallback: '#1a1a1a' },
+        { name: 'text-secondary', var: '--text-secondary', fallback: '#666' },
+        { name: 'bg-primary', var: '--bg-primary', fallback: '#ffffff' },
+        { name: 'bg-secondary', var: '--bg-secondary', fallback: '#f5f5f5' },
+        { name: 'border', var: '--border-color', fallback: '#e0e0e0' },
+        { name: 'success', var: '--success-color', fallback: '#28a745' },
+        { name: 'error', var: '--error-text', fallback: '#c00' }
+      ];
+
+      container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem;">
+          ${colors.map(c => `
+            <div style="text-align: center;">
+              <div style="width: 50px; height: 50px; background: var(${c.var}, ${c.fallback}); border-radius: 4px; margin: 0 auto; border: 1px solid var(--border-color, #e0e0e0);"></div>
+              <div style="font-size: 0.6875rem; margin-top: 0.25rem; color: var(--text-secondary, #666);">${c.name}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+  },
+  {
+    id: 'ui-spacing',
+    name: 'Spacing Scale',
+    category: 'UI Patterns',
+    description: 'Consistent spacing units',
+    stories: [
+      { name: 'Default', props: {} }
+    ],
+    controls: [],
+    render: (container) => {
+      const spacings = [
+        { label: '0.25rem (4px)', size: '4px' },
+        { label: '0.5rem (8px)', size: '8px' },
+        { label: '0.75rem (12px)', size: '12px' },
+        { label: '1rem (16px)', size: '16px' },
+        { label: '1.5rem (24px)', size: '24px' },
+        { label: '2rem (32px)', size: '32px' }
+      ];
+
+      container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          ${spacings.map(s => `
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div style="width: ${s.size}; height: 16px; background: var(--accent-color, #0066cc);"></div>
+              <span style="font-size: 0.75rem; color: var(--text-secondary, #666);">${s.label}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+  },
+  {
+    id: 'ui-cards',
+    name: 'Cards',
+    category: 'UI Patterns',
+    description: 'Container for grouped content',
+    stories: [
+      { name: 'Default', props: {} }
+    ],
+    controls: [],
+    render: (container) => {
+      container.innerHTML = `
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <div class="demo-card">
+            <h3>Card Title</h3>
+            <p>Card description text goes here with some content.</p>
+          </div>
+          <div class="demo-card">
+            <h3>Another Card</h3>
+            <p>Different content for this card example.</p>
+          </div>
+        </div>
+        <style>
+          .demo-card {
+            background: var(--bg-primary, #ffffff);
+            padding: 1rem;
+            border: 1px solid var(--border-color, #e0e0e0);
+            border-radius: 8px;
+            width: 200px;
+          }
+          .demo-card h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 0.875rem;
+            font-weight: 600;
+          }
+          .demo-card p {
+            margin: 0;
+            font-size: 0.75rem;
+            color: var(--text-secondary, #666);
+          }
+        </style>
+      `;
+    }
+  }
+];
+
+// Get component by ID
+export function getComponentById(id) {
+  return componentRegistry.find(c => c.id === id);
+}
+
+// Get all categories
+export function getCategories() {
+  const categories = new Map();
+  for (const component of componentRegistry) {
+    if (!categories.has(component.category)) {
+      categories.set(component.category, []);
+    }
+    categories.get(component.category).push(component);
+  }
+  return categories;
+}
+
+// Get first component (for default view)
+export function getFirstComponent() {
+  return componentRegistry[0];
+}

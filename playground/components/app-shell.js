@@ -9,6 +9,7 @@ import './views/landing-view.js';
 import './views/preferences-view.js';
 import './views/docs-view.js';
 import './views/storybook-view.js';
+import './views/storybook-detail-view.js';
 import './views/blog-view.js';
 import './views/blog-post-view.js';
 import './workspace-view.js';
@@ -128,6 +129,7 @@ class AppShell extends HTMLElement {
       'preferences-view': 'preferences',
       'docs-view': 'docs',
       'storybook-view': 'storybook',
+      'storybook-detail-view': 'storybook-detail',
       'blog-view': 'blog',
       'blog-post-view': 'blog-post'
     };
@@ -148,6 +150,7 @@ class AppShell extends HTMLElement {
         <preferences-view></preferences-view>
         <docs-view></docs-view>
         <storybook-view></storybook-view>
+        <storybook-detail-view></storybook-detail-view>
         <blog-view></blog-view>
         <blog-post-view></blog-post-view>
       </main>

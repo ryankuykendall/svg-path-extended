@@ -12,7 +12,8 @@ export const routes = [
   { path: '/workspace/:id', view: 'workspace' },
   { path: '/preferences', view: 'preferences' },
   { path: '/docs', view: 'docs' },
-  { path: '/storybook', view: 'storybook' },
+  { path: '/storybook', view: 'storybook-detail' },
+  { path: '/storybook/:component', view: 'storybook-detail' },
   { path: '/blog', view: 'blog' },
   { path: '/blog/:slug', view: 'blog-post' },
 ];

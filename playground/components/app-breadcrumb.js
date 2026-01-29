@@ -103,6 +103,11 @@ const viewConfig = {
     parent: 'landing',
     showBreadcrumb: true
   },
+  'storybook-detail': {
+    label: 'Storybook',
+    parent: 'landing',
+    showBreadcrumb: true
+  },
   blog: {
     label: 'Blog',
     parent: 'landing',
