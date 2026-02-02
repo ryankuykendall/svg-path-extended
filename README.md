@@ -145,6 +145,14 @@ npm test         # Run tests
 npm run dev      # Build with watch mode
 ```
 
+### Changelog Reminder Hook
+
+Contributors can opt in to a gentle reminder after each commit if `CHANGELOG.md` was not updated:
+
+```bash
+scripts/install-git-hooks.sh
+```
+
 ### Website Development
 
 ```bash

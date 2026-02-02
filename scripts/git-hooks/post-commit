@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Remind contributors to update the changelog if it wasn't part of the commit.
+# This is non-blocking by design.
+
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if ! git diff-tree --no-commit-id --name-only -r HEAD | grep -q "^CHANGELOG\.md$"; then
+    printf "\nReminder: consider updating CHANGELOG.md for this commit.\n\n"
+  fi
+fi
