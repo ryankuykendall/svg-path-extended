@@ -4,9 +4,12 @@
 import { store } from '../state/store.js';
 import { defaultCode, examples } from '../utils/examples.js';
 import { loadFromURL, applyURLState } from '../utils/url-state.js';
+import { workspaceApi } from '../services/api.js';
+import { autosave, SaveStatus } from '../services/autosave.js';
+import { getUserId } from '../services/user-id.js';
+import { BASE_PATH, parseWorkspaceSlugId, buildWorkspaceSlugId } from '../utils/router.js';
 
 // Import all sub-components
-import './playground-header.js';
 import './playground-main.js';
 import './playground-footer.js';
 import './code-editor-pane.js';
@@ -24,6 +27,7 @@ export class WorkspaceView extends HTMLElement {
     this._fileHandle = null;
     this._initialized = false;
     this._routeUnsubscribe = null;
+    this._loadingWorkspace = false;
   }
 
   connectedCallback() {
@@ -31,11 +35,11 @@ export class WorkspaceView extends HTMLElement {
     this.setupEventListeners();
 
     // Subscribe to route changes to initialize when becoming active
-    this._routeUnsubscribe = store.subscribe(['currentView'], () => {
+    this._routeUnsubscribe = store.subscribe(['currentView', 'routeParams'], () => {
       this.handleRouteChange();
     });
 
-    // Check if we should initialize immediately (if already on playground route)
+    // Check if we should initialize immediately (if already on workspace route)
     this.handleRouteChange();
   }
 
@@ -43,14 +47,31 @@ export class WorkspaceView extends HTMLElement {
     if (this._routeUnsubscribe) {
       this._routeUnsubscribe();
     }
+    // Stop autosave when leaving
+    autosave.stop();
+    // Clean up event listeners
+    this.cleanupEventListeners();
   }
 
   handleRouteChange() {
     const currentView = store.get('currentView');
+    const routeParams = store.get('routeParams') || {};
     const isActive = currentView === 'workspace';
 
-    if (isActive && !this._initialized) {
-      this.waitForLibrary();
+    // Parse workspace ID from slugId (format: slug--id or just id)
+    const { id: workspaceId } = parseWorkspaceSlugId(routeParams.slugId);
+
+    if (isActive) {
+      // Check if we need to load a different workspace
+      if (!this._initialized || this._currentWorkspaceId !== workspaceId) {
+        this._currentWorkspaceId = workspaceId;
+        this.waitForLibrary();
+      }
+    } else {
+      // Stop autosave when leaving workspace view
+      if (this._initialized) {
+        autosave.stop();
+      }
     }
   }
 
@@ -92,19 +113,64 @@ export class WorkspaceView extends HTMLElement {
     check();
   }
 
-  initialize() {
-    if (this._initialized) return;
+  async initialize() {
     this._initialized = true;
+    const routeParams = store.get('routeParams') || {};
+    const routeQuery = store.get('routeQuery') || {};
+    // Parse workspace ID from slugId (format: slug--id or just id)
+    const { id: workspaceId } = parseWorkspaceSlugId(routeParams.slugId);
 
-    // Load state from URL (query params) or use default
-    const urlState = loadFromURL();
-    const initialCode = applyURLState(urlState, store) || defaultCode;
+    // Reset workspace state
+    store.update({
+      workspaceId: null,
+      workspaceName: null,
+      workspaceDescription: null,
+      workspaceIsPublic: false,
+      workspaceOwnerId: null,
+      workspaceUpdatedAt: null,
+      saveStatus: SaveStatus.IDLE,
+      saveError: null,
+    });
 
-    // Set initial code
-    this.editorPane.initialCode = initialCode;
-    store.set('code', initialCode);
+    // Check for URL state (backward compatibility for shareable links)
+    if (routeQuery.state) {
+      const urlState = loadFromURL();
+      const initialCode = applyURLState(urlState, store) || defaultCode;
+      this.editorPane.initialCode = initialCode;
+      store.set('code', initialCode);
+      // Don't initialize autosave for URL-state workspaces (they're not persisted)
+    }
+    // Load workspace from API if ID is provided and not 'new'
+    else if (workspaceId && workspaceId !== 'new') {
+      await this.loadWorkspace(workspaceId);
+    }
+    // New workspace
+    else {
+      // Use default code for new workspaces
+      const preferences = store.get('preferences');
+      this.editorPane.initialCode = defaultCode;
+      store.update({
+        code: defaultCode,
+        currentFileName: null,
+      });
+      // Apply user preferences to SVG styles
+      if (preferences) {
+        store.update({
+          width: preferences.width,
+          height: preferences.height,
+          stroke: preferences.stroke,
+          strokeWidth: preferences.strokeWidth,
+          fillEnabled: preferences.fillEnabled,
+          fill: preferences.fill,
+          background: preferences.background,
+          gridEnabled: preferences.gridEnabled,
+          gridColor: preferences.gridColor,
+          gridSize: preferences.gridSize,
+        });
+      }
+    }
 
-    // Initialize panes based on URL state
+    // Initialize panes based on store state
     if (store.get('annotatedOpen')) {
       this.annotatedPane.open();
     }
@@ -116,10 +182,99 @@ export class WorkspaceView extends HTMLElement {
     this.updatePreview();
   }
 
+  updateUrlWithSlug(id, slug) {
+    // Only update if slug exists and URL doesn't already have it
+    if (!slug) return;
+
+    const routeParams = store.get('routeParams') || {};
+    const currentSlugId = routeParams.slugId || '';
+    const expectedSlugId = buildWorkspaceSlugId(slug, id);
+
+    if (currentSlugId === expectedSlugId) return;
+
+    // Build new URL with slug--id format
+    const newPath = `${BASE_PATH}/workspace/${encodeURIComponent(expectedSlugId)}`;
+
+    // Use replaceState to avoid adding to history
+    history.replaceState(null, '', newPath);
+
+    // Update store with new slugId
+    store.set('routeParams', { ...routeParams, slugId: expectedSlugId });
+  }
+
+  async loadWorkspace(id) {
+    if (this._loadingWorkspace) return;
+    this._loadingWorkspace = true;
+
+    try {
+      const workspace = await workspaceApi.get(id);
+      const userId = getUserId();
+
+      // Update store with workspace data
+      store.update({
+        workspaceId: workspace.id,
+        workspaceName: workspace.name,
+        workspaceDescription: workspace.description,
+        workspaceIsPublic: workspace.isPublic,
+        workspaceOwnerId: workspace.userId,
+        workspaceUpdatedAt: workspace.updatedAt,
+        code: workspace.code,
+        currentFileName: workspace.name,
+      });
+
+      // Apply workspace preferences to SVG styles
+      if (workspace.preferences) {
+        const prefs = workspace.preferences;
+        store.update({
+          width: prefs.width ?? store.get('width'),
+          height: prefs.height ?? store.get('height'),
+          stroke: prefs.stroke ?? store.get('stroke'),
+          strokeWidth: prefs.strokeWidth ?? store.get('strokeWidth'),
+          fillEnabled: prefs.fillEnabled ?? store.get('fillEnabled'),
+          fill: prefs.fill ?? store.get('fill'),
+          background: prefs.background ?? store.get('background'),
+          gridEnabled: prefs.gridEnabled ?? store.get('gridEnabled'),
+          gridColor: prefs.gridColor ?? store.get('gridColor'),
+          gridSize: prefs.gridSize ?? store.get('gridSize'),
+        });
+      }
+
+      // Set editor code
+      this.editorPane.initialCode = workspace.code;
+
+      // Update URL with slug if not already present
+      this.updateUrlWithSlug(workspace.id, workspace.slug);
+
+      // Initialize autosave if user owns this workspace
+      if (workspace.userId === userId) {
+        autosave.init(workspace.id, workspace.contentHash);
+      }
+    } catch (err) {
+      console.error('Failed to load workspace:', err);
+      if (err.status === 404) {
+        this.showError('Workspace not found');
+      } else if (err.status === 403) {
+        this.showError('You do not have access to this workspace');
+      } else {
+        this.showError('Failed to load workspace: ' + err.message);
+      }
+
+      // Fall back to default code
+      this.editorPane.initialCode = defaultCode;
+      store.set('code', defaultCode);
+    } finally {
+      this._loadingWorkspace = false;
+    }
+  }
+
   setupEventListeners() {
     // Code changes from editor
     this.shadowRoot.addEventListener('code-change', () => {
       this.debouncedUpdate();
+
+      // Trigger autosave
+      const code = store.get('code');
+      autosave.onChange(code);
     });
 
     // Style changes from footer
@@ -127,49 +282,91 @@ export class WorkspaceView extends HTMLElement {
       this.previewPane.updateSvgStyles();
     });
 
-    // File operations
-    this.shadowRoot.addEventListener('open-file', () => this.openFile());
-    this.shadowRoot.addEventListener('save-file', () => this.saveFile());
-
-    // Toggle panes
-    this.shadowRoot.addEventListener('toggle-annotated', () => {
-      this.annotatedPane.toggle();
-      if (this.annotatedPane.isOpen) {
-        this.updateAnnotatedOutput();
-      }
-    });
-
-    this.shadowRoot.addEventListener('toggle-console', () => {
-      this.consolePane.toggle();
-    });
-
-    // Load example
-    this.shadowRoot.addEventListener('load-example', (e) => {
-      this.editorPane.code = e.detail.code;
-      store.set('code', e.detail.code);
-      this.updatePreview();
-      this.updateAnnotatedOutput();
-    });
-
     // Open docs
     this.shadowRoot.addEventListener('open-docs', () => {
       this.docsPanel.open();
     });
 
+    // Listen for events from app-header and app-breadcrumb (bubble up through DOM)
+    // These listeners are on document to catch events from outside shadow DOM
+    this._handleExportFile = () => {
+      if (store.get('currentView') === 'workspace') {
+        this.exportFile();
+      }
+    };
+    document.addEventListener('export-file', this._handleExportFile);
+
+    this._handleCopyCode = () => {
+      if (store.get('currentView') === 'workspace') {
+        this.copyCode();
+      }
+    };
+    document.addEventListener('copy-code', this._handleCopyCode);
+
+    this._handleCopySvg = () => {
+      if (store.get('currentView') === 'workspace') {
+        this.copySvg();
+      }
+    };
+    document.addEventListener('copy-svg', this._handleCopySvg);
+
+    this._handleToggleAnnotated = () => {
+      if (store.get('currentView') === 'workspace') {
+        this.annotatedPane.toggle();
+        if (this.annotatedPane.isOpen) {
+          this.updateAnnotatedOutput();
+        }
+      }
+    };
+    document.addEventListener('toggle-annotated', this._handleToggleAnnotated);
+
+    this._handleToggleConsole = () => {
+      if (store.get('currentView') === 'workspace') {
+        this.consolePane.toggle();
+      }
+    };
+    document.addEventListener('toggle-console', this._handleToggleConsole);
+
     // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
+    this._handleKeydown = (e) => {
+      if (store.get('currentView') !== 'workspace') return;
+
       if (e.key === 'Escape' && this.docsPanel.classList.contains('open')) {
         this.docsPanel.close();
       }
+      // Ctrl/Cmd+S now exports
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        this.saveFile();
+        this.exportFile();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-        e.preventDefault();
-        this.openFile();
-      }
+    };
+    document.addEventListener('keydown', this._handleKeydown);
+  }
+
+  cleanupEventListeners() {
+    document.removeEventListener('export-file', this._handleExportFile);
+    document.removeEventListener('copy-code', this._handleCopyCode);
+    document.removeEventListener('copy-svg', this._handleCopySvg);
+    document.removeEventListener('toggle-annotated', this._handleToggleAnnotated);
+    document.removeEventListener('toggle-console', this._handleToggleConsole);
+    document.removeEventListener('keydown', this._handleKeydown);
+  }
+
+  copyCode() {
+    const code = this.editorPane.code;
+    navigator.clipboard.writeText(code).catch(err => {
+      console.error('Failed to copy code:', err);
     });
+  }
+
+  copySvg() {
+    const svgElement = this.previewPane.shadowRoot?.querySelector('svg');
+    if (svgElement) {
+      const svgString = svgElement.outerHTML;
+      navigator.clipboard.writeText(svgString).catch(err => {
+        console.error('Failed to copy SVG:', err);
+      });
+    }
   }
 
   debouncedUpdate() {
@@ -214,106 +411,39 @@ export class WorkspaceView extends HTMLElement {
     this.errorPanel.hide();
   }
 
-  async saveFile() {
+  // Export file (renamed from saveFile)
+  async exportFile() {
     const code = this.editorPane.code;
+    const workspaceName = store.get('workspaceName') || store.get('currentFileName') || 'untitled';
+    const suggestedName = workspaceName.endsWith('.svgx') ? workspaceName : `${workspaceName}.svgx`;
 
     try {
       if ('showSaveFilePicker' in window) {
         const options = {
-          suggestedName: store.get('currentFileName') || 'untitled.svgx',
+          suggestedName,
           types: [{
             description: 'SVG Path Extended Files',
             accept: { 'text/plain': ['.svgx'] },
           }],
         };
 
-        if (this._fileHandle) {
-          const writable = await this._fileHandle.createWritable();
-          await writable.write(code);
-          await writable.close();
-        } else {
-          const handle = await window.showSaveFilePicker(options);
-          const writable = await handle.createWritable();
-          await writable.write(code);
-          await writable.close();
-          this._fileHandle = handle;
-          store.set('currentFileName', handle.name);
-        }
-
-        store.set('isModified', false);
+        const handle = await window.showSaveFilePicker(options);
+        const writable = await handle.createWritable();
+        await writable.write(code);
+        await writable.close();
       } else {
-        // Fallback
+        // Fallback for browsers without File System Access API
         const blob = new Blob([code], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = store.get('currentFileName') || 'untitled.svgx';
+        a.download = suggestedName;
         a.click();
         URL.revokeObjectURL(url);
-
-        if (!store.get('currentFileName')) {
-          store.set('currentFileName', 'untitled.svgx');
-        }
-        store.set('isModified', false);
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
-        console.error('Save failed:', err);
-      }
-    }
-  }
-
-  async openFile() {
-    try {
-      if ('showOpenFilePicker' in window) {
-        const options = {
-          types: [{
-            description: 'SVG Path Extended Files',
-            accept: { 'text/plain': ['.svgx'] },
-          }],
-          multiple: false,
-        };
-
-        const [handle] = await window.showOpenFilePicker(options);
-        const file = await handle.getFile();
-        const contents = await file.text();
-
-        this._fileHandle = handle;
-        store.set('currentFileName', handle.name);
-
-        this.editorPane.code = contents;
-        store.set('code', contents);
-        store.set('isModified', false);
-
-        this.updatePreview();
-        this.updateAnnotatedOutput();
-      } else {
-        // Fallback
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.svgx';
-
-        input.onchange = async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-
-          const contents = await file.text();
-          store.set('currentFileName', file.name);
-          this._fileHandle = null;
-
-          this.editorPane.code = contents;
-          store.set('code', contents);
-          store.set('isModified', false);
-
-          this.updatePreview();
-          this.updateAnnotatedOutput();
-        };
-
-        input.click();
-      }
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.error('Open failed:', err);
+        console.error('Export failed:', err);
       }
     }
   }
@@ -341,8 +471,6 @@ export class WorkspaceView extends HTMLElement {
           min-height: 0;
         }
       </style>
-
-      <playground-header></playground-header>
 
       <playground-main>
         <code-editor-pane></code-editor-pane>

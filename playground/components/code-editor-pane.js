@@ -128,22 +128,6 @@ export class CodeEditorPane extends HTMLElement {
     }));
   }
 
-  async copyCode() {
-    const code = this.code;
-    try {
-      await navigator.clipboard.writeText(code);
-      const btn = this.shadowRoot.querySelector('#copy-code');
-      btn.textContent = 'Copied!';
-      btn.classList.add('copied');
-      setTimeout(() => {
-        btn.textContent = 'Copy Code';
-        btn.classList.remove('copied');
-      }, 1500);
-    } catch (err) {
-      console.error('Copy failed:', err);
-    }
-  }
-
   render() {
     this.shadowRoot.innerHTML = `
       <style>
@@ -169,34 +153,6 @@ export class CodeEditorPane extends HTMLElement {
           overflow: auto;
         }
 
-        .copy-btn {
-          position: absolute;
-          top: 8px;
-          right: 8px;
-          z-index: 10;
-          padding: 4px 10px;
-          font-size: 0.75rem;
-          font-family: inherit;
-          background: var(--bg-primary, #ffffff);
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          cursor: pointer;
-          opacity: 0.7;
-          transition: opacity 0.15s;
-        }
-
-        .copy-btn:hover {
-          opacity: 1;
-          background: var(--bg-secondary, #f5f5f5);
-        }
-
-        .copy-btn.copied {
-          background: var(--success-color, #28a745);
-          border-color: var(--success-color, #28a745);
-          color: white;
-          opacity: 1;
-        }
-
         /* CodeMirror styles */
         #editor-container .cm-editor {
           height: 100%;
@@ -212,11 +168,8 @@ export class CodeEditorPane extends HTMLElement {
         }
       </style>
 
-      <button id="copy-code" class="copy-btn">Copy Code</button>
       <div id="editor-container"></div>
     `;
-
-    this.shadowRoot.querySelector('#copy-code').addEventListener('click', () => this.copyCode());
   }
 }
 

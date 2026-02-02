@@ -73,6 +73,20 @@ export const store = createStore({
 
   // Workspaces
   workspaces: [],         // Array of saved workspace metadata
+  workspacesLoading: false,
+  workspacesError: null,
+
+  // Current workspace (loaded from API)
+  workspaceId: null,              // ID of current workspace (null = unsaved)
+  workspaceName: null,            // Name of current workspace
+  workspaceDescription: null,     // Description
+  workspaceIsPublic: false,       // Visibility
+  workspaceOwnerId: null,         // Owner user ID
+  workspaceUpdatedAt: null,       // Last update timestamp
+
+  // Save status for autosave
+  saveStatus: 'idle',     // 'idle', 'modified', 'saving', 'saved', 'error'
+  saveError: null,        // Error message if save failed
 
   // User preferences (defaults for new workspaces)
   preferences: {

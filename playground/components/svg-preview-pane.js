@@ -325,33 +325,7 @@ export class SvgPreviewPane extends HTMLElement {
     this.updateNavigatorContent();
   }
 
-  async copySvg() {
-    const width = this.preview.getAttribute('width');
-    const height = this.preview.getAttribute('height');
-    const viewBox = this.preview.getAttribute('viewBox');
-    const pathD = this.previewPath.getAttribute('d') || '';
-
-    const cleanSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
-  <path d="${pathD}"/>
-</svg>`;
-
-    try {
-      await navigator.clipboard.writeText(cleanSvg);
-      const btn = this.shadowRoot.querySelector('#copy-svg');
-      btn.textContent = 'Copied!';
-      btn.classList.add('copied');
-      setTimeout(() => {
-        btn.textContent = 'Copy SVG';
-        btn.classList.remove('copied');
-      }, 1500);
-    } catch (err) {
-      console.error('Copy failed:', err);
-    }
-  }
-
   setupEventListeners() {
-    // Copy button
-    this.shadowRoot.querySelector('#copy-svg').addEventListener('click', () => this.copySvg());
 
     // Zoom controls
     this.shadowRoot.querySelector('#zoom-in').addEventListener('click', () => this.zoomIn());
@@ -456,34 +430,6 @@ export class SvgPreviewPane extends HTMLElement {
           cursor: grabbing;
         }
 
-        .copy-btn {
-          position: absolute;
-          top: 8px;
-          right: 8px;
-          z-index: 10;
-          padding: 4px 10px;
-          font-size: 0.75rem;
-          font-family: inherit;
-          background: var(--bg-primary, #ffffff);
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          cursor: pointer;
-          opacity: 0.7;
-          transition: opacity 0.15s;
-        }
-
-        .copy-btn:hover {
-          opacity: 1;
-          background: var(--bg-secondary, #f5f5f5);
-        }
-
-        .copy-btn.copied {
-          background: var(--success-color, #28a745);
-          border-color: var(--success-color, #28a745);
-          color: white;
-          opacity: 1;
-        }
-
         /* Navigator */
         #zoom-navigator {
           position: absolute;
@@ -571,8 +517,6 @@ export class SvgPreviewPane extends HTMLElement {
           border-color: var(--accent-color, #0066cc);
         }
       </style>
-
-      <button id="copy-svg" class="copy-btn">Copy SVG</button>
 
       <div id="zoom-navigator">
         <svg id="navigator-svg">

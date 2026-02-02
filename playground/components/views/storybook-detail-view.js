@@ -381,7 +381,10 @@ class StorybookDetailView extends HTMLElement {
         this.updateFromRoute();
       }
     });
-    this.updateFromRoute();
+    // Only update from route if we're actually on the storybook view
+    if (store.get('currentView') === 'storybook-detail') {
+      this.updateFromRoute();
+    }
   }
 
   updateFromRoute() {

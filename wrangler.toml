@@ -1,0 +1,16 @@
+# CloudFlare Pages configuration
+name = "svg-path-extended"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "public"
+
+# KV Namespace binding for workspace persistence
+# After creating the namespace, replace the placeholder IDs:
+#   wrangler kv:namespace create WORKSPACES
+#   wrangler kv:namespace create WORKSPACES --preview
+[[kv_namespaces]]
+binding = "WORKSPACES"
+id = "fdaa643f894a4a118329961dcd0e8d0e"
+preview_id = "19a9d6b448604bca927cc6a198f4a96a"
+
+[vars]
+# Environment variables can be added here

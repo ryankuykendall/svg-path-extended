@@ -6,6 +6,7 @@ import { initRouter, navigateTo } from '../utils/router.js';
 import './app-header.js';
 import './app-breadcrumb.js';
 import './views/landing-view.js';
+import './views/new-workspace-view.js';
 import './views/preferences-view.js';
 import './views/docs-view.js';
 import './views/storybook-view.js';
@@ -125,6 +126,7 @@ class AppShell extends HTMLElement {
     // Map tag names to view names
     const mappings = {
       'landing-view': 'landing',
+      'new-workspace-view': 'new-workspace',
       'workspace-view': 'workspace',
       'preferences-view': 'preferences',
       'docs-view': 'docs',
@@ -146,6 +148,7 @@ class AppShell extends HTMLElement {
 
       <main>
         <landing-view></landing-view>
+        <new-workspace-view></new-workspace-view>
         <workspace-view></workspace-view>
         <preferences-view></preferences-view>
         <docs-view></docs-view>

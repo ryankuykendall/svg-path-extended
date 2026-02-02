@@ -7,9 +7,11 @@ import { store } from '../state/store.js';
 export const BASE_PATH = '/svg-path-extended';
 
 // Route definitions
+// Workspace URLs use format: /workspace/slug--id (e.g., /workspace/my-project--abc123)
 export const routes = [
   { path: '/', view: 'landing' },
-  { path: '/workspace/:id', view: 'workspace' },
+  { path: '/workspace/new', view: 'new-workspace' },  // Must be before :slugId route
+  { path: '/workspace/:slugId', view: 'workspace' },  // Format: slug--id or just id
   { path: '/preferences', view: 'preferences' },
   { path: '/docs', view: 'docs' },
   { path: '/storybook', view: 'storybook-detail' },
@@ -17,6 +19,30 @@ export const routes = [
   { path: '/blog', view: 'blog' },
   { path: '/blog/:slug', view: 'blog-post' },
 ];
+
+// Build workspace URL segment from slug and id
+export function buildWorkspaceSlugId(slug, id) {
+  if (slug) {
+    return `${slug}--${id}`;
+  }
+  return id;
+}
+
+// Parse workspace URL segment into slug and id
+export function parseWorkspaceSlugId(slugId) {
+  if (!slugId) return { slug: null, id: null };
+
+  // Find the last occurrence of '--' to split slug and id
+  const lastDelimiter = slugId.lastIndexOf('--');
+  if (lastDelimiter > 0) {
+    return {
+      slug: slugId.substring(0, lastDelimiter),
+      id: slugId.substring(lastDelimiter + 2)
+    };
+  }
+  // No delimiter, treat entire string as id (backward compatibility)
+  return { slug: null, id: slugId };
+}
 
 // Parse current URL into path and query params
 export function parseLocation() {

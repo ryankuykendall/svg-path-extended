@@ -2,6 +2,7 @@
 // Route: /preferences
 
 import { store } from '../../state/store.js';
+import { preferencesApi } from '../../services/api.js';
 
 const styles = `
   :host {
@@ -111,8 +112,13 @@ const styles = `
     transition: background 0.15s ease;
   }
 
-  .save-btn:hover {
+  .save-btn:hover:not(:disabled) {
     background: var(--accent-hover, #0052a3);
+  }
+
+  .save-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .reset-btn {
@@ -142,6 +148,49 @@ const styles = `
 
   .notice strong {
     color: var(--text-primary, #1a1a1a);
+  }
+
+  .save-feedback {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .save-feedback.visible {
+    opacity: 1;
+  }
+
+  .save-feedback.success {
+    background: var(--success-bg, #d4edda);
+    color: var(--success-color, #155724);
+  }
+
+  .save-feedback.error {
+    background: var(--error-bg, #f8d7da);
+    color: var(--error-color, #721c24);
+  }
+
+  /* Loading state */
+  .loading-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary, #666);
+  }
+
+  .loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-color, #e0e0e0);
+    border-top-color: var(--accent-color, #0066cc);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   @media (max-width: 600px) {
@@ -186,16 +235,61 @@ class PreferencesView extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.formValues = { ...DEFAULTS };
+    this._unsubscribe = null;
+    this._loading = false;
+    this._saving = false;
+    this._feedback = null;
   }
 
   connectedCallback() {
-    // Load current preferences from store
-    const storedPrefs = store.get('preferences');
-    if (storedPrefs) {
-      this.formValues = { ...DEFAULTS, ...storedPrefs };
+    // Subscribe to view changes to load when becoming active
+    this._unsubscribe = store.subscribe(['currentView'], () => {
+      if (store.get('currentView') === 'preferences') {
+        this.loadPreferences();
+      }
+    });
+
+    // Initial load if we're on preferences
+    if (store.get('currentView') === 'preferences') {
+      this.loadPreferences();
+    } else {
+      // Just render with local store data
+      const storedPrefs = store.get('preferences');
+      if (storedPrefs) {
+        this.formValues = { ...DEFAULTS, ...storedPrefs };
+      }
+      this.render();
     }
+  }
+
+  disconnectedCallback() {
+    if (this._unsubscribe) {
+      this._unsubscribe();
+    }
+  }
+
+  async loadPreferences() {
+    this._loading = true;
+    this._feedback = null;
     this.render();
-    this.setupEventListeners();
+
+    try {
+      const prefs = await preferencesApi.get();
+      // Merge with defaults (API may return empty object for new users)
+      this.formValues = { ...DEFAULTS, ...prefs };
+      // Also update the store
+      store.set('preferences', this.formValues);
+    } catch (err) {
+      console.error('Failed to load preferences:', err);
+      // Fall back to local store
+      const storedPrefs = store.get('preferences');
+      if (storedPrefs) {
+        this.formValues = { ...DEFAULTS, ...storedPrefs };
+      }
+    } finally {
+      this._loading = false;
+      this.render();
+    }
   }
 
   setupEventListeners() {
@@ -233,19 +327,72 @@ class PreferencesView extends HTMLElement {
     });
   }
 
-  savePreferences() {
-    store.set('preferences', { ...this.formValues });
-    // Show feedback (could add toast notification later)
-    alert('Preferences saved!');
+  async savePreferences() {
+    if (this._saving) return;
+
+    this._saving = true;
+    this._feedback = null;
+    this.updateSaveButton();
+
+    try {
+      await preferencesApi.save(this.formValues);
+      store.set('preferences', { ...this.formValues });
+      this._feedback = { type: 'success', message: 'Preferences saved!' };
+    } catch (err) {
+      console.error('Failed to save preferences:', err);
+      this._feedback = { type: 'error', message: 'Failed to save preferences' };
+    } finally {
+      this._saving = false;
+      this.updateSaveButton();
+      this.showFeedback();
+    }
+  }
+
+  updateSaveButton() {
+    const btn = this.shadowRoot.querySelector('.save-btn');
+    if (btn) {
+      btn.disabled = this._saving;
+      btn.textContent = this._saving ? 'Saving...' : 'Save Preferences';
+    }
+  }
+
+  showFeedback() {
+    const feedbackEl = this.shadowRoot.querySelector('.save-feedback');
+    if (feedbackEl && this._feedback) {
+      feedbackEl.textContent = this._feedback.message;
+      feedbackEl.className = `save-feedback visible ${this._feedback.type}`;
+
+      // Hide after 3 seconds
+      setTimeout(() => {
+        feedbackEl.classList.remove('visible');
+      }, 3000);
+    }
   }
 
   resetToDefaults() {
     this.formValues = { ...DEFAULTS };
     store.set('preferences', { ...DEFAULTS });
     this.render();
+    // Also save to API
+    this.savePreferences();
   }
 
   render() {
+    if (this._loading) {
+      this.shadowRoot.innerHTML = `
+        <style>${styles}</style>
+        <div class="preferences-container">
+          <h1>Preferences</h1>
+          <p class="subtitle">Default settings for new workspaces</p>
+          <div class="loading-state">
+            <div class="loading-spinner"></div>
+            <p>Loading preferences...</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     const prefs = this.formValues;
 
     this.shadowRoot.innerHTML = `
@@ -327,6 +474,7 @@ class PreferencesView extends HTMLElement {
           <div class="actions">
             <button type="button" class="save-btn">Save Preferences</button>
             <button type="button" class="reset-btn">Reset to Defaults</button>
+            <span class="save-feedback"></span>
           </div>
         </form>
 

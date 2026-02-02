@@ -149,7 +149,24 @@ npm run dev      # Build with watch mode
 
 ```bash
 npm run build:website   # Build docs, blog, and playground
-npm run dev:website     # Build and serve locally
+npm run dev:website     # Build and serve locally at http://localhost:3000
+```
+
+The playground is deployed to CloudFlare Pages with KV storage for workspace persistence.
+
+**Local Development with KV Emulation:**
+
+When you run `npm run dev:website`, Wrangler automatically emulates CloudFlare KV locally:
+
+- Local data is stored in `.wrangler/state/v3/kv/`
+- Data persists between restarts
+- Completely isolated from production (local changes don't affect deployed site)
+- Start fresh by deleting the `.wrangler/` directory
+
+To test against real CloudFlare KV (requires authentication):
+
+```bash
+npx wrangler pages dev public --port 3000 --remote
 ```
 
 ### Blog
