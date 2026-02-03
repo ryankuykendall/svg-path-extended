@@ -224,18 +224,48 @@ class NewWorkspaceView extends HTMLElement {
       isPublic: false,
     };
     this.errors = {};
+
+    // Copy mode state
+    this._copyFromId = null;
+    this._loadingSource = false;
+    this._sourceWorkspace = null;
   }
 
   connectedCallback() {
     this.loadPreferences();
-    this.render();
+
+    // Check for copy mode
+    const query = store.get('routeQuery') || {};
+    if (query.copyFrom) {
+      this._copyFromId = query.copyFrom;
+      this.loadSourceWorkspace(query.copyFrom);
+    } else {
+      this.render();
+    }
+
     this.setupEventListeners();
 
     // Subscribe to route changes to reset form when navigating back
-    this._unsubscribe = store.subscribe(['currentView'], () => {
+    this._unsubscribe = store.subscribe(['currentView', 'routeQuery'], () => {
       if (store.get('currentView') === 'new-workspace') {
-        this.loadPreferences();
-        this.resetForm();
+        const newQuery = store.get('routeQuery') || {};
+        const newCopyFromId = newQuery.copyFrom || null;
+
+        // Check if we're entering copy mode or the copyFrom ID changed
+        if (newCopyFromId !== this._copyFromId) {
+          this._copyFromId = newCopyFromId;
+          this._sourceWorkspace = null;
+
+          if (newCopyFromId) {
+            this.loadSourceWorkspace(newCopyFromId);
+          } else {
+            this.loadPreferences();
+            this.resetForm();
+          }
+        } else if (!newCopyFromId) {
+          this.loadPreferences();
+          this.resetForm();
+        }
       }
     });
   }
@@ -252,7 +282,44 @@ class NewWorkspaceView extends HTMLElement {
     this.formData.height = prefs.height || 200;
   }
 
+  async loadSourceWorkspace(id) {
+    this._loadingSource = true;
+    this.render();
+
+    try {
+      const workspace = await workspaceApi.get(id);
+      this._sourceWorkspace = workspace;
+
+      // Pre-populate form with source workspace data
+      this.formData.name = `${workspace.name} (Copy)`;
+      this.formData.description = workspace.description || '';
+      this.formData.isPublic = workspace.isPublic || false;
+
+      // Use source workspace preferences for canvas size
+      if (workspace.preferences) {
+        this.formData.width = workspace.preferences.width || 200;
+        this.formData.height = workspace.preferences.height || 200;
+      }
+
+      // Clear template since we're copying code from source
+      this.formData.template = '';
+    } catch (err) {
+      console.error('Failed to load source workspace:', err);
+      this.errors.submit = `Failed to load workspace: ${err.message}`;
+      this._sourceWorkspace = null;
+    } finally {
+      this._loadingSource = false;
+      this.render();
+    }
+  }
+
   resetForm() {
+    // If in copy mode, reload source workspace instead of clearing
+    if (this._copyFromId) {
+      this.loadSourceWorkspace(this._copyFromId);
+      return;
+    }
+
     this.formData = {
       name: '',
       description: '',
@@ -262,6 +329,7 @@ class NewWorkspaceView extends HTMLElement {
       isPublic: false,
     };
     this.errors = {};
+    this._sourceWorkspace = null;
     this.render();
   }
 
@@ -278,12 +346,12 @@ class NewWorkspaceView extends HTMLElement {
       this.errors.description = 'Description must be 500 characters or less';
     }
 
-    if (this.formData.width < 50 || this.formData.width > 2000) {
-      this.errors.width = 'Width must be between 50 and 2000';
+    if (this.formData.width < 50 || this.formData.width > 20000) {
+      this.errors.width = 'Width must be between 50 and 20000';
     }
 
-    if (this.formData.height < 50 || this.formData.height > 2000) {
-      this.errors.height = 'Height must be between 50 and 2000';
+    if (this.formData.height < 50 || this.formData.height > 20000) {
+      this.errors.height = 'Height must be between 50 and 20000';
     }
 
     return Object.keys(this.errors).length === 0;
@@ -302,13 +370,20 @@ class NewWorkspaceView extends HTMLElement {
     this.render();
 
     try {
-      // Get code based on template selection (empty string if no template selected)
-      const code = this.formData.template
-        ? examples[this.formData.template]
-        : '';
+      // Get code: from source workspace if copying, otherwise from template
+      let code;
+      if (this._sourceWorkspace) {
+        code = this._sourceWorkspace.code || '';
+      } else {
+        code = this.formData.template
+          ? examples[this.formData.template]
+          : '';
+      }
 
       // Get user preferences for other settings
       const prefs = store.get('preferences') || {};
+      // If copying, merge source workspace preferences
+      const sourcePrefs = this._sourceWorkspace?.preferences || {};
 
       const workspace = await workspaceApi.create({
         name: this.formData.name.trim(),
@@ -318,14 +393,14 @@ class NewWorkspaceView extends HTMLElement {
         preferences: {
           width: this.formData.width,
           height: this.formData.height,
-          stroke: prefs.stroke || '#000000',
-          strokeWidth: prefs.strokeWidth || 2,
-          fillEnabled: prefs.fillEnabled || false,
-          fill: prefs.fill || '#3498db',
-          background: prefs.background || '#f5f5f5',
-          gridEnabled: prefs.gridEnabled !== false,
-          gridColor: prefs.gridColor || '#cccccc',
-          gridSize: prefs.gridSize || 20,
+          stroke: sourcePrefs.stroke || prefs.stroke || '#000000',
+          strokeWidth: sourcePrefs.strokeWidth ?? prefs.strokeWidth ?? 2,
+          fillEnabled: sourcePrefs.fillEnabled ?? prefs.fillEnabled ?? false,
+          fill: sourcePrefs.fill || prefs.fill || '#3498db',
+          background: sourcePrefs.background || prefs.background || '#f5f5f5',
+          gridEnabled: sourcePrefs.gridEnabled ?? prefs.gridEnabled ?? true,
+          gridColor: sourcePrefs.gridColor || prefs.gridColor || '#cccccc',
+          gridSize: sourcePrefs.gridSize ?? prefs.gridSize ?? 20,
         },
       });
 
@@ -407,17 +482,43 @@ class NewWorkspaceView extends HTMLElement {
   }
 
   render() {
+    const isCopyMode = !!this._copyFromId;
+    const isLoading = this._loadingSource;
+
+    // Show loading state while fetching source workspace
+    if (isLoading) {
+      this.shadowRoot.innerHTML = `
+        <style>${styles}</style>
+        <div class="form-container">
+          <h1>Copy Workspace</h1>
+          <p class="subtitle">Loading workspace data...</p>
+          <div style="text-align: center; padding: 2rem; color: var(--text-secondary, #666);">
+            Loading...
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     const templateOptions = Object.keys(examples).map(key => {
       const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
       return `<option value="${key}" ${this.formData.template === key ? 'selected' : ''}>${label}</option>`;
     }).join('');
 
+    const title = isCopyMode ? 'Copy Workspace' : 'New Workspace';
+    const subtitle = isCopyMode && this._sourceWorkspace
+      ? `Creating a copy of "${this.escapeHtml(this._sourceWorkspace.name)}"`
+      : 'Create a new workspace to start building SVG paths';
+    const submitText = this._isSubmitting
+      ? (isCopyMode ? 'Creating Copy...' : 'Creating...')
+      : (isCopyMode ? 'Create Copy' : 'Create Workspace');
+
     this.shadowRoot.innerHTML = `
       <style>${styles}</style>
 
       <div class="form-container">
-        <h1>New Workspace</h1>
-        <p class="subtitle">Create a new workspace to start building SVG paths</p>
+        <h1>${title}</h1>
+        <p class="subtitle">${subtitle}</p>
 
         <form>
           <div class="form-section">
@@ -462,7 +563,7 @@ class NewWorkspaceView extends HTMLElement {
                   name="width"
                   value="${this.formData.width}"
                   min="50"
-                  max="2000"
+                  max="20000"
                   class="${this.errors.width ? 'error' : ''}"
                 >
                 <span id="width-error" class="error-message">${this.errors.width || ''}</span>
@@ -476,7 +577,7 @@ class NewWorkspaceView extends HTMLElement {
                   name="height"
                   value="${this.formData.height}"
                   min="50"
-                  max="2000"
+                  max="20000"
                   class="${this.errors.height ? 'error' : ''}"
                 >
                 <span id="height-error" class="error-message">${this.errors.height || ''}</span>
@@ -484,6 +585,7 @@ class NewWorkspaceView extends HTMLElement {
             </div>
           </div>
 
+          ${!isCopyMode ? `
           <div class="form-section">
             <h2>Starting Template</h2>
 
@@ -500,6 +602,7 @@ class NewWorkspaceView extends HTMLElement {
               ${this.formData.template ? this.escapeHtml(examples[this.formData.template] || '') : ''}
             </div>
           </div>
+          ` : ''}
 
           <div class="form-section">
             <h2>Visibility</h2>
@@ -526,7 +629,7 @@ class NewWorkspaceView extends HTMLElement {
 
           <div class="actions">
             <button type="submit" class="primary-btn" ${this._isSubmitting ? 'disabled' : ''}>
-              ${this._isSubmitting ? 'Creating...' : 'Create Workspace'}
+              ${submitText}
             </button>
             <button type="button" class="secondary-btn">Cancel</button>
           </div>

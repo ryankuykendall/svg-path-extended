@@ -57,41 +57,10 @@ export class PlaygroundHeader extends HTMLElement {
     }
   }
 
-  async copyWorkspace() {
-    if (this._copying) return;
-
+  copyWorkspace() {
     const workspaceId = store.get('workspaceId');
     if (!workspaceId) return;
-
-    this._copying = true;
-    const copyBtn = this.shadowRoot.querySelector('#copy-workspace');
-    if (copyBtn) {
-      copyBtn.textContent = 'Copying...';
-      copyBtn.disabled = true;
-    }
-
-    try {
-      const newWorkspace = await workspaceApi.copy(workspaceId);
-      // Navigate to the new workspace (with slug--id format)
-      const slugId = buildWorkspaceSlugId(newWorkspace.slug, newWorkspace.id);
-      navigateTo('/workspace/:slugId', { params: { slugId } });
-    } catch (err) {
-      console.error('Failed to copy workspace:', err);
-      // Show error briefly
-      if (copyBtn) {
-        copyBtn.textContent = 'Error';
-        setTimeout(() => {
-          copyBtn.textContent = 'Copy Workspace';
-          copyBtn.disabled = false;
-        }, 2000);
-      }
-    } finally {
-      this._copying = false;
-      if (copyBtn && !copyBtn.disabled) {
-        copyBtn.textContent = 'Copy Workspace';
-        copyBtn.disabled = false;
-      }
-    }
+    navigateTo('/workspace/new', { query: { copyFrom: workspaceId } });
   }
 
   updateSaveStatus() {

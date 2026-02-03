@@ -433,14 +433,7 @@ class LandingView extends HTMLElement {
 
     switch (action) {
       case 'copy':
-        try {
-          const copied = await workspaceApi.copy(id);
-          // Reload workspaces to show the copy
-          await this.loadWorkspaces();
-        } catch (err) {
-          console.error('Failed to copy workspace:', err);
-          alert('Failed to copy workspace: ' + err.message);
-        }
+        navigateTo('/workspace/new', { query: { copyFrom: id } });
         break;
 
       case 'delete':

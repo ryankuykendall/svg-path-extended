@@ -343,24 +343,10 @@ class AppHeader extends HTMLElement {
     }
   }
 
-  async copyWorkspace() {
-    if (this._copying) return;
-
+  copyWorkspace() {
     const workspaceId = store.get('workspaceId');
     if (!workspaceId) return;
-
-    this._copying = true;
-
-    try {
-      const newWorkspace = await workspaceApi.copy(workspaceId);
-      const slugId = buildWorkspaceSlugId(newWorkspace.slug, newWorkspace.id);
-      navigateTo('/workspace/:slugId', { params: { slugId } });
-    } catch (err) {
-      console.error('Failed to copy workspace:', err);
-      this.showFeedback('Copy failed');
-    } finally {
-      this._copying = false;
-    }
+    navigateTo('/workspace/new', { query: { copyFrom: workspaceId } });
   }
 
   showFeedback(message) {

@@ -407,11 +407,11 @@ class PreferencesView extends HTMLElement {
             <h2>Canvas Size</h2>
             <div class="form-group">
               <label for="width">Width (px)</label>
-              <input type="number" id="width" name="width" value="${prefs.width}" min="50" max="2000">
+              <input type="number" id="width" name="width" value="${prefs.width}" min="50" max="20000">
             </div>
             <div class="form-group">
               <label for="height">Height (px)</label>
-              <input type="number" id="height" name="height" value="${prefs.height}" min="50" max="2000">
+              <input type="number" id="height" name="height" value="${prefs.height}" min="50" max="20000">
             </div>
           </div>
 
