@@ -436,6 +436,25 @@ class LandingView extends HTMLElement {
         navigateTo('/workspace/new', { query: { copyFrom: id } });
         break;
 
+      case 'toggle-publish':
+        try {
+          const workspaces = store.get('workspaces') || [];
+          const workspace = workspaces.find(w => w.id === id);
+          if (!workspace) return;
+
+          const newIsPublic = !workspace.isPublic;
+          await workspaceApi.update(id, { isPublic: newIsPublic });
+
+          // Update local state
+          workspace.isPublic = newIsPublic;
+          store.set('workspaces', [...workspaces]);
+          this.render();
+        } catch (err) {
+          console.error('Failed to update workspace visibility:', err);
+          alert('Failed to update visibility: ' + err.message);
+        }
+        break;
+
       case 'delete':
         if (confirm('Are you sure you want to delete this workspace? This cannot be undone.')) {
           try {
@@ -507,6 +526,7 @@ class LandingView extends HTMLElement {
               </button>
               <div class="menu-dropdown ${this._openMenuId === ws.id ? 'open' : ''}">
                 <button data-action="copy">Duplicate</button>
+                <button data-action="toggle-publish">${ws.isPublic ? 'Make Private' : 'Make Public'}</button>
                 <button data-action="delete" class="danger">Delete</button>
               </div>
               <h3>${this.escapeHtml(ws.name)}</h3>

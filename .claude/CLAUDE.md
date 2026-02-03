@@ -44,6 +44,10 @@ docs/
 └── examples.md        # Practical examples and recipes
 ```
 
+## Build Artifacts (Do Not Edit Directly)
+
+- `public/` - Generated build output; changes here will be overwritten
+
 ## Architecture
 
 - **Parser**: Parsimmon parser combinators. Operator precedence via chained expression parsers (or → and → equality → comparison → additive → multiplicative → unary → primary).
