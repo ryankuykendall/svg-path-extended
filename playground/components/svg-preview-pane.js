@@ -56,6 +56,32 @@ export class SvgPreviewPane extends HTMLElement {
     this.updateNavigatorContent();
   }
 
+  /**
+   * Set path data and measure rendering time using forced layout calculation.
+   * @param {string} value - The path data to set
+   * @returns {number} The rendering time in milliseconds
+   */
+  setPathDataWithTiming(value) {
+    store.set('pathData', value || '');
+
+    const start = performance.now();
+    this.previewPath.setAttribute('d', value || '');
+
+    // Force synchronous layout calculation
+    // getBBox() requires the browser to calculate the path geometry
+    try {
+      this.previewPath.getBBox();
+    } catch (e) {
+      // getBBox can throw if path is empty or invalid
+    }
+
+    const renderTime = performance.now() - start;
+
+    this.updateNavigatorContent();
+
+    return renderTime;
+  }
+
   // Zoom/Pan methods
   updateViewBox() {
     const width = store.get('width');

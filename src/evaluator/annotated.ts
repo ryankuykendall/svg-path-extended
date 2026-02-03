@@ -15,7 +15,7 @@ import type {
   Comment,
 } from '../parser/ast';
 import { stdlib, contextAwareFunctions } from '../stdlib';
-import { createPathContext, contextToObject, updateContextForCommand, type PathContext } from './context';
+import { createPathContext, contextToObject, updateContextForCommand, setLastTangent, type PathContext } from './context';
 
 // Types for annotated output
 export type AnnotatedLine =
@@ -241,7 +241,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       const command = isMoveTo ? 'M' : 'L';
 
       updateContextForCommand(ctx, command, [x, y]);
-      ctx.lastTangent = angle;  // Set tangent to movement direction
+      setLastTangent(ctx, angle);  // Set tangent to movement direction
       updateCtxVariable(scope);
 
       return { type: 'PathSegment' as const, value: `${command} ${x} ${y}` };
@@ -254,7 +254,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       const y = ctx.position.y + Math.sin(angle) * distance;
 
       updateContextForCommand(ctx, 'L', [x, y]);
-      ctx.lastTangent = angle;
+      setLastTangent(ctx, angle);
       updateCtxVariable(scope);
 
       return { type: 'PathSegment' as const, value: `L ${x} ${y}` };
@@ -309,7 +309,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       parseAndTrackPathString(pathStr, scope);
 
       // Store tangent for tangentLine/tangentArc
-      ctx.lastTangent = tangentAngle;
+      setLastTangent(ctx, tangentAngle);
       updateCtxVariable(scope);
 
       // Return both path and result info
@@ -365,7 +365,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       parseAndTrackPathString(pathStr, scope);
 
       // Store tangent for tangentLine/tangentArc
-      ctx.lastTangent = tangentAngle;
+      setLastTangent(ctx, tangentAngle);
       updateCtxVariable(scope);
 
       // Return both path and result info
@@ -436,7 +436,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       // Update context tracking
       parseAndTrackPathString(pathStr, scope);
 
-      ctx.lastTangent = newTangent;
+      setLastTangent(ctx, newTangent);
       updateCtxVariable(scope);
 
       // Return both path and result info

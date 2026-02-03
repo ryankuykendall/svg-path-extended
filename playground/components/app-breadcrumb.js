@@ -194,6 +194,45 @@ const styles = `
     cursor: help;
   }
 
+  .compilation-status {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    margin-right: 0.5rem;
+  }
+
+  .compilation-status.hidden {
+    display: none;
+  }
+
+  .compilation-status.compiling {
+    background: var(--info-bg, #cce5ff);
+    color: var(--info-color, #004085);
+    animation: pulse 1s infinite;
+  }
+
+  .compilation-status.rendering {
+    background: var(--warning-bg, #fff3cd);
+    color: var(--warning-color, #856404);
+    animation: pulse 0.5s infinite;
+  }
+
+  .compilation-status.completed {
+    background: var(--success-bg, #d4edda);
+    color: var(--success-color, #155724);
+  }
+
+  .compilation-status.error {
+    background: var(--error-bg, #f8d7da);
+    color: var(--error-color, #721c24);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
   /* Hide breadcrumb on landing page */
   :host(.hidden) {
     display: none;
@@ -297,7 +336,7 @@ class AppBreadcrumb extends HTMLElement {
 
     // Subscribe to route and workspace changes
     this.unsubscribe = store.subscribe(
-      ['currentView', 'routeParams', 'currentFileName', 'workspaces', 'workspaceName', 'workspaceId', 'annotatedOpen', 'consoleOpen', 'saveStatus', 'saveError'],
+      ['currentView', 'routeParams', 'currentFileName', 'workspaces', 'workspaceName', 'workspaceId', 'annotatedOpen', 'consoleOpen', 'saveStatus', 'saveError', 'compilationStatus'],
       () => this.render()
     );
   }
@@ -421,6 +460,32 @@ class AppBreadcrumb extends HTMLElement {
     return `<span class="save-status ${statusClass}" ${error ? `title="${error}"` : ''}>${statusText}</span>`;
   }
 
+  getCompilationStatusHtml() {
+    const status = store.get('compilationStatus');
+
+    let statusClass = status || 'idle';
+    let statusText = '';
+
+    switch (status) {
+      case 'compiling':
+        statusText = 'Compiling...';
+        break;
+      case 'rendering':
+        statusText = 'Rendering...';
+        break;
+      case 'completed':
+        statusText = 'Ready';
+        break;
+      case 'error':
+        statusText = 'Error';
+        break;
+      default:
+        statusClass = 'hidden';
+    }
+
+    return `<span id="compilation-status" class="compilation-status ${statusClass}">${statusText}</span>`;
+  }
+
   render() {
     const currentView = store.get('currentView');
     const config = viewConfig[currentView] || viewConfig.landing;
@@ -452,6 +517,7 @@ class AppBreadcrumb extends HTMLElement {
         ${isWorkspaceView ? `
           <div class="workspace-controls-wrapper">
             <div class="controls-left">
+              ${this.getCompilationStatusHtml()}
               <button id="annotated-toggle" class="toggle-btn ${annotatedOpen ? 'active' : ''}" title="Show annotated output">
                 <span class="toggle-icon">&#9654;</span>
                 Annotated

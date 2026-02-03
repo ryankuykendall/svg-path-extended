@@ -107,7 +107,7 @@ describe('Path Context Tracking', () => {
 
   describe('command history', () => {
     it('records commands with start and end positions', () => {
-      const result = compileWithContext('M 10 20 L 30 40');
+      const result = compileWithContext('M 10 20 L 30 40', { trackHistory: true });
       expect(result.context.commands).toHaveLength(2);
 
       // First command: M 10 20
@@ -129,7 +129,7 @@ describe('Path Context Tracking', () => {
         for (i in 1..3) {
           L calc(i * 10) calc(i * 10)
         }
-      `);
+      `, { trackHistory: true });
       expect(result.context.commands).toHaveLength(4); // M + 3 L commands
       expect(result.context.position).toEqual({ x: 30, y: 30 });
     });

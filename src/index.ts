@@ -6,7 +6,7 @@ export { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } fro
 export { stdlib } from './stdlib';
 
 export type { Program, Statement, Expression, Node, SourceLocation, Comment } from './parser/ast';
-export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart } from './evaluator';
+export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart } from './evaluator';
 export type { FormatOptions } from './evaluator/formatter';
 
 /**
@@ -57,15 +57,24 @@ export function compileAnnotated(source: string): string {
 }
 
 /**
+ * Options for compileWithContext
+ */
+export interface CompileWithContextOptions {
+  /** Whether to track command history (default: false for performance) */
+  trackHistory?: boolean;
+}
+
+/**
  * Compile extended SVG path syntax with context tracking.
  * Returns path string, final context state, and any log() outputs.
  *
  * The context tracks:
  * - `position`: Current pen position { x, y }
  * - `start`: Subpath start position (set by M, used by Z)
- * - `commands`: History of executed commands with start/end positions
+ * - `commands`: History of executed commands with start/end positions (when trackHistory: true)
  *
  * @param source - The extended SVG path source code
+ * @param options - Optional settings (trackHistory defaults to false for performance)
  * @returns Object containing path, context, and logs
  *
  * @example
@@ -84,7 +93,7 @@ export function compileAnnotated(source: string): string {
  * console.log(result.logs);     // [JSON of context at log() call]
  * ```
  */
-export function compileWithContext(source: string) {
+export function compileWithContext(source: string, options: CompileWithContextOptions = {}) {
   const ast = parse(source);
-  return evaluateWithContext(ast);
+  return evaluateWithContext(ast, options);
 }

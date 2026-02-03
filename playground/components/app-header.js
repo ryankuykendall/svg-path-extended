@@ -200,6 +200,7 @@ const styles = `
     opacity: 1;
   }
 
+
   @media (max-width: 600px) {
     .header {
       padding: 0.5rem;

@@ -27,11 +27,12 @@ export class PlaygroundHeader extends HTMLElement {
 
   subscribeToStore() {
     this._unsubscribe = store.subscribe(
-      ['annotatedOpen', 'consoleOpen', 'saveStatus', 'saveError', 'workspaceId'],
+      ['annotatedOpen', 'consoleOpen', 'saveStatus', 'saveError', 'workspaceId', 'compilationStatus'],
       () => {
         this.updateToggleStates();
         this.updateSaveStatus();
         this.updateCopyButton();
+        this.updateCompilationStatus();
       }
     );
   }
@@ -128,6 +129,40 @@ export class PlaygroundHeader extends HTMLElement {
         statusEl.textContent = error ? `Error: ${error}` : 'Save failed';
         statusEl.title = error || 'Save failed';
         break;
+      default:
+        statusEl.textContent = '';
+        statusEl.classList.add('hidden');
+    }
+  }
+
+  updateCompilationStatus() {
+    const statusEl = this.shadowRoot.querySelector('#compilation-status');
+    if (!statusEl) return;
+
+    const status = store.get('compilationStatus');
+
+    statusEl.className = `compilation-status ${status}`;
+
+    switch (status) {
+      case 'compiling':
+        statusEl.textContent = 'Compiling...';
+        statusEl.classList.remove('hidden');
+        break;
+      case 'completed':
+        statusEl.textContent = 'Ready';
+        statusEl.classList.remove('hidden');
+        // Auto-hide after a brief moment
+        setTimeout(() => {
+          if (store.get('compilationStatus') === 'completed') {
+            statusEl.classList.add('hidden');
+          }
+        }, 1500);
+        break;
+      case 'error':
+        statusEl.textContent = 'Error';
+        statusEl.classList.remove('hidden');
+        break;
+      case 'idle':
       default:
         statusEl.textContent = '';
         statusEl.classList.add('hidden');
@@ -235,6 +270,38 @@ export class PlaygroundHeader extends HTMLElement {
           cursor: help;
         }
 
+        .compilation-status {
+          font-size: 0.75rem;
+          padding: 4px 8px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+        }
+
+        .compilation-status.hidden {
+          display: none;
+        }
+
+        .compilation-status.compiling {
+          background: var(--info-bg, #cce5ff);
+          color: var(--info-color, #004085);
+          animation: pulse 1s infinite;
+        }
+
+        .compilation-status.completed {
+          background: var(--success-bg, #d4edda);
+          color: var(--success-color, #155724);
+        }
+
+        .compilation-status.error {
+          background: var(--error-bg, #f8d7da);
+          color: var(--error-color, #721c24);
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+
         .secondary-btn {
           padding: 4px 10px;
           font-size: 0.75rem;
@@ -326,6 +393,7 @@ export class PlaygroundHeader extends HTMLElement {
             Console
           </button>
           <span id="save-status" class="save-status hidden"></span>
+          <span id="compilation-status" class="compilation-status hidden"></span>
         </div>
         <div class="header-right">
           <button id="copy-url" class="secondary-btn">Copy URL</button>

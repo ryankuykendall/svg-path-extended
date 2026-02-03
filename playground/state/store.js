@@ -112,6 +112,11 @@ export const store = createStore({
   logs: [],
   error: null,
 
+  // Compilation status (for async worker)
+  compilationStatus: 'idle',    // 'idle', 'compiling', 'rendering', 'completed', 'error'
+  compilationError: null,
+  compilationId: 0,             // Tracks current compilation for staleness detection
+
   // SVG styles
   width: 200,
   height: 200,

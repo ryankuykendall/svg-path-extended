@@ -20,6 +20,7 @@ import {
   createPathContext,
   updateContextForCommand,
   contextToObject,
+  setLastTangent,
 } from './context';
 
 export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult;
@@ -579,7 +580,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       const command = isMoveTo ? 'M' : 'L';
 
       updateContextForCommand(ctx, command, [x, y]);
-      ctx.lastTangent = angle;  // Set tangent to movement direction
+      setLastTangent(ctx, angle);  // Set tangent to movement direction
       updateCtxVariable(scope);
 
       return { type: 'PathSegment' as const, value: `${command} ${x} ${y}` };
@@ -592,7 +593,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       const y = ctx.position.y + Math.sin(angle) * distance;
 
       updateContextForCommand(ctx, 'L', [x, y]);
-      ctx.lastTangent = angle;
+      setLastTangent(ctx, angle);
       updateCtxVariable(scope);
 
       return { type: 'PathSegment' as const, value: `L ${x} ${y}` };
@@ -647,7 +648,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       parseAndTrackPathString(pathStr, scope);
 
       // Store tangent for tangentLine/tangentArc
-      ctx.lastTangent = tangentAngle;
+      setLastTangent(ctx, tangentAngle);
       updateCtxVariable(scope);
 
       // Return both path and result info
@@ -703,7 +704,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       parseAndTrackPathString(pathStr, scope);
 
       // Store tangent for tangentLine/tangentArc
-      ctx.lastTangent = tangentAngle;
+      setLastTangent(ctx, tangentAngle);
       updateCtxVariable(scope);
 
       // Return both path and result info
@@ -774,7 +775,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       // Update context tracking
       parseAndTrackPathString(pathStr, scope);
 
-      ctx.lastTangent = newTangent;
+      setLastTangent(ctx, newTangent);
       updateCtxVariable(scope);
 
       // Return both path and result info
@@ -849,7 +850,11 @@ function parseAndTrackPathString(pathStr: string, scope: Scope): void {
   updateCtxVariable(scope);
 }
 
-function evaluateStatement(stmt: Statement, scope: Scope): string {
+/**
+ * Evaluate a statement, appending output to the accumulator array.
+ * Using an accumulator avoids O(n^2) string concatenation from nested joins.
+ */
+function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]): void {
   switch (stmt.type) {
     case 'LetDeclaration': {
       const value = evaluateExpression(stmt.value, scope);
@@ -857,10 +862,11 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
       if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathWithResult') {
         const pwr = value as PathWithResult;
         setVariable(scope, stmt.name, pwr.result);
-        return pwr.path;  // Emit the path
+        if (pwr.path) accum.push(pwr.path);
+        return;
       }
       setVariable(scope, stmt.name, value);
-      return '';
+      return;
     }
 
     case 'ForLoop': {
@@ -884,22 +890,21 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
         throw new Error(`for loop would run ${iterations} iterations (max ${MAX_ITERATIONS})`);
       }
 
-      const results: string[] = [];
       if (ascending) {
         for (let i = start; i <= end; i++) {
           const loopScope = createScope(scope);
           setVariable(loopScope, stmt.variable, i);
-          results.push(evaluateStatements(stmt.body, loopScope));
+          evaluateStatementsToAccum(stmt.body, loopScope, accum);
         }
       } else {
         // Descending range
         for (let i = start; i >= end; i--) {
           const loopScope = createScope(scope);
           setVariable(loopScope, stmt.variable, i);
-          results.push(evaluateStatements(stmt.body, loopScope));
+          evaluateStatementsToAccum(stmt.body, loopScope, accum);
         }
       }
-      return results.filter(Boolean).join(' ');
+      return;
     }
 
     case 'IfStatement': {
@@ -907,11 +912,11 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
       const isTruthy = typeof condition === 'number' ? condition !== 0 : Boolean(condition);
 
       if (isTruthy) {
-        return evaluateStatements(stmt.consequent, createScope(scope));
+        evaluateStatementsToAccum(stmt.consequent, createScope(scope), accum);
       } else if (stmt.alternate) {
-        return evaluateStatements(stmt.alternate, createScope(scope));
+        evaluateStatementsToAccum(stmt.alternate, createScope(scope), accum);
       }
-      return '';
+      return;
     }
 
     case 'FunctionDefinition': {
@@ -921,11 +926,14 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
         body: stmt.body,
       };
       setVariable(scope, stmt.name, fn);
-      return '';
+      return;
     }
 
-    case 'PathCommand':
-      return evaluatePathCommand(stmt, scope);
+    case 'PathCommand': {
+      const result = evaluatePathCommand(stmt, scope);
+      if (result) accum.push(result);
+      return;
+    }
 
     case 'ReturnStatement': {
       const value = evaluateExpression(stmt.value, scope);
@@ -937,15 +945,23 @@ function evaluateStatement(stmt: Statement, scope: Scope): string {
   }
 }
 
-function evaluateStatements(stmts: Statement[], scope: Scope): string {
-  const results: string[] = [];
+/**
+ * Evaluate statements, appending output to the accumulator array.
+ */
+function evaluateStatementsToAccum(stmts: Statement[], scope: Scope, accum: string[]): void {
   for (const stmt of stmts) {
-    const result = evaluateStatement(stmt, scope);
-    if (result) {
-      results.push(result);
-    }
+    evaluateStatementToAccum(stmt, scope, accum);
   }
-  return results.join(' ');
+}
+
+/**
+ * Evaluate statements and return the joined result.
+ * This is the public interface that uses the optimized accumulator internally.
+ */
+function evaluateStatements(stmts: Statement[], scope: Scope): string {
+  const accum: string[] = [];
+  evaluateStatementsToAccum(stmts, scope, accum);
+  return accum.join(' ');
 }
 
 export function evaluate(program: Program): string {
@@ -975,11 +991,19 @@ export interface EvaluateWithContextResult {
 }
 
 /**
+ * Options for evaluateWithContext
+ */
+export interface EvaluateWithContextOptions {
+  /** Whether to track command history (default: false for performance) */
+  trackHistory?: boolean;
+}
+
+/**
  * Evaluate a program with path context tracking
  * Returns the path string, final context state, and any log() outputs
  */
-export function evaluateWithContext(program: Program): EvaluateWithContextResult {
-  const pathContext = createPathContext();
+export function evaluateWithContext(program: Program, options: EvaluateWithContextOptions = {}): EvaluateWithContextResult {
+  const pathContext = createPathContext({ trackHistory: options.trackHistory ?? false });
   const logs: LogEntry[] = [];
   const evalState: EvaluationState = { pathContext, logs };
 

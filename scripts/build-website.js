@@ -107,6 +107,26 @@ async function build() {
     // Map file doesn't exist, that's fine
   }
 
+  // Copy worker file for async compilation
+  console.log('Copying worker...');
+  try {
+    await copyFile(
+      join(ROOT, 'dist', 'worker.worker.js'),
+      join(playgroundDest, 'dist', 'worker.worker.js')
+    );
+    // Also copy worker source map if it exists
+    try {
+      await copyFile(
+        join(ROOT, 'dist', 'worker.worker.js.map'),
+        join(playgroundDest, 'dist', 'worker.worker.js.map')
+      );
+    } catch (e) {
+      // Map file doesn't exist, that's fine
+    }
+  } catch (e) {
+    console.warn('  Worker file not found, skipping...');
+  }
+
   // Copy blog if it exists
   try {
     const blogSrc = join(ROOT, 'website', 'blog');

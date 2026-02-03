@@ -27,16 +27,29 @@ export interface PathContext {
   start: Point;        // Subpath start (set by M, used by Z)
   commands: CommandHistoryEntry[];
   lastTangent?: number; // Tangent angle from last arc/polar command (radians)
+  trackHistory: boolean;  // Whether to store command history (performance optimization)
+  _dirty: boolean;        // Whether context has changed since last object conversion
+  _cachedObject: Record<string, unknown> | null;  // Cached object representation
+}
+
+/**
+ * Options for creating a PathContext
+ */
+export interface PathContextOptions {
+  trackHistory?: boolean;  // Whether to track command history (default: false for performance)
 }
 
 /**
  * Create a new PathContext initialized at origin (0, 0)
  */
-export function createPathContext(): PathContext {
+export function createPathContext(options: PathContextOptions = {}): PathContext {
   return {
     position: { x: 0, y: 0 },
     start: { x: 0, y: 0 },
     commands: [],
+    trackHistory: options.trackHistory ?? false,
+    _dirty: true,
+    _cachedObject: null,
   };
 }
 
@@ -187,36 +200,63 @@ export function updateContextForCommand(
       endPos = copyPoint(ctx.position);
   }
 
-  // Record the command in history
-  ctx.commands.push({
-    command,
-    args: [...args],
-    start: startPos,
-    end: copyPoint(endPos),
-  });
+  // Record the command in history only if tracking is enabled
+  if (ctx.trackHistory) {
+    ctx.commands.push({
+      command,
+      args: [...args],
+      start: startPos,
+      end: copyPoint(endPos),
+    });
+  }
 
   // Update current position
   ctx.position = endPos;
+
+  // Mark context as dirty (needs re-conversion if accessed)
+  ctx._dirty = true;
+  ctx._cachedObject = null;
+}
+
+/**
+ * Set the lastTangent value and mark context as dirty
+ */
+export function setLastTangent(ctx: PathContext, angle: number): void {
+  ctx.lastTangent = angle;
+  ctx._dirty = true;
+  ctx._cachedObject = null;
 }
 
 /**
  * Create a plain object representation of the context for use in scope
  * This is what users will access via ctx.position.x, etc.
+ * Uses lazy conversion with caching to avoid O(n^2) behavior.
  */
 export function contextToObject(ctx: PathContext): Record<string, unknown> {
+  // Return cached object if context hasn't changed
+  if (!ctx._dirty && ctx._cachedObject) {
+    return ctx._cachedObject;
+  }
+
   const obj: Record<string, unknown> = {
     position: { x: ctx.position.x, y: ctx.position.y },
     start: { x: ctx.start.x, y: ctx.start.y },
-    commands: ctx.commands.map((cmd) => ({
+    // Only include commands if history tracking is enabled
+    commands: ctx.trackHistory ? ctx.commands.map((cmd) => ({
       command: cmd.command,
       args: [...cmd.args],
       start: { x: cmd.start.x, y: cmd.start.y },
       end: { x: cmd.end.x, y: cmd.end.y },
-    })),
+    })) : [],
   };
   // Include lastTangent if defined
   if (ctx.lastTangent !== undefined) {
     obj.lastTangent = ctx.lastTangent;
   }
+
+  // Cache the result
+  ctx._cachedObject = obj;
+  ctx._dirty = false;
+
   return obj;
 }

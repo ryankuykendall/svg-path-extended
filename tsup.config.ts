@@ -26,4 +26,11 @@ export default defineConfig([
       js: '#!/usr/bin/env node',
     },
   },
+  // Web Worker build
+  {
+    entry: ['src/worker.ts'],
+    format: ['iife'],
+    outExtension: () => ({ js: '.worker.js' }),
+    sourcemap: true,
+  },
 ]);

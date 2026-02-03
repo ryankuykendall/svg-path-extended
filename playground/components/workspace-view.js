@@ -8,6 +8,7 @@ import { workspaceApi } from '../services/api.js';
 import { autosave, SaveStatus } from '../services/autosave.js';
 import { getUserId } from '../services/user-id.js';
 import { BASE_PATH, parseWorkspaceSlugId, buildWorkspaceSlugId } from '../utils/router.js';
+import compilerWorker from '../services/compiler-worker.js';
 
 // Import all sub-components
 import './playground-main.js';
@@ -51,6 +52,8 @@ export class WorkspaceView extends HTMLElement {
     autosave.stop();
     // Clean up event listeners
     this.cleanupEventListeners();
+    // Terminate compiler worker
+    compilerWorker.terminateWorker();
   }
 
   handleRouteChange() {
@@ -377,28 +380,84 @@ export class WorkspaceView extends HTMLElement {
     }, 150);
   }
 
-  updatePreview() {
+  async updatePreview() {
     const code = store.get('code') || this.editorPane.code;
 
+    // Increment compilation ID for staleness detection
+    const compilationId = store.get('compilationId') + 1;
+    store.update({
+      compilationId,
+      compilationStatus: 'compiling',
+      compilationError: null,
+    });
+
+    // Check if this compilation is stale (newer one started)
+    const isStale = (id) => store.get('compilationId') !== id;
+
+    const compileStart = performance.now();
     try {
-      const result = window.SvgPathExtended.compileWithContext(code);
-      this.previewPane.pathData = result.path;
+      const result = await compilerWorker.compileWithContext(code, compilationId, isStale);
+      const compileTime = performance.now() - compileStart;
+      console.log(`Compile time: ${compileTime.toFixed(2)}ms`);
+
+      // Don't update if stale
+      if (isStale(compilationId)) return;
+
+      // Set rendering state before updating the SVG
+      store.set('compilationStatus', 'rendering');
+
+      // Use timing method to measure rendering
+      const renderTime = this.previewPane.setPathDataWithTiming(result.path);
+      console.log(`Render time: ${renderTime.toFixed(2)}ms`);
+
       this.consolePane.logs = result.logs || [];
       this.hideError();
+      store.update({
+        compilationStatus: 'completed',
+        compilationError: null,
+      });
+
+      // Auto-hide completion status after a brief moment
+      setTimeout(() => {
+        if (store.get('compilationStatus') === 'completed') {
+          store.set('compilationStatus', 'idle');
+        }
+      }, 1500);
     } catch (e) {
+      // Don't update if stale (unless it's not a stale error)
+      if (e.message === 'Stale result') return;
+      if (isStale(compilationId)) return;
+
       this.showError(e.message);
       this.consolePane.logs = [];
+      store.update({
+        compilationStatus: 'error',
+        compilationError: e.message,
+      });
     }
   }
 
-  updateAnnotatedOutput() {
+  async updateAnnotatedOutput() {
     if (!this.annotatedPane.isOpen) return;
 
     const code = store.get('code') || this.editorPane.code;
+    const compilationId = store.get('compilationId');
+
+    // Check if this compilation is stale
+    const isStale = (id) => store.get('compilationId') !== id;
+
     try {
-      const annotated = window.SvgPathExtended.compileAnnotated(code);
+      const annotated = await compilerWorker.compileAnnotated(code, compilationId, isStale);
+
+      // Don't update if stale
+      if (isStale(compilationId)) return;
+
       this.annotatedPane.content = annotated;
     } catch (e) {
+      // Don't update if stale
+      if (e.message === 'Stale result') return;
+      if (isStale(compilationId)) return;
+
       this.annotatedPane.content = `// Error: ${e.message}`;
     }
   }
