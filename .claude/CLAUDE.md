@@ -80,7 +80,7 @@ docs/
 ## Live Playground
 
 - Local: `open playground/index.html` (after `npm run build`)
-- Deployed: https://ryankuykendall.github.io/svg-path-extended/
+- Deployed: https://pedestal.design/svg-path-extended/
 
 ## Summary Instructions
 
