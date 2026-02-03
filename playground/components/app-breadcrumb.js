@@ -151,6 +151,35 @@ const styles = `
     color: var(--text-primary, #1a1a1a);
   }
 
+  .refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    background: transparent;
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 4px;
+    color: var(--text-secondary, #666);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .refresh-btn:hover {
+    background: var(--accent-color, #0066cc);
+    border-color: var(--accent-color, #0066cc);
+    color: white;
+  }
+
+  .refresh-btn .refresh-icon {
+    transition: transform 0.3s ease;
+  }
+
+  .refresh-btn:hover .refresh-icon {
+    transform: rotate(180deg);
+  }
+
   .copy-feedback {
     font-size: 0.75rem;
     color: var(--success-color, #28a745);
@@ -336,7 +365,7 @@ class AppBreadcrumb extends HTMLElement {
 
     // Subscribe to route and workspace changes
     this.unsubscribe = store.subscribe(
-      ['currentView', 'routeParams', 'currentFileName', 'workspaces', 'workspaceName', 'workspaceId', 'annotatedOpen', 'consoleOpen', 'saveStatus', 'saveError', 'compilationStatus'],
+      ['currentView', 'routeParams', 'currentFileName', 'workspaces', 'workspaceName', 'workspaceId', 'annotatedOpen', 'consoleOpen', 'saveStatus', 'saveError', 'compilationStatus', 'calledStdlibFunctions'],
       () => this.render()
     );
   }
@@ -493,6 +522,10 @@ class AppBreadcrumb extends HTMLElement {
     const annotatedOpen = store.get('annotatedOpen');
     const consoleOpen = store.get('consoleOpen');
 
+    // Derive usesRandom from calledStdlibFunctions
+    const calledStdlib = store.get('calledStdlibFunctions') || [];
+    const usesRandom = calledStdlib.includes('random') || calledStdlib.includes('randomRange');
+
     // Hide breadcrumb on landing page
     this.classList.toggle('hidden', !config.showBreadcrumb);
 
@@ -518,6 +551,12 @@ class AppBreadcrumb extends HTMLElement {
           <div class="workspace-controls-wrapper">
             <div class="controls-left">
               ${this.getCompilationStatusHtml()}
+              ${usesRandom ? `
+                <button id="refresh-btn" class="refresh-btn" title="Generate new random values">
+                  <span class="refresh-icon">&#8635;</span>
+                  Refresh
+                </button>
+              ` : ''}
               <button id="annotated-toggle" class="toggle-btn ${annotatedOpen ? 'active' : ''}" title="Show annotated output">
                 <span class="toggle-icon">&#9654;</span>
                 Annotated
@@ -571,6 +610,11 @@ class AppBreadcrumb extends HTMLElement {
     this.shadowRoot.querySelector('#copy-code')?.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('copy-code', { bubbles: true, composed: true }));
       this.showCopyFeedback();
+    });
+
+    // Refresh button
+    this.shadowRoot.querySelector('#refresh-btn')?.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('refresh-preview', { bubbles: true, composed: true }));
     });
   }
 

@@ -111,6 +111,7 @@ class ReturnSignal {
 export interface EvaluationState {
   pathContext: PathContext;
   logs: LogEntry[];
+  calledStdlibFunctions: Set<string>;  // Stdlib function names invoked during evaluation
 }
 
 export interface Scope {
@@ -387,6 +388,11 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
 
   // Check if it's a stdlib function
   if (typeof fn === 'function') {
+    // Track stdlib function usage
+    if (scope.evalState) {
+      scope.evalState.calledStdlibFunctions.add(call.name);
+    }
+
     const args = call.args.map((arg) => evaluateExpression(arg, scope));
     const result = (fn as (...args: number[]) => number)(...args as number[]);
 
@@ -967,7 +973,7 @@ function evaluateStatements(stmts: Statement[], scope: Scope): string {
 export function evaluate(program: Program): string {
   const pathContext = createPathContext();
   const logs: LogEntry[] = [];
-  const evalState: EvaluationState = { pathContext, logs };
+  const evalState: EvaluationState = { pathContext, logs, calledStdlibFunctions: new Set() };
 
   const scope = createScope();
   scope.evalState = evalState;
@@ -988,6 +994,7 @@ export interface EvaluateWithContextResult {
   path: string;
   context: PathContext;
   logs: LogEntry[];
+  calledStdlibFunctions: string[];  // Stdlib function names invoked during evaluation
 }
 
 /**
@@ -1005,7 +1012,8 @@ export interface EvaluateWithContextOptions {
 export function evaluateWithContext(program: Program, options: EvaluateWithContextOptions = {}): EvaluateWithContextResult {
   const pathContext = createPathContext({ trackHistory: options.trackHistory ?? false });
   const logs: LogEntry[] = [];
-  const evalState: EvaluationState = { pathContext, logs };
+  const calledStdlibFunctions = new Set<string>();
+  const evalState: EvaluationState = { pathContext, logs, calledStdlibFunctions };
 
   const scope = createScope();
   scope.evalState = evalState;
@@ -1024,6 +1032,7 @@ export function evaluateWithContext(program: Program, options: EvaluateWithConte
     path,
     context: pathContext,
     logs,
+    calledStdlibFunctions: Array.from(calledStdlibFunctions),
   };
 }
 

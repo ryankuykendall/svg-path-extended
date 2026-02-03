@@ -272,11 +272,13 @@ export class WorkspaceView extends HTMLElement {
 
   setupEventListeners() {
     // Code changes from editor
-    this.shadowRoot.addEventListener('code-change', () => {
+    this.shadowRoot.addEventListener('code-change', (e) => {
       this.debouncedUpdate();
 
+      // Get code from event detail (more reliable than store timing)
+      const code = e.detail?.code || store.get('code');
+
       // Trigger autosave
-      const code = store.get('code');
       autosave.onChange(code);
     });
 
@@ -344,6 +346,15 @@ export class WorkspaceView extends HTMLElement {
       }
     };
     document.addEventListener('keydown', this._handleKeydown);
+
+    // Refresh preview (for random functions)
+    this._handleRefreshPreview = () => {
+      if (store.get('currentView') === 'workspace') {
+        this.updatePreview();
+        this.updateAnnotatedOutput();
+      }
+    };
+    document.addEventListener('refresh-preview', this._handleRefreshPreview);
   }
 
   cleanupEventListeners() {
@@ -353,6 +364,7 @@ export class WorkspaceView extends HTMLElement {
     document.removeEventListener('toggle-annotated', this._handleToggleAnnotated);
     document.removeEventListener('toggle-console', this._handleToggleConsole);
     document.removeEventListener('keydown', this._handleKeydown);
+    document.removeEventListener('refresh-preview', this._handleRefreshPreview);
   }
 
   copyCode() {
@@ -415,6 +427,7 @@ export class WorkspaceView extends HTMLElement {
       store.update({
         compilationStatus: 'completed',
         compilationError: null,
+        calledStdlibFunctions: result.calledStdlibFunctions || [],
       });
 
       // Auto-hide completion status after a brief moment

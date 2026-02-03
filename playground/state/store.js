@@ -116,6 +116,7 @@ export const store = createStore({
   compilationStatus: 'idle',    // 'idle', 'compiling', 'rendering', 'completed', 'error'
   compilationError: null,
   compilationId: 0,             // Tracks current compilation for staleness detection
+  calledStdlibFunctions: [],    // Stdlib function names invoked during last compilation
 
   // SVG styles
   width: 200,
