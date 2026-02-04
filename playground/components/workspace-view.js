@@ -251,6 +251,20 @@ export class WorkspaceView extends HTMLElement {
       // Initialize autosave if user owns this workspace
       if (workspace.userId === userId) {
         autosave.init(workspace.id, workspace.contentHash);
+
+        // Store initial preferences state for change detection
+        autosave.setInitialPreferences({
+          width: store.get('width'),
+          height: store.get('height'),
+          stroke: store.get('stroke'),
+          strokeWidth: store.get('strokeWidth'),
+          fillEnabled: store.get('fillEnabled'),
+          fill: store.get('fill'),
+          background: store.get('background'),
+          gridEnabled: store.get('gridEnabled'),
+          gridColor: store.get('gridColor'),
+          gridSize: store.get('gridSize'),
+        });
       }
     } catch (err) {
       console.error('Failed to load workspace:', err);
@@ -285,6 +299,21 @@ export class WorkspaceView extends HTMLElement {
     // Style changes from footer
     this.shadowRoot.addEventListener('style-change', () => {
       this.previewPane.updateSvgStyles();
+
+      // Save preferences to backend
+      const preferences = {
+        width: store.get('width'),
+        height: store.get('height'),
+        stroke: store.get('stroke'),
+        strokeWidth: store.get('strokeWidth'),
+        fillEnabled: store.get('fillEnabled'),
+        fill: store.get('fill'),
+        background: store.get('background'),
+        gridEnabled: store.get('gridEnabled'),
+        gridColor: store.get('gridColor'),
+        gridSize: store.get('gridSize'),
+      };
+      autosave.onPreferencesChange(preferences);
     });
 
     // Open docs

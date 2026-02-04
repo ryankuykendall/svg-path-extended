@@ -35,6 +35,9 @@ class AutosaveManager {
     this._lastSavedHash = null;
     this._pendingCode = null;
     this._isEnabled = false;
+    // Preferences state (separate from code)
+    this._preferencesTimer = null;
+    this._lastPreferences = null;
   }
 
   // Initialize autosave for a workspace
@@ -58,6 +61,10 @@ class AutosaveManager {
     if (this._debounceTimer) {
       clearTimeout(this._debounceTimer);
       this._debounceTimer = null;
+    }
+    if (this._preferencesTimer) {
+      clearTimeout(this._preferencesTimer);
+      this._preferencesTimer = null;
     }
     this._pendingCode = null;
   }
@@ -184,6 +191,61 @@ class AutosaveManager {
     this._lastSaveTime = 0;
     await this._doSave(code, hash);
     return store.get('saveStatus') !== SaveStatus.ERROR;
+  }
+
+  // Set initial preferences state for change detection
+  setInitialPreferences(preferences) {
+    this._lastPreferences = JSON.stringify(preferences);
+  }
+
+  // Called when preferences change - triggers debounced save
+  onPreferencesChange(preferences) {
+    if (!this._isEnabled || !this._workspaceId) {
+      return;
+    }
+
+    // Clear existing timer
+    if (this._preferencesTimer) {
+      clearTimeout(this._preferencesTimer);
+    }
+
+    // Debounce preferences saves
+    this._preferencesTimer = setTimeout(() => {
+      this._savePreferences(preferences);
+    }, DEBOUNCE_MS);
+  }
+
+  // Save preferences to backend
+  async _savePreferences(preferences) {
+    if (!this._isEnabled || !this._workspaceId) {
+      return;
+    }
+
+    // Skip if preferences haven't changed
+    const prefsJson = JSON.stringify(preferences);
+    if (prefsJson === this._lastPreferences) {
+      return;
+    }
+
+    try {
+      store.set('saveStatus', SaveStatus.SAVING);
+      await workspaceApi.update(this._workspaceId, { preferences });
+      this._lastPreferences = prefsJson;
+      store.set('saveStatus', SaveStatus.SAVED);
+
+      // Auto-clear saved status after a brief moment
+      setTimeout(() => {
+        if (store.get('saveStatus') === SaveStatus.SAVED) {
+          store.set('saveStatus', SaveStatus.IDLE);
+        }
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to save preferences:', err);
+      store.update({
+        saveStatus: SaveStatus.ERROR,
+        saveError: err.message,
+      });
+    }
   }
 
   // Get current status
