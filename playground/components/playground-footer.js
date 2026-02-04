@@ -200,11 +200,11 @@ export class PlaygroundFooter extends HTMLElement {
       <div class="controls">
         <div class="control-group">
           <label for="width">Width:</label>
-          <input type="number" id="width" value="${state.width}" min="50" max="1000">
+          <input type="number" id="width" value="${state.width}" min="50" max="20000">
         </div>
         <div class="control-group">
           <label for="height">Height:</label>
-          <input type="number" id="height" value="${state.height}" min="50" max="1000">
+          <input type="number" id="height" value="${state.height}" min="50" max="20000">
         </div>
         <div class="control-group">
           <label for="stroke">Stroke:</label>
