@@ -209,6 +209,8 @@ export class PlaygroundHeader extends HTMLElement {
 
         .save-status {
           font-size: 0.75rem;
+          font-family: var(--font-mono, 'Inconsolata', monospace);
+          font-weight: 500;
           padding: 4px 8px;
           border-radius: 4px;
           transition: all 0.2s ease;
@@ -241,6 +243,8 @@ export class PlaygroundHeader extends HTMLElement {
 
         .compilation-status {
           font-size: 0.75rem;
+          font-family: var(--font-mono, 'Inconsolata', monospace);
+          font-weight: 500;
           padding: 4px 8px;
           border-radius: 4px;
           transition: all 0.2s ease;

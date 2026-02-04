@@ -4,7 +4,7 @@
 import { store } from '../state/store.js';
 
 // Base path for the playground app
-export const BASE_PATH = '/svg-path-extended';
+export const BASE_PATH = '/pathogen';
 
 // Route definitions
 // Workspace URLs use format: /workspace/slug--id (e.g., /workspace/my-project--abc123)

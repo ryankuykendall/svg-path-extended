@@ -198,7 +198,8 @@ export class AnnotatedPane extends HTMLElement {
         }
 
         #editor-container .cm-editor .cm-scroller {
-          font-family: var(--font-mono, 'SF Mono', Monaco, monospace);
+          font-family: var(--font-mono, 'Inconsolata', monospace);
+          font-weight: 500;
         }
 
         #editor-container .cm-editor.cm-focused {

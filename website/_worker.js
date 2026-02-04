@@ -1,10 +1,10 @@
 /**
  * CloudFlare Pages Worker - SPA routing + API endpoints
  *
- * Routes under /svg-path-extended/* that don't match static files
+ * Routes under /pathogen/* that don't match static files
  * are served the SPA index.html for client-side routing.
  *
- * API routes under /svg-path-extended/api/* are handled by the worker.
+ * API routes under /pathogen/api/* are handled by the worker.
  */
 
 // Nano ID implementation (URL-safe, 21 chars)
@@ -416,20 +416,20 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // API routes under /svg-path-extended/api/
-    if (path.startsWith('/svg-path-extended/api/')) {
-      const apiPath = path.replace('/svg-path-extended/api', '');
+    // API routes under /pathogen/api/
+    if (path.startsWith('/pathogen/api/')) {
+      const apiPath = path.replace('/pathogen/api', '');
       return handleApiRequest(request, env, apiPath);
     }
 
-    // SPA routes under /svg-path-extended/ that don't have file extensions
+    // SPA routes under /pathogen/ that don't have file extensions
     if (
-      path.startsWith('/svg-path-extended/') &&
-      path !== '/svg-path-extended/' &&
+      path.startsWith('/pathogen/') &&
+      path !== '/pathogen/' &&
       !/\.\w+$/.test(path)
     ) {
       // Serve the SPA index.html
-      url.pathname = '/svg-path-extended/index.html';
+      url.pathname = '/pathogen/index.html';
       return env.ASSETS.fetch(url.toString());
     }
 

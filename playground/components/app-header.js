@@ -30,22 +30,36 @@ const styles = `
   }
 
   .logo {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text-primary, #1a1a1a);
+    display: flex;
+    flex-direction: column;
     text-decoration: none;
     cursor: pointer;
-    font-family: var(--font-mono, monospace);
+    line-height: 1.1;
   }
 
-  .logo:hover {
+  .logo:hover .logo-main {
     color: var(--accent-color, #0066cc);
+  }
+
+  .logo-main {
+    font-family: 'Baumans', cursive;
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: var(--text-primary, #1a1a1a);
+    transition: color 0.15s ease;
+  }
+
+  .logo-sub {
+    font-family: var(--font-mono, 'Inconsolata', monospace);
+    font-size: 0.6rem;
+    color: var(--text-secondary, #666);
+    white-space: nowrap;
   }
 
   .version {
     font-size: 0.75rem;
     color: var(--text-secondary, #666);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono, 'Inconsolata', monospace);
   }
 
   nav {
@@ -391,8 +405,10 @@ class AppHeader extends HTMLElement {
 
       <header class="header">
         <div class="logo-section">
-          <a class="logo" data-route="/">svg-path-extended</a>
-          <span class="version">v1.0</span>
+          <a class="logo" data-route="/">
+            <span class="logo-main">Pathogen</span>
+            <span class="logo-sub">built on svg-path-extended v1.0</span>
+          </a>
         </div>
 
         <nav>

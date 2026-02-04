@@ -57,6 +57,7 @@
 
 .cm-editor .cm-scroller {
   font-family: var(--font-mono);
+  font-weight: 500;
 }
 
 .cm-editor.cm-focused {

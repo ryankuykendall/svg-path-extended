@@ -193,6 +193,8 @@ const styles = `
 
   .save-status {
     font-size: 0.75rem;
+    font-family: var(--font-mono, 'Inconsolata', monospace);
+    font-weight: 500;
     padding: 4px 8px;
     border-radius: 4px;
     transition: all 0.2s ease;
@@ -225,6 +227,8 @@ const styles = `
 
   .compilation-status {
     font-size: 0.75rem;
+    font-family: var(--font-mono, 'Inconsolata', monospace);
+    font-weight: 500;
     padding: 4px 8px;
     border-radius: 4px;
     transition: all 0.2s ease;

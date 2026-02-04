@@ -63,8 +63,8 @@ async function build() {
   await copyFile(join(ROOT, 'website', 'index.html'), join(DIST, 'index.html'));
   await copyFile(join(ROOT, 'website', '_worker.js'), join(DIST, '_worker.js'));
 
-  // Copy playground to svg-path-extended/
-  const playgroundDest = join(DIST, 'svg-path-extended');
+  // Copy playground to pathogen/
+  const playgroundDest = join(DIST, 'pathogen');
   console.log('Copying playground...');
 
   // Copy and modify playground index.html for production
@@ -73,7 +73,7 @@ async function build() {
   // This is required for SPA routing - when browser loads /svg-path-extended/workspace/new,
   // relative paths would otherwise resolve incorrectly (e.g., styles/theme.css -> /svg-path-extended/workspace/styles/theme.css)
   indexHtml = indexHtml
-    .replace('<head>', '<head>\n    <base href="/svg-path-extended/">')
+    .replace('<head>', '<head>\n    <base href="/pathogen/">')
     .replace('../dist/index.global.js', 'dist/index.global.js');
   await fs.mkdir(playgroundDest, { recursive: true });
   await fs.writeFile(join(playgroundDest, 'index.html'), indexHtml);
