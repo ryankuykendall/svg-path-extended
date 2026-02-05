@@ -100,6 +100,7 @@ export const store = createStore({
     gridEnabled: true,
     gridColor: '#cccccc',
     gridSize: 20,
+    toFixed: null,
   },
 
   // Editor
@@ -129,6 +130,7 @@ export const store = createStore({
   gridEnabled: true,
   gridColor: '#cccccc',
   gridSize: 20,
+  toFixed: null,
 
   // Zoom/pan
   zoomLevel: 1,

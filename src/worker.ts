@@ -2,11 +2,13 @@
 // Offloads interpreter execution from main thread
 
 import { compile, compileAnnotated, compileWithContext } from './index';
+import type { CompileOptions } from './index';
 
 export interface WorkerRequest {
   id: number;
   type: 'compile' | 'compileAnnotated' | 'compileWithContext';
   source: string;
+  options?: CompileOptions;
 }
 
 export interface WorkerResponse {
@@ -19,20 +21,20 @@ export interface WorkerResponse {
 
 // Handle incoming messages
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
-  const { id, type, source } = event.data;
+  const { id, type, source, options } = event.data;
 
   try {
     let result: unknown;
 
     switch (type) {
       case 'compile':
-        result = compile(source);
+        result = compile(source, options);
         break;
       case 'compileAnnotated':
         result = compileAnnotated(source);
         break;
       case 'compileWithContext':
-        result = compileWithContext(source);
+        result = compileWithContext(source, options);
         break;
       default:
         throw new Error(`Unknown compilation type: ${type}`);

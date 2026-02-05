@@ -169,6 +169,7 @@ export class WorkspaceView extends HTMLElement {
           gridEnabled: preferences.gridEnabled,
           gridColor: preferences.gridColor,
           gridSize: preferences.gridSize,
+          toFixed: preferences.toFixed ?? null,
         });
       }
     }
@@ -239,6 +240,7 @@ export class WorkspaceView extends HTMLElement {
           gridEnabled: prefs.gridEnabled ?? store.get('gridEnabled'),
           gridColor: prefs.gridColor ?? store.get('gridColor'),
           gridSize: prefs.gridSize ?? store.get('gridSize'),
+          toFixed: prefs.toFixed ?? store.get('toFixed'),
         });
       }
 
@@ -264,6 +266,7 @@ export class WorkspaceView extends HTMLElement {
           gridEnabled: store.get('gridEnabled'),
           gridColor: store.get('gridColor'),
           gridSize: store.get('gridSize'),
+          toFixed: store.get('toFixed'),
         });
       }
     } catch (err) {
@@ -312,6 +315,29 @@ export class WorkspaceView extends HTMLElement {
         gridEnabled: store.get('gridEnabled'),
         gridColor: store.get('gridColor'),
         gridSize: store.get('gridSize'),
+        toFixed: store.get('toFixed'),
+      };
+      autosave.onPreferencesChange(preferences);
+    });
+
+    // Precision changes from footer (requires recompilation)
+    this.shadowRoot.addEventListener('precision-change', () => {
+      this.updatePreview();
+      this.updateAnnotatedOutput();
+
+      // Save preferences to backend
+      const preferences = {
+        width: store.get('width'),
+        height: store.get('height'),
+        stroke: store.get('stroke'),
+        strokeWidth: store.get('strokeWidth'),
+        fillEnabled: store.get('fillEnabled'),
+        fill: store.get('fill'),
+        background: store.get('background'),
+        gridEnabled: store.get('gridEnabled'),
+        gridColor: store.get('gridColor'),
+        gridSize: store.get('gridSize'),
+        toFixed: store.get('toFixed'),
       };
       autosave.onPreferencesChange(preferences);
     });
@@ -437,7 +463,9 @@ export class WorkspaceView extends HTMLElement {
 
     const compileStart = performance.now();
     try {
-      const result = await compilerWorker.compileWithContext(code, compilationId, isStale);
+      const toFixed = store.get('toFixed');
+      const compileOptions = toFixed != null ? { toFixed } : undefined;
+      const result = await compilerWorker.compileWithContext(code, compilationId, isStale, compileOptions);
       const compileTime = performance.now() - compileStart;
       console.log(`Compile time: ${compileTime.toFixed(2)}ms`);
 

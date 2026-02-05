@@ -402,6 +402,7 @@ class NewWorkspaceView extends HTMLElement {
           gridEnabled: sourcePrefs.gridEnabled ?? prefs.gridEnabled ?? true,
           gridColor: sourcePrefs.gridColor || prefs.gridColor || '#cccccc',
           gridSize: sourcePrefs.gridSize ?? prefs.gridSize ?? 20,
+          toFixed: sourcePrefs.toFixed ?? prefs.toFixed ?? null,
         },
       });
 

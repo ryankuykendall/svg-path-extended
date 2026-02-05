@@ -316,4 +316,44 @@ describe('CLI', () => {
       unlinkSync(outputFile);
     });
   });
+
+  describe('--to-fixed option', () => {
+    it('rounds decimals with --to-fixed=2', () => {
+      const result = runCli(['-e', 'M calc(10/3) calc(20/7)', '--to-fixed=2']);
+      expect(result.stdout.trim()).toBe('M 3.33 2.86');
+      expect(result.status).toBe(0);
+    });
+
+    it('rounds to 0 places with --to-fixed=0', () => {
+      const result = runCli(['-e', 'M calc(10/3) calc(20/7)', '--to-fixed=0']);
+      expect(result.stdout.trim()).toBe('M 3 3');
+      expect(result.status).toBe(0);
+    });
+
+    it('preserves integers', () => {
+      const result = runCli(['-e', 'M 100 200', '--to-fixed=2']);
+      expect(result.stdout.trim()).toBe('M 100 200');
+      expect(result.status).toBe(0);
+    });
+
+    it('errors on invalid value', () => {
+      const result = runCli(['-e', 'M 0 0', '--to-fixed=abc']);
+      expect(result.stderr).toContain('--to-fixed must be an integer between 0 and 20');
+      expect(result.status).toBe(1);
+    });
+
+    it('works with --output-svg-file', () => {
+      const outputFile = join(TMP_DIR, 'to-fixed-output.svg');
+      if (existsSync(outputFile)) unlinkSync(outputFile);
+
+      const result = runCli(['-e', 'M calc(10/3) 0', '--to-fixed=2', `--output-svg-file=${outputFile}`]);
+      expect(result.status).toBe(0);
+      expect(existsSync(outputFile)).toBe(true);
+
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toContain('d="M 3.33 0"');
+
+      unlinkSync(outputFile);
+    });
+  });
 });

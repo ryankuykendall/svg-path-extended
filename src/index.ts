@@ -10,9 +10,18 @@ export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, Evaluat
 export type { FormatOptions } from './evaluator/formatter';
 
 /**
+ * Options for compile and compileWithContext
+ */
+export interface CompileOptions {
+  /** Fixed decimal precision for number formatting (0-20) */
+  toFixed?: number;
+}
+
+/**
  * Compile extended SVG path syntax to standard SVG path string.
  *
  * @param source - The extended SVG path source code
+ * @param options - Optional compilation options
  * @returns The compiled standard SVG path string
  *
  * @example
@@ -27,9 +36,9 @@ export type { FormatOptions } from './evaluator/formatter';
  * // => "M 100 100 A 50 50 0 1 1 200 100"
  * ```
  */
-export function compile(source: string): string {
+export function compile(source: string, options?: CompileOptions): string {
   const ast = parse(source);
-  return evaluate(ast);
+  return evaluate(ast, options);
 }
 
 /**
@@ -62,6 +71,8 @@ export function compileAnnotated(source: string): string {
 export interface CompileWithContextOptions {
   /** Whether to track command history (default: false for performance) */
   trackHistory?: boolean;
+  /** Fixed decimal precision for number formatting (0-20) */
+  toFixed?: number;
 }
 
 /**

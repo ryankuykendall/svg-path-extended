@@ -22,6 +22,7 @@ import {
   contextToObject,
   setLastTangent,
 } from './context';
+import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 
 export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult;
 
@@ -445,12 +446,12 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
 function evaluatePathArg(arg: PathArg, scope: Scope): string {
   switch (arg.type) {
     case 'NumberLiteral':
-      return String(arg.value);
+      return formatNum(arg.value);
 
     case 'Identifier': {
       const value = lookupVariable(scope, arg.name);
       if (typeof value === 'number') {
-        return String(value);
+        return formatNum(value);
       }
       if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathSegment') {
         return value.value;
@@ -463,13 +464,13 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
       if (typeof value !== 'number') {
         throw new Error('calc() must evaluate to a number');
       }
-      return String(value);
+      return formatNum(value);
     }
 
     case 'FunctionCall': {
       const value = evaluateFunctionCall(arg, scope);
       if (typeof value === 'number') {
-        return String(value);
+        return formatNum(value);
       }
       if (typeof value === 'object' && value !== null && 'type' in value) {
         if (value.type === 'PathSegment') {
@@ -486,7 +487,7 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
     case 'MemberExpression': {
       const value = evaluateMemberExpression(arg, scope);
       if (typeof value === 'number') {
-        return String(value);
+        return formatNum(value);
       }
       throw new Error(`Member expression did not evaluate to a number`);
     }
@@ -589,7 +590,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       setLastTangent(ctx, angle);  // Set tangent to movement direction
       updateCtxVariable(scope);
 
-      return { type: 'PathSegment' as const, value: `${command} ${x} ${y}` };
+      return { type: 'PathSegment' as const, value: `${command} ${formatNum(x)} ${formatNum(y)}` };
     }
 
     case 'polarLine': {
@@ -602,7 +603,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       setLastTangent(ctx, angle);
       updateCtxVariable(scope);
 
-      return { type: 'PathSegment' as const, value: `L ${x} ${y}` };
+      return { type: 'PathSegment' as const, value: `L ${formatNum(x)} ${formatNum(y)}` };
     }
 
     case 'arcFromCenter': {
@@ -644,10 +645,10 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       let pathStr: string;
       if (positionMatches) {
         // Current position is at arc start - just emit arc
-        pathStr = `A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+        pathStr = `A ${formatNum(radius)} ${formatNum(radius)} 0 ${largeArc} ${sweep} ${formatNum(endX)} ${formatNum(endY)}`;
       } else {
         // Position mismatch - draw line to arc start, then arc (keeps path continuous)
-        pathStr = `L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+        pathStr = `L ${formatNum(startX)} ${formatNum(startY)} A ${formatNum(radius)} ${formatNum(radius)} 0 ${largeArc} ${sweep} ${formatNum(endX)} ${formatNum(endY)}`;
       }
 
       // Update context tracking
@@ -704,7 +705,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       const tangentAngle = angleOfArc > 0 ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
 
       // No M or L command - current position is guaranteed on circle
-      const pathStr = `A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+      const pathStr = `A ${formatNum(radius)} ${formatNum(radius)} 0 ${largeArc} ${sweep} ${formatNum(endX)} ${formatNum(endY)}`;
 
       // Update context tracking
       parseAndTrackPathString(pathStr, scope);
@@ -742,7 +743,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       // lastTangent stays the same (continuing in same direction)
       updateCtxVariable(scope);
 
-      return { type: 'PathSegment' as const, value: `L ${x} ${y}` };
+      return { type: 'PathSegment' as const, value: `L ${formatNum(x)} ${formatNum(y)}` };
     }
 
     case 'tangentArc': {
@@ -776,7 +777,7 @@ function evaluateContextAwareFunction(name: string, args: Value[], scope: Scope)
       const newTangent = sweepAngle >= 0 ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
 
       // Generate path string
-      const pathStr = `A ${radius} ${radius} 0 ${largeArc} ${sweep} ${endX} ${endY}`;
+      const pathStr = `A ${formatNum(radius)} ${formatNum(radius)} 0 ${largeArc} ${sweep} ${formatNum(endX)} ${formatNum(endY)}`;
 
       // Update context tracking
       parseAndTrackPathString(pathStr, scope);
@@ -970,21 +971,26 @@ function evaluateStatements(stmts: Statement[], scope: Scope): string {
   return accum.join(' ');
 }
 
-export function evaluate(program: Program): string {
-  const pathContext = createPathContext();
-  const logs: LogEntry[] = [];
-  const evalState: EvaluationState = { pathContext, logs, calledStdlibFunctions: new Set() };
+export function evaluate(program: Program, options?: { toFixed?: number }): string {
+  setNumberFormat(options?.toFixed);
+  try {
+    const pathContext = createPathContext();
+    const logs: LogEntry[] = [];
+    const evalState: EvaluationState = { pathContext, logs, calledStdlibFunctions: new Set() };
 
-  const scope = createScope();
-  scope.evalState = evalState;
+    const scope = createScope();
+    scope.evalState = evalState;
 
-  // Initialize ctx variable
-  scope.variables.set('ctx', {
-    type: 'ContextObject' as const,
-    value: contextToObject(pathContext),
-  });
+    // Initialize ctx variable
+    scope.variables.set('ctx', {
+      type: 'ContextObject' as const,
+      value: contextToObject(pathContext),
+    });
 
-  return evaluateStatements(program.body, scope);
+    return evaluateStatements(program.body, scope);
+  } finally {
+    resetNumberFormat();
+  }
 }
 
 /**
@@ -1003,6 +1009,8 @@ export interface EvaluateWithContextResult {
 export interface EvaluateWithContextOptions {
   /** Whether to track command history (default: false for performance) */
   trackHistory?: boolean;
+  /** Fixed decimal precision for number formatting */
+  toFixed?: number;
 }
 
 /**
@@ -1010,30 +1018,35 @@ export interface EvaluateWithContextOptions {
  * Returns the path string, final context state, and any log() outputs
  */
 export function evaluateWithContext(program: Program, options: EvaluateWithContextOptions = {}): EvaluateWithContextResult {
-  const pathContext = createPathContext({ trackHistory: options.trackHistory ?? false });
-  const logs: LogEntry[] = [];
-  const calledStdlibFunctions = new Set<string>();
-  const evalState: EvaluationState = { pathContext, logs, calledStdlibFunctions };
+  setNumberFormat(options.toFixed);
+  try {
+    const pathContext = createPathContext({ trackHistory: options.trackHistory ?? false });
+    const logs: LogEntry[] = [];
+    const calledStdlibFunctions = new Set<string>();
+    const evalState: EvaluationState = { pathContext, logs, calledStdlibFunctions };
 
-  const scope = createScope();
-  scope.evalState = evalState;
+    const scope = createScope();
+    scope.evalState = evalState;
 
-  // Initialize ctx variable
-  scope.variables.set('ctx', {
-    type: 'ContextObject' as const,
-    value: contextToObject(pathContext),
-  });
+    // Initialize ctx variable
+    scope.variables.set('ctx', {
+      type: 'ContextObject' as const,
+      value: contextToObject(pathContext),
+    });
 
-  // Note: log() is handled specially in evaluateFunctionCall, not registered here
+    // Note: log() is handled specially in evaluateFunctionCall, not registered here
 
-  const path = evaluateStatements(program.body, scope);
+    const path = evaluateStatements(program.body, scope);
 
-  return {
-    path,
-    context: pathContext,
-    logs,
-    calledStdlibFunctions: Array.from(calledStdlibFunctions),
-  };
+    return {
+      path,
+      context: pathContext,
+      logs,
+      calledStdlibFunctions: Array.from(calledStdlibFunctions),
+    };
+  } finally {
+    resetNumberFormat();
+  }
 }
 
 // Re-export types from context module

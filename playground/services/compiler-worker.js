@@ -76,14 +76,15 @@ export function terminateWorker() {
  * @param {string} source - The source code to compile
  * @param {number} compilationId - The compilation ID to check for staleness
  * @param {function} isStale - Function to check if this request is stale
+ * @param {object} [options] - Compilation options (e.g. { toFixed: 2 })
  * @returns {Promise<any>} The compilation result
  */
-async function sendRequest(type, source, compilationId, isStale) {
+async function sendRequest(type, source, compilationId, isStale, options) {
   const w = initWorker();
 
   // Fall back to sync if worker unavailable
   if (!w) {
-    return fallbackSync(type, source);
+    return fallbackSync(type, source, options);
   }
 
   const id = ++requestId;
@@ -102,25 +103,25 @@ async function sendRequest(type, source, compilationId, isStale) {
       compilationId,
     });
 
-    w.postMessage({ id, type, source });
+    w.postMessage({ id, type, source, options });
   });
 }
 
 /**
  * Fallback to synchronous compilation using the global library
  */
-function fallbackSync(type, source) {
+function fallbackSync(type, source, options) {
   if (!window.SvgPathExtended) {
     throw new Error('SvgPathExtended library not loaded');
   }
 
   switch (type) {
     case 'compile':
-      return window.SvgPathExtended.compile(source);
+      return window.SvgPathExtended.compile(source, options);
     case 'compileAnnotated':
       return window.SvgPathExtended.compileAnnotated(source);
     case 'compileWithContext':
-      return window.SvgPathExtended.compileWithContext(source);
+      return window.SvgPathExtended.compileWithContext(source, options);
     default:
       throw new Error(`Unknown compilation type: ${type}`);
   }
@@ -131,10 +132,11 @@ function fallbackSync(type, source) {
  * @param {string} source - The source code
  * @param {number} compilationId - Current compilation ID
  * @param {function} isStale - Function to check staleness
+ * @param {object} [options] - Compilation options (e.g. { toFixed: 2 })
  * @returns {Promise<string>}
  */
-export function compile(source, compilationId, isStale) {
-  return sendRequest('compile', source, compilationId, isStale);
+export function compile(source, compilationId, isStale, options) {
+  return sendRequest('compile', source, compilationId, isStale, options);
 }
 
 /**
@@ -153,10 +155,11 @@ export function compileAnnotated(source, compilationId, isStale) {
  * @param {string} source - The source code
  * @param {number} compilationId - Current compilation ID
  * @param {function} isStale - Function to check staleness
+ * @param {object} [options] - Compilation options (e.g. { toFixed: 2 })
  * @returns {Promise<{path: string, context: object, logs: array}>}
  */
-export function compileWithContext(source, compilationId, isStale) {
-  return sendRequest('compileWithContext', source, compilationId, isStale);
+export function compileWithContext(source, compilationId, isStale, options) {
+  return sendRequest('compileWithContext', source, compilationId, isStale, options);
 }
 
 /**

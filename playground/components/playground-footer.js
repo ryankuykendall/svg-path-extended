@@ -16,7 +16,7 @@ export class PlaygroundFooter extends HTMLElement {
 
   subscribeToStore() {
     // Subscribe to relevant state changes
-    store.subscribe(['width', 'height', 'stroke', 'strokeWidth', 'fillEnabled', 'fill', 'background', 'gridEnabled', 'gridColor', 'gridSize'], () => {
+    store.subscribe(['width', 'height', 'stroke', 'strokeWidth', 'fillEnabled', 'fill', 'background', 'gridEnabled', 'gridColor', 'gridSize', 'toFixed'], () => {
       this.syncFromStore();
     });
   }
@@ -36,6 +36,7 @@ export class PlaygroundFooter extends HTMLElement {
     root.querySelector('#grid-enabled').checked = state.gridEnabled;
     root.querySelector('#grid-color').value = state.gridColor;
     root.querySelector('#grid-size').value = state.gridSize;
+    root.querySelector('#to-fixed').value = state.toFixed != null ? String(state.toFixed) : '';
   }
 
   setupEventListeners() {
@@ -95,6 +96,17 @@ export class PlaygroundFooter extends HTMLElement {
     root.querySelector('#grid-size').addEventListener('change', (e) => {
       store.set('gridSize', e.target.value);
       this.dispatchStyleChange();
+    });
+
+    // Precision (toFixed)
+    root.querySelector('#to-fixed').addEventListener('change', (e) => {
+      const val = e.target.value;
+      store.set('toFixed', val === '' ? null : parseInt(val, 10));
+      this.dispatchEvent(new CustomEvent('precision-change', {
+        bubbles: true,
+        composed: true,
+        detail: store.getAll()
+      }));
     });
 
     // Docs button
@@ -340,6 +352,20 @@ export class PlaygroundFooter extends HTMLElement {
             <option value="25" ${state.gridSize == 25 ? 'selected' : ''}>25px</option>
             <option value="50" ${state.gridSize == 50 ? 'selected' : ''}>50px</option>
             <option value="100" ${state.gridSize == 100 ? 'selected' : ''}>100px</option>
+          </select>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="control-group">
+          <label for="to-fixed">Precision</label>
+          <select id="to-fixed">
+            <option value="" ${state.toFixed == null ? 'selected' : ''}>Off</option>
+            <option value="0" ${state.toFixed === 0 ? 'selected' : ''}>0</option>
+            <option value="1" ${state.toFixed === 1 ? 'selected' : ''}>1</option>
+            <option value="2" ${state.toFixed === 2 ? 'selected' : ''}>2</option>
+            <option value="3" ${state.toFixed === 3 ? 'selected' : ''}>3</option>
+            <option value="4" ${state.toFixed === 4 ? 'selected' : ''}>4</option>
           </select>
         </div>
 

@@ -764,4 +764,47 @@ describe('Evaluator', () => {
       expect(result).toBe('M 3 0');
     });
   });
+
+  describe('toFixed option', () => {
+    it('rounds decimals to specified precision', () => {
+      expect(compile('M calc(10/3) calc(20/7)', { toFixed: 2 })).toBe('M 3.33 2.86');
+    });
+
+    it('rounds to 0 decimal places', () => {
+      expect(compile('M calc(10/3) calc(20/7)', { toFixed: 0 })).toBe('M 3 3');
+    });
+
+    it('rounds to 4 decimal places', () => {
+      expect(compile('M calc(10/3) 0', { toFixed: 4 })).toBe('M 3.3333 0');
+    });
+
+    it('does not modify integers', () => {
+      expect(compile('M 100 200', { toFixed: 2 })).toBe('M 100 200');
+    });
+
+    it('preserves arc flags as integers', () => {
+      expect(compile('A 25 25 0 1 1 50 50', { toFixed: 2 })).toBe('A 25 25 0 1 1 50 50');
+    });
+
+    it('handles negative decimals', () => {
+      expect(compile('M calc(-10/3) calc(-20/7)', { toFixed: 2 })).toBe('M -3.33 -2.86');
+    });
+
+    it('does not round when option not provided', () => {
+      const result = compile('M calc(10/3) 0');
+      expect(result).toBe(`M ${10/3} 0`);
+    });
+
+    it('works with stdlib functions', () => {
+      const result = compile('circle(100, 100, calc(100/3))', { toFixed: 2 });
+      // All decimals should have at most 2 decimal places
+      const numbers = result.match(/-?\d+\.?\d*/g) || [];
+      for (const num of numbers) {
+        if (num.includes('.')) {
+          const decimals = num.split('.')[1];
+          expect(decimals.length).toBeLessThanOrEqual(2);
+        }
+      }
+    });
+  });
 });

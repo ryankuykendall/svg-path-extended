@@ -10,6 +10,7 @@ interface CliOptions {
   fill?: string;
   strokeWidth?: string;
   annotated?: boolean;
+  toFixed?: number;
 }
 
 function printUsage() {
@@ -35,6 +36,7 @@ Options:
   --stroke=<color>               Path stroke color (default: "#000")
   --fill=<color>                 Path fill color (default: "none")
   --stroke-width=<w>             Path stroke width (default: "2")
+  --to-fixed=<N>                 Round decimals to N digits (0-20)
 
 Examples:
   svg-path-extended input.svgx
@@ -154,6 +156,18 @@ function parseArgs(args: string[]): { source: string; options: CliOptions; outpu
       continue;
     }
 
+    if (arg.startsWith('--to-fixed=')) {
+      const val = arg.split('=')[1];
+      const n = parseInt(val, 10);
+      if (isNaN(n) || n < 0 || n > 20) {
+        console.error('Error: --to-fixed must be an integer between 0 and 20');
+        process.exit(1);
+      }
+      options.toFixed = n;
+      i++;
+      continue;
+    }
+
     // If not a flag, treat as input file or stdin
     if (arg === '-') {
       source = readFileSync(0, 'utf-8');
@@ -201,7 +215,8 @@ function main() {
       return;
     }
 
-    const pathData = compile(source);
+    const compileOptions = options.toFixed != null ? { toFixed: options.toFixed } : undefined;
+    const pathData = compile(source, compileOptions);
 
     // Output as SVG file
     if (options.svgOutput) {
