@@ -2,12 +2,13 @@
 
 body {
   font-family: var(--font-sans);
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   color: var(--text-primary);
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  line-height: 1.5;
 }
 
 main {
@@ -32,56 +33,119 @@ select, input, button {
 }
 
 select {
-  padding: 6px 12px;
+  padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-primary);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   cursor: pointer;
+  transition: all var(--transition-base, 0.15s ease);
+}
+
+select:hover {
+  border-color: var(--border-strong);
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+input[type="text"],
+input[type="number"] {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: all var(--transition-base, 0.15s ease);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 input[type="number"] {
   width: 70px;
-  padding: 6px 8px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
 }
 
 input[type="color"] {
-  width: 36px;
-  height: 30px;
-  padding: 2px;
+  width: 40px;
+  height: 36px;
+  padding: 4px;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary);
   cursor: pointer;
+  transition: all var(--transition-base, 0.15s ease);
+}
+
+input[type="color"]:hover {
+  border-color: var(--border-strong);
+}
+
+input[type="color"]:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   cursor: pointer;
+  accent-color: var(--accent-color);
 }
 
 button {
-  padding: 6px 16px;
+  padding: 0.5rem 1rem;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-primary);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all var(--transition-base, 0.15s ease);
 }
 
-button:hover {
-  background: var(--bg-secondary);
+button:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--border-strong);
+}
+
+button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 button.primary {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-text, #ffffff);
   border-color: var(--accent-color);
 }
 
-button.primary:hover {
-  background: #0052a3;
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--accent-subtle);
 }
 
 .spacer {
@@ -95,8 +159,35 @@ button.primary:hover {
 .links a {
   color: var(--accent-color);
   text-decoration: none;
+  transition: color var(--transition-base, 0.15s ease);
 }
 
 .links a:hover {
+  color: var(--accent-hover);
   text-decoration: underline;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full, 9999px);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) var(--bg-tertiary);
 }

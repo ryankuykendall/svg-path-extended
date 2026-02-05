@@ -183,37 +183,38 @@ export class PlaygroundHeader extends HTMLElement {
       <style>
         :host {
           display: block;
-          background: var(--bg-primary, #ffffff);
-          border-bottom: 1px solid var(--border-color, #ddd);
-          padding: 8px 16px;
+          background: var(--bg-secondary, #ffffff);
+          border-bottom: 1px solid var(--border-color, #e2e8f0);
+          padding: 0.5rem 1rem;
         }
 
         .header-content {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 0.75rem;
         }
 
         .header-left {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 0.5rem;
         }
 
         .header-right {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 0.5rem;
         }
 
         .save-status {
-          font-size: 0.75rem;
+          font-size: 0.6875rem;
           font-family: var(--font-mono, 'Inconsolata', monospace);
-          font-weight: 500;
-          padding: 4px 8px;
-          border-radius: 4px;
-          transition: all 0.2s ease;
+          font-weight: 600;
+          padding: 0.25rem 0.5rem;
+          border-radius: var(--radius-sm, 4px);
+          transition: all var(--transition-base, 0.15s ease);
+          border: 1px solid transparent;
         }
 
         .save-status.hidden {
@@ -221,33 +222,38 @@ export class PlaygroundHeader extends HTMLElement {
         }
 
         .save-status.modified {
-          background: var(--warning-bg, #fff3cd);
-          color: var(--warning-color, #856404);
+          background: var(--warning-bg, #fffbeb);
+          color: var(--warning-color, #f59e0b);
+          border-color: var(--warning-border, #fde68a);
         }
 
         .save-status.saving {
-          background: var(--info-bg, #cce5ff);
-          color: var(--info-color, #004085);
+          background: var(--info-bg, #eff6ff);
+          color: var(--info-color, #3b82f6);
+          border-color: var(--info-border, #bfdbfe);
         }
 
         .save-status.saved {
-          background: var(--success-bg, #d4edda);
-          color: var(--success-color, #155724);
+          background: var(--success-bg, #ecfdf5);
+          color: var(--success-color, #10b981);
+          border-color: var(--success-border, #a7f3d0);
         }
 
         .save-status.error {
-          background: var(--error-bg, #f8d7da);
-          color: var(--error-color, #721c24);
+          background: var(--error-bg, #fef2f2);
+          color: var(--error-color, #ef4444);
+          border-color: var(--error-border, #fecaca);
           cursor: help;
         }
 
         .compilation-status {
-          font-size: 0.75rem;
+          font-size: 0.6875rem;
           font-family: var(--font-mono, 'Inconsolata', monospace);
-          font-weight: 500;
-          padding: 4px 8px;
-          border-radius: 4px;
-          transition: all 0.2s ease;
+          font-weight: 600;
+          padding: 0.25rem 0.5rem;
+          border-radius: var(--radius-sm, 4px);
+          transition: all var(--transition-base, 0.15s ease);
+          border: 1px solid transparent;
         }
 
         .compilation-status.hidden {
@@ -255,19 +261,22 @@ export class PlaygroundHeader extends HTMLElement {
         }
 
         .compilation-status.compiling {
-          background: var(--info-bg, #cce5ff);
-          color: var(--info-color, #004085);
+          background: var(--info-bg, #eff6ff);
+          color: var(--info-color, #3b82f6);
+          border-color: var(--info-border, #bfdbfe);
           animation: pulse 1s infinite;
         }
 
         .compilation-status.completed {
-          background: var(--success-bg, #d4edda);
-          color: var(--success-color, #155724);
+          background: var(--success-bg, #ecfdf5);
+          color: var(--success-color, #10b981);
+          border-color: var(--success-border, #a7f3d0);
         }
 
         .compilation-status.error {
-          background: var(--error-bg, #f8d7da);
-          color: var(--error-color, #721c24);
+          background: var(--error-bg, #fef2f2);
+          color: var(--error-color, #ef4444);
+          border-color: var(--error-border, #fecaca);
         }
 
         @keyframes pulse {
@@ -276,56 +285,60 @@ export class PlaygroundHeader extends HTMLElement {
         }
 
         .secondary-btn {
-          padding: 4px 10px;
+          padding: 0.375rem 0.75rem;
           font-size: 0.75rem;
           font-family: inherit;
-          background: transparent;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          color: var(--text-secondary, #666);
+          font-weight: 500;
+          background: var(--bg-secondary, #ffffff);
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
+          color: var(--text-secondary, #64748b);
           cursor: pointer;
-          transition: all 0.15s;
+          transition: all var(--transition-base, 0.15s ease);
         }
 
         .secondary-btn:hover:not(:disabled) {
-          background: var(--bg-secondary, #f5f5f5);
-          color: var(--text-primary, #1a1a1a);
+          background: var(--hover-bg, rgba(0, 0, 0, 0.04));
+          border-color: var(--border-strong, #cbd5e1);
+          color: var(--text-primary, #1a1a2e);
         }
 
         .secondary-btn:disabled {
-          opacity: 0.6;
+          opacity: 0.5;
           cursor: not-allowed;
         }
 
         .toggle-btn {
           display: flex;
           align-items: center;
-          gap: 4px;
-          padding: 4px 10px;
+          gap: 0.25rem;
+          padding: 0.375rem 0.75rem;
           font-size: 0.75rem;
           font-family: inherit;
-          background: transparent;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          color: var(--text-secondary, #666);
+          font-weight: 500;
+          background: var(--bg-secondary, #ffffff);
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
+          color: var(--text-secondary, #64748b);
           cursor: pointer;
-          transition: all 0.15s;
+          transition: all var(--transition-base, 0.15s ease);
         }
 
         .toggle-btn:hover {
-          background: var(--bg-secondary, #f5f5f5);
-          color: var(--text-primary, #1a1a1a);
+          background: var(--hover-bg, rgba(0, 0, 0, 0.04));
+          border-color: var(--border-strong, #cbd5e1);
+          color: var(--text-primary, #1a1a2e);
         }
 
         .toggle-btn.active {
-          background: var(--accent-color, #0066cc);
-          border-color: var(--accent-color, #0066cc);
-          color: white;
+          background: var(--accent-color, #10b981);
+          border-color: var(--accent-color, #10b981);
+          color: var(--accent-text, #ffffff);
         }
 
         .toggle-icon {
-          font-size: 0.875rem;
-          transition: transform 0.2s;
+          font-size: 0.75rem;
+          transition: transform var(--transition-base, 0.15s ease);
         }
 
         .toggle-btn.active .toggle-icon {
@@ -334,9 +347,10 @@ export class PlaygroundHeader extends HTMLElement {
 
         #copy-feedback {
           font-size: 0.75rem;
-          color: var(--success-color, #28a745);
+          font-weight: 500;
+          color: var(--success-color, #10b981);
           opacity: 0;
-          transition: opacity 0.2s;
+          transition: opacity var(--transition-base, 0.15s ease);
         }
 
         #copy-feedback.visible {

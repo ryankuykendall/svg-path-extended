@@ -103,7 +103,7 @@ const styles = `
   .save-btn {
     padding: 0.625rem 1.5rem;
     background: var(--accent-color, #0066cc);
-    color: white;
+    color: var(--accent-text, #ffffff);
     border: none;
     border-radius: 4px;
     font-size: 0.875rem;

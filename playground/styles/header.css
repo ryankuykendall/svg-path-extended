@@ -98,7 +98,7 @@ h1 code {
 .toggle-btn.active {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: white;
+  color: var(--accent-text, #ffffff);
 }
 
 .toggle-btn .toggle-icon {

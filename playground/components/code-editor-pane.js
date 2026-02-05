@@ -2,6 +2,7 @@
 
 import { store } from '../state/store.js';
 import { svgPathCompletions } from '../utils/codemirror-setup.js';
+import { themeManager } from '../utils/theme.js';
 
 export class CodeEditorPane extends HTMLElement {
   constructor() {
@@ -10,11 +11,20 @@ export class CodeEditorPane extends HTMLElement {
     this._editor = null;
     this._cmModules = null;
     this._initialCode = '';
+    this._themeCompartment = null;
+    this._highlightCompartment = null;
+    this._themeUnsubscribe = null;
   }
 
   connectedCallback() {
     this.render();
     this.loadCodeMirror();
+  }
+
+  disconnectedCallback() {
+    if (this._themeUnsubscribe) {
+      this._themeUnsubscribe();
+    }
   }
 
   set initialCode(code) {
@@ -52,19 +62,36 @@ export class CodeEditorPane extends HTMLElement {
     if (this._cmModules) return;
 
     try {
-      const [state, view, commands, language, langJs, autocomplete] = await Promise.all([
+      const [state, view, commands, language, langJs, autocomplete, oneDark] = await Promise.all([
         import('https://esm.sh/@codemirror/state@6'),
         import('https://esm.sh/@codemirror/view@6'),
         import('https://esm.sh/@codemirror/commands@6'),
         import('https://esm.sh/@codemirror/language@6'),
         import('https://esm.sh/@codemirror/lang-javascript@6'),
         import('https://esm.sh/@codemirror/autocomplete@6'),
+        import('https://esm.sh/@codemirror/theme-one-dark@6'),
       ]);
 
-      this._cmModules = { state, view, commands, language, langJs, autocomplete };
+      this._cmModules = { state, view, commands, language, langJs, autocomplete, oneDark };
       this.createEditor();
     } catch (err) {
       console.error('Failed to load CodeMirror:', err);
+    }
+  }
+
+  _getThemeExtensions() {
+    const { language, oneDark } = this._cmModules;
+    const isDark = themeManager.getActiveTheme() === 'dark';
+
+    if (isDark) {
+      return [
+        oneDark.oneDarkTheme,
+        language.syntaxHighlighting(oneDark.oneDarkHighlightStyle),
+      ];
+    } else {
+      return [
+        language.syntaxHighlighting(language.defaultHighlightStyle),
+      ];
     }
   }
 
@@ -73,6 +100,9 @@ export class CodeEditorPane extends HTMLElement {
     if (!container || !this._cmModules) return;
 
     const { state, view, commands, language, langJs, autocomplete } = this._cmModules;
+
+    // Create compartments for dynamic theme swapping
+    this._themeCompartment = new state.Compartment();
 
     const updateExtension = view.EditorView.updateListener.of((update) => {
       if (update.docChanged) {
@@ -98,7 +128,7 @@ export class CodeEditorPane extends HTMLElement {
         view.highlightActiveLine(),
         language.indentOnInput(),
         language.bracketMatching(),
-        language.syntaxHighlighting(language.defaultHighlightStyle),
+        this._themeCompartment.of(this._getThemeExtensions()),
         langJs.javascript(),
         view.keymap.of([
           ...commands.defaultKeymap,
@@ -119,6 +149,11 @@ export class CodeEditorPane extends HTMLElement {
       parent: container,
     });
 
+    // Listen for theme changes and swap editor theme
+    this._themeUnsubscribe = themeManager.subscribe(() => {
+      this._updateEditorTheme();
+    });
+
     // Focus the editor
     this._editor.focus();
 
@@ -126,6 +161,14 @@ export class CodeEditorPane extends HTMLElement {
       bubbles: true,
       composed: true
     }));
+  }
+
+  _updateEditorTheme() {
+    if (!this._editor || !this._themeCompartment) return;
+
+    this._editor.dispatch({
+      effects: this._themeCompartment.reconfigure(this._getThemeExtensions()),
+    });
   }
 
   render() {
@@ -136,14 +179,15 @@ export class CodeEditorPane extends HTMLElement {
           display: flex;
           flex-direction: column;
           min-width: 0;
-          border-right: 1px solid var(--border-color, #ddd);
+          border-right: 1px solid var(--border-color, #e2e8f0);
           position: relative;
+          background: var(--bg-secondary, #ffffff);
         }
 
         @media (max-width: 800px) {
           :host {
             border-right: none;
-            border-bottom: 1px solid var(--border-color, #ddd);
+            border-bottom: 1px solid var(--border-color, #e2e8f0);
             min-height: 300px;
           }
         }
@@ -153,7 +197,7 @@ export class CodeEditorPane extends HTMLElement {
           overflow: auto;
         }
 
-        /* CodeMirror styles */
+        /* CodeMirror base styles */
         #editor-container .cm-editor {
           height: 100%;
           font-size: 14px;

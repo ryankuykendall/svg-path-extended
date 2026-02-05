@@ -5,8 +5,8 @@
 :root {
   --view-padding: 2rem;
   --view-max-width: 1200px;
-  --card-radius: 8px;
-  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --card-radius: var(--radius-lg, 12px);
+  --card-shadow: var(--shadow-md);
 }
 
 /* Landing View */
@@ -23,6 +23,13 @@ preferences-view {
 /* Docs View */
 docs-view {
   --docs-max-width: 800px;
+  --code-bg: var(--bg-tertiary);
+  --code-text: var(--text-primary);
+}
+
+/* Dark mode code blocks */
+[data-theme="dark"] docs-view,
+[data-active-theme="dark"] docs-view {
   --code-bg: #1e1e1e;
   --code-text: #d4d4d4;
 }
@@ -36,7 +43,7 @@ storybook-view {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -48,8 +55,10 @@ storybook-view {
 landing-view.active,
 preferences-view.active,
 docs-view.active,
-storybook-view.active {
-  animation: fadeIn 0.2s ease-out;
+storybook-view.active,
+blog-view.active,
+new-workspace-view.active {
+  animation: fadeIn 0.25s ease-out;
 }
 
 /* Responsive adjustments */
@@ -85,58 +94,55 @@ storybook-view.active {
   }
 }
 
-/* Dark mode support (future) */
-@media (prefers-color-scheme: dark) {
-  docs-view {
-    --code-bg: #1e1e1e;
-    --code-text: #d4d4d4;
-  }
-}
-
 /* Focus visible for keyboard navigation */
 landing-view .workspace-item:focus-visible,
 preferences-view input:focus-visible,
 preferences-view button:focus-visible,
 docs-view a:focus-visible,
 storybook-view button:focus-visible {
-  outline: 2px solid var(--accent-color, #0066cc);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 /* Scrollbar styling for views */
 landing-view,
 preferences-view,
 docs-view,
-storybook-view {
+storybook-view,
+blog-view {
   scrollbar-width: thin;
-  scrollbar-color: var(--border-color, #e0e0e0) transparent;
+  scrollbar-color: var(--border-strong) var(--bg-tertiary);
 }
 
 landing-view::-webkit-scrollbar,
 preferences-view::-webkit-scrollbar,
 docs-view::-webkit-scrollbar,
-storybook-view::-webkit-scrollbar {
+storybook-view::-webkit-scrollbar,
+blog-view::-webkit-scrollbar {
   width: 8px;
 }
 
 landing-view::-webkit-scrollbar-track,
 preferences-view::-webkit-scrollbar-track,
 docs-view::-webkit-scrollbar-track,
-storybook-view::-webkit-scrollbar-track {
-  background: transparent;
+storybook-view::-webkit-scrollbar-track,
+blog-view::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
 }
 
 landing-view::-webkit-scrollbar-thumb,
 preferences-view::-webkit-scrollbar-thumb,
 docs-view::-webkit-scrollbar-thumb,
-storybook-view::-webkit-scrollbar-thumb {
-  background-color: var(--border-color, #e0e0e0);
-  border-radius: 4px;
+storybook-view::-webkit-scrollbar-thumb,
+blog-view::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: var(--radius-full, 9999px);
 }
 
 landing-view::-webkit-scrollbar-thumb:hover,
 preferences-view::-webkit-scrollbar-thumb:hover,
 docs-view::-webkit-scrollbar-thumb:hover,
-storybook-view::-webkit-scrollbar-thumb:hover {
-  background-color: var(--text-tertiary, #999);
+storybook-view::-webkit-scrollbar-thumb:hover,
+blog-view::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-tertiary);
 }

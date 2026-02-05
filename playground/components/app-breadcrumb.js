@@ -122,7 +122,7 @@ const styles = `
   .toggle-btn.active {
     background: var(--accent-color, #0066cc);
     border-color: var(--accent-color, #0066cc);
-    color: white;
+    color: var(--accent-text, #ffffff);
   }
 
   .toggle-icon {
@@ -169,7 +169,7 @@ const styles = `
   .refresh-btn:hover {
     background: var(--accent-color, #0066cc);
     border-color: var(--accent-color, #0066cc);
-    color: white;
+    color: var(--accent-text, #ffffff);
   }
 
   .refresh-btn .refresh-icon {

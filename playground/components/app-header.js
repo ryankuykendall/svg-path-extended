@@ -1,32 +1,36 @@
 // App Header - Top navigation bar
-// Contains logo, main navigation links, and workspace-specific actions
+// Contains logo, main navigation links, theme toggle, and workspace-specific actions
 
 import { store } from '../state/store.js';
 import { routeUrl, buildWorkspaceSlugId, navigateTo } from '../utils/router.js';
 import { copyURL } from '../utils/url-state.js';
 import { workspaceApi } from '../services/api.js';
+import { themeManager } from '../utils/theme.js';
 
 const styles = `
   :host {
     display: block;
-    background: var(--bg-secondary, #f5f5f5);
-    border-bottom: 1px solid var(--border-color, #e0e0e0);
+    background: var(--bg-secondary, #ffffff);
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
   }
 
   .header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5rem 1rem;
+    padding: 0 1rem;
     max-width: 100%;
-    height: 48px;
+    height: 56px;
     box-sizing: border-box;
+    gap: 1rem;
   }
 
   .logo-section {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex-shrink: 0;
   }
 
   .logo {
@@ -38,44 +42,40 @@ const styles = `
   }
 
   .logo:hover .logo-main {
-    color: var(--accent-color, #0066cc);
+    color: var(--accent-color, #10b981);
   }
 
   .logo-main {
     font-family: 'Baumans', cursive;
     font-size: 1.5rem;
     font-weight: 400;
-    color: var(--text-primary, #1a1a1a);
-    transition: color 0.15s ease;
+    color: var(--text-primary, #1a1a2e);
+    transition: color var(--transition-base, 0.15s ease);
   }
 
   .logo-sub {
     font-family: var(--font-mono, 'Inconsolata', monospace);
     font-size: 0.6rem;
-    color: var(--text-secondary, #666);
+    color: var(--text-secondary, #64748b);
     white-space: nowrap;
-  }
-
-  .version {
-    font-size: 0.75rem;
-    color: var(--text-secondary, #666);
-    font-family: var(--font-mono, 'Inconsolata', monospace);
   }
 
   nav {
     display: flex;
     align-items: center;
     gap: 0.25rem;
+    flex: 1;
+    justify-content: center;
   }
 
   .nav-link {
-    padding: 0.5rem 0.75rem;
-    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md, 8px);
     text-decoration: none;
-    color: var(--text-primary, #1a1a1a);
+    color: var(--text-secondary, #64748b);
     font-size: 0.875rem;
     font-weight: 500;
-    transition: background-color 0.15s ease;
+    transition: all var(--transition-base, 0.15s ease);
     cursor: pointer;
     border: none;
     background: none;
@@ -83,39 +83,87 @@ const styles = `
   }
 
   .nav-link:hover {
-    background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+    background: var(--hover-bg, rgba(0, 0, 0, 0.04));
+    color: var(--text-primary, #1a1a2e);
   }
 
   .nav-link.active {
-    background: var(--accent-color, #0066cc);
-    color: white;
+    background: var(--accent-color, #10b981);
+    color: var(--accent-text, #ffffff);
   }
 
   .actions {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--border-color, #e2e8f0);
+    background: var(--bg-secondary, #ffffff);
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+    transition: all var(--transition-base, 0.15s ease);
+  }
+
+  .theme-toggle:hover {
+    border-color: var(--accent-color, #10b981);
+    color: var(--accent-color, #10b981);
+    background: var(--accent-subtle, rgba(16, 185, 129, 0.1));
+  }
+
+  .theme-toggle svg {
+    width: 18px;
+    height: 18px;
+    transition: transform var(--transition-base, 0.15s ease);
+  }
+
+  .theme-toggle:hover svg {
+    transform: rotate(15deg);
   }
 
   .action-btn {
-    padding: 0.375rem 0.75rem;
-    border-radius: 4px;
-    border: 1px solid var(--border-color, #e0e0e0);
-    background: var(--bg-primary, #ffffff);
-    color: var(--text-primary, #1a1a1a);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--border-color, #e2e8f0);
+    background: var(--bg-secondary, #ffffff);
+    color: var(--text-primary, #1a1a2e);
     font-size: 0.8125rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-base, 0.15s ease);
   }
 
   .action-btn:hover:not(:disabled) {
-    border-color: var(--accent-color, #0066cc);
-    color: var(--accent-color, #0066cc);
+    border-color: var(--accent-color, #10b981);
+    color: var(--accent-color, #10b981);
+    background: var(--accent-subtle, rgba(16, 185, 129, 0.1));
   }
 
   .action-btn:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* Primary action button */
+  .action-btn.primary {
+    background: var(--accent-color, #10b981);
+    border-color: var(--accent-color, #10b981);
+    color: var(--accent-text, #ffffff);
+  }
+
+  .action-btn.primary:hover:not(:disabled) {
+    background: var(--accent-hover, #059669);
+    border-color: var(--accent-hover, #059669);
+    color: var(--accent-text, #ffffff);
   }
 
   /* Overflow menu */
@@ -124,108 +172,125 @@ const styles = `
   }
 
   .menu-btn {
-    padding: 0.375rem 0.5rem;
-    border-radius: 4px;
-    border: 1px solid var(--border-color, #e0e0e0);
-    background: var(--bg-primary, #ffffff);
-    color: var(--text-secondary, #666);
-    cursor: pointer;
-    transition: all 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md, 8px);
+    border: 1px solid var(--border-color, #e2e8f0);
+    background: var(--bg-secondary, #ffffff);
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+    transition: all var(--transition-base, 0.15s ease);
   }
 
   .menu-btn:hover {
-    border-color: var(--accent-color, #0066cc);
-    color: var(--accent-color, #0066cc);
+    border-color: var(--accent-color, #10b981);
+    color: var(--accent-color, #10b981);
+    background: var(--accent-subtle, rgba(16, 185, 129, 0.1));
   }
 
   .menu-dropdown {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 8px);
     right: 0;
-    background: var(--bg-primary, #ffffff);
-    border: 1px solid var(--border-color, #e0e0e0);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    min-width: 160px;
-    z-index: 1000;
+    background: var(--bg-elevated, #ffffff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: var(--radius-lg, 12px);
+    box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.08));
+    min-width: 180px;
+    z-index: var(--z-dropdown, 100);
     display: none;
+    overflow: hidden;
   }
 
   .menu-dropdown.open {
     display: block;
+    animation: dropdownFadeIn 0.15s ease;
+  }
+
+  @keyframes dropdownFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .menu-dropdown button {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     width: 100%;
-    padding: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
     border: none;
     background: transparent;
     text-align: left;
-    font-size: 0.8125rem;
-    color: var(--text-primary, #1a1a1a);
+    font-size: 0.875rem;
+    color: var(--text-primary, #1a1a2e);
     cursor: pointer;
-    transition: background 0.15s ease;
-  }
-
-  .menu-dropdown button:first-child {
-    border-radius: 6px 6px 0 0;
-  }
-
-  .menu-dropdown button:last-child {
-    border-radius: 0 0 6px 6px;
-  }
-
-  .menu-dropdown button:only-child {
-    border-radius: 6px;
+    transition: background var(--transition-fast, 0.1s ease);
   }
 
   .menu-dropdown button:hover {
-    background: var(--bg-secondary, #f5f5f5);
+    background: var(--hover-bg, rgba(0, 0, 0, 0.04));
   }
 
   .menu-dropdown .menu-icon {
     width: 16px;
     height: 16px;
     opacity: 0.6;
+    flex-shrink: 0;
+  }
+
+  .menu-divider {
+    height: 1px;
+    background: var(--border-color, #e2e8f0);
+    margin: 0.25rem 0;
   }
 
   .copy-feedback {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 8px);
     right: 0;
-    background: var(--success-bg, #d4edda);
-    color: var(--success-color, #155724);
-    padding: 0.375rem 0.75rem;
-    border-radius: 4px;
+    background: var(--success-bg, #ecfdf5);
+    color: var(--success-color, #10b981);
+    border: 1px solid var(--success-border, #a7f3d0);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md, 8px);
     font-size: 0.75rem;
+    font-weight: 500;
     white-space: nowrap;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--transition-base, 0.15s ease);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.07));
   }
 
   .copy-feedback.visible {
     opacity: 1;
   }
 
-
-  @media (max-width: 600px) {
+  @media (max-width: 768px) {
     .header {
-      padding: 0.5rem;
+      padding: 0 0.75rem;
+      height: 52px;
     }
 
-    .version {
+    .logo-sub {
       display: none;
     }
 
+    nav {
+      gap: 0;
+    }
+
     .nav-link {
-      padding: 0.375rem 0.5rem;
+      padding: 0.5rem 0.75rem;
       font-size: 0.8125rem;
     }
 
@@ -234,8 +299,14 @@ const styles = `
     }
 
     .action-btn {
-      padding: 0.375rem 0.5rem;
+      padding: 0.5rem 0.75rem;
       font-size: 0.75rem;
+    }
+  }
+
+  @media (max-width: 600px) {
+    nav {
+      display: none;
     }
   }
 `;
@@ -245,6 +316,7 @@ class AppHeader extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.unsubscribe = null;
+    this._themeUnsubscribe = null;
     this._menuOpen = false;
     this._copying = false;
   }
@@ -257,6 +329,11 @@ class AppHeader extends HTMLElement {
     this.unsubscribe = store.subscribe(['currentView', 'workspaceId'], () => {
       this.updateActiveLink();
       this.updateWorkspaceActions();
+    });
+
+    // Subscribe to theme changes
+    this._themeUnsubscribe = themeManager.subscribe(() => {
+      this.updateThemeIcon();
     });
 
     // Close menu on outside click
@@ -284,11 +361,20 @@ class AppHeader extends HTMLElement {
     if (this.unsubscribe) {
       this.unsubscribe();
     }
+    if (this._themeUnsubscribe) {
+      this._themeUnsubscribe();
+    }
     document.removeEventListener('click', this._handleOutsideClick);
   }
 
   setupEventListeners() {
     this.shadowRoot.addEventListener('click', (e) => {
+      // Theme toggle
+      if (e.target.closest('.theme-toggle')) {
+        themeManager.cycle();
+        return;
+      }
+
       // Navigation links
       const navLink = e.target.closest('[data-route]');
       if (navLink) {
@@ -394,11 +480,48 @@ class AppHeader extends HTMLElement {
     return routeToView[route] === currentView;
   }
 
+  updateThemeIcon() {
+    const btn = this.shadowRoot.querySelector('.theme-toggle');
+    if (!btn) return;
+
+    const preference = themeManager.getPreference();
+    btn.innerHTML = this.getThemeIcon(preference);
+    btn.title = this.getThemeTitle(preference);
+  }
+
+  getThemeIcon(preference) {
+    switch (preference) {
+      case 'light':
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>`;
+      case 'dark':
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>`;
+      default: // system
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <path d="M8 21h8M12 17v4"/>
+        </svg>`;
+    }
+  }
+
+  getThemeTitle(preference) {
+    switch (preference) {
+      case 'light': return 'Light mode (click to switch to dark)';
+      case 'dark': return 'Dark mode (click to switch to system)';
+      default: return 'System theme (click to switch to light)';
+    }
+  }
+
   render() {
     const currentView = store.get('currentView');
     const workspaceId = store.get('workspaceId');
     const isWorkspaceView = currentView === 'workspace';
     const hasWorkspace = isWorkspaceView && workspaceId;
+    const themePreference = themeManager.getPreference();
 
     this.shadowRoot.innerHTML = `
       <style>${styles}</style>
@@ -427,6 +550,10 @@ class AppHeader extends HTMLElement {
         </nav>
 
         <div class="actions">
+          <button class="theme-toggle" title="${this.getThemeTitle(themePreference)}">
+            ${this.getThemeIcon(themePreference)}
+          </button>
+
           ${isWorkspaceView ? `
             <button id="export-btn" class="action-btn" title="Export to file (Ctrl+S)">Export</button>
             <div class="menu-container">
@@ -476,13 +603,18 @@ class AppHeader extends HTMLElement {
     const workspaceId = store.get('workspaceId');
     const isWorkspaceView = currentView === 'workspace';
     const hasWorkspace = isWorkspaceView && workspaceId;
+    const themePreference = themeManager.getPreference();
 
     const actionsContainer = this.shadowRoot.querySelector('.actions');
     if (!actionsContainer) return;
 
     // Update visibility of workspace-specific actions
-    if (isWorkspaceView) {
-      actionsContainer.innerHTML = `
+    actionsContainer.innerHTML = `
+      <button class="theme-toggle" title="${this.getThemeTitle(themePreference)}">
+        ${this.getThemeIcon(themePreference)}
+      </button>
+
+      ${isWorkspaceView ? `
         <button id="export-btn" class="action-btn" title="Export to file (Ctrl+S)">Export</button>
         <div class="menu-container">
           <button class="menu-btn" title="More actions">
@@ -518,10 +650,8 @@ class AppHeader extends HTMLElement {
           </div>
           <span class="copy-feedback"></span>
         </div>
-      `;
-    } else {
-      actionsContainer.innerHTML = '';
-    }
+      ` : ''}
+    `;
   }
 }
 

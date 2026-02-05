@@ -118,121 +118,189 @@ export class PlaygroundFooter extends HTMLElement {
       <style>
         :host {
           display: block;
-          background: var(--bg-primary, #ffffff);
-          border-top: 1px solid var(--border-color, #ddd);
-          padding: 12px 20px;
+          background: var(--bg-secondary, #ffffff);
+          border-top: 1px solid var(--border-color, #e2e8f0);
+          padding: 0.625rem 1rem;
         }
 
         .controls {
           display: flex;
           flex-wrap: wrap;
           align-items: center;
-          gap: 16px;
+          gap: 1rem;
         }
 
         .control-group {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 0.375rem;
+        }
+
+        .separator {
+          width: 1px;
+          height: 24px;
+          background: var(--border-color, #e2e8f0);
+          flex-shrink: 0;
         }
 
         label {
-          font-size: 0.8125rem;
-          color: var(--text-secondary, #666);
+          font-size: 0.75rem;
+          font-weight: 500;
+          color: var(--text-secondary, #64748b);
           white-space: nowrap;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
         }
 
         input[type="number"] {
-          width: 70px;
-          padding: 6px 8px;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          font-family: inherit;
-          font-size: 0.875rem;
+          width: 64px;
+          padding: 0.375rem 0.5rem;
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
+          font-family: var(--font-mono, 'Inconsolata', monospace);
+          font-size: 0.8125rem;
+          font-weight: 500;
+          background: var(--bg-tertiary, #f0f1f2);
+          color: var(--text-primary, #1a1a2e);
+          transition: all var(--transition-base, 0.15s ease);
+        }
+
+        input[type="number"]:focus {
+          outline: none;
+          border-color: var(--accent-color, #10b981);
+          box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.4));
+          background: var(--bg-secondary, #ffffff);
+        }
+
+        input[type="number"]:hover:not(:focus) {
+          border-color: var(--border-strong, #cbd5e1);
         }
 
         input[type="color"] {
-          width: 36px;
-          height: 30px;
-          padding: 2px;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
+          width: 32px;
+          height: 32px;
+          padding: 3px;
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
+          background: var(--bg-tertiary, #f0f1f2);
           cursor: pointer;
+          transition: all var(--transition-base, 0.15s ease);
+        }
+
+        input[type="color"]:hover {
+          border-color: var(--border-strong, #cbd5e1);
+          transform: scale(1.05);
+        }
+
+        input[type="color"]:focus {
+          outline: none;
+          border-color: var(--accent-color, #10b981);
+          box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.4));
+        }
+
+        input[type="color"]:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          transform: none;
         }
 
         input[type="checkbox"] {
           width: 16px;
           height: 16px;
           cursor: pointer;
+          accent-color: var(--accent-color, #10b981);
+          border-radius: var(--radius-sm, 4px);
         }
 
         select {
-          min-width: 60px;
-          padding: 6px 12px;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          background: var(--bg-primary, #ffffff);
+          min-width: 56px;
+          padding: 0.375rem 0.5rem;
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
+          background: var(--bg-tertiary, #f0f1f2);
+          color: var(--text-primary, #1a1a2e);
           cursor: pointer;
-          font-family: inherit;
-          font-size: 0.875rem;
+          font-family: var(--font-mono, 'Inconsolata', monospace);
+          font-size: 0.8125rem;
+          font-weight: 500;
+          transition: all var(--transition-base, 0.15s ease);
+          -webkit-appearance: none;
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.5rem center;
+          padding-right: 1.5rem;
+        }
+
+        select:hover {
+          border-color: var(--border-strong, #cbd5e1);
+        }
+
+        select:focus {
+          outline: none;
+          border-color: var(--accent-color, #10b981);
+          box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.4));
+          background-color: var(--bg-secondary, #ffffff);
         }
 
         .spacer {
           flex: 1;
         }
 
-        button {
-          padding: 6px 16px;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          background: var(--bg-primary, #ffffff);
+        #docs-btn {
+          padding: 0.375rem 1rem;
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
+          background: var(--bg-tertiary, #f0f1f2);
+          color: var(--text-primary, #1a1a2e);
           cursor: pointer;
           font-family: inherit;
-          font-size: 0.875rem;
-          transition: background 0.15s;
+          font-size: 0.8125rem;
+          font-weight: 500;
+          transition: all var(--transition-base, 0.15s ease);
         }
 
-        button:hover {
-          background: var(--bg-secondary, #f5f5f5);
+        #docs-btn:hover {
+          background: var(--accent-subtle, rgba(16, 185, 129, 0.1));
+          border-color: var(--accent-color, #10b981);
+          color: var(--accent-color, #10b981);
+        }
+
+        #docs-btn:focus {
+          outline: none;
+          box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.4));
+        }
+
+        @media (max-width: 768px) {
+          :host {
+            padding: 0.5rem 0.75rem;
+          }
+
+          .controls {
+            gap: 0.75rem;
+          }
+
+          .separator {
+            display: none;
+          }
         }
       </style>
 
       <div class="controls">
         <div class="control-group">
-          <label for="width">Width:</label>
+          <label for="width">W</label>
           <input type="number" id="width" value="${state.width}" min="50" max="20000">
         </div>
         <div class="control-group">
-          <label for="height">Height:</label>
+          <label for="height">H</label>
           <input type="number" id="height" value="${state.height}" min="50" max="20000">
         </div>
+
+        <div class="separator"></div>
+
         <div class="control-group">
-          <label for="stroke">Stroke:</label>
+          <label for="stroke">Stroke</label>
           <input type="color" id="stroke" value="${state.stroke}">
-        </div>
-        <div class="control-group">
-          <label for="fill-enabled">Fill:</label>
-          <input type="checkbox" id="fill-enabled" ${state.fillEnabled ? 'checked' : ''}>
-          <input type="color" id="fill" value="${state.fill}" ${state.fillEnabled ? '' : 'disabled'}>
-        </div>
-        <div class="control-group">
-          <label for="bg">Background:</label>
-          <input type="color" id="bg" value="${state.background}">
-        </div>
-        <div class="control-group">
-          <label for="grid-enabled">Grid:</label>
-          <input type="checkbox" id="grid-enabled" ${state.gridEnabled ? 'checked' : ''}>
-          <input type="color" id="grid-color" value="${state.gridColor}">
-          <select id="grid-size">
-            <option value="10" ${state.gridSize == 10 ? 'selected' : ''}>10px</option>
-            <option value="20" ${state.gridSize == 20 ? 'selected' : ''}>20px</option>
-            <option value="25" ${state.gridSize == 25 ? 'selected' : ''}>25px</option>
-            <option value="50" ${state.gridSize == 50 ? 'selected' : ''}>50px</option>
-            <option value="100" ${state.gridSize == 100 ? 'selected' : ''}>100px</option>
-          </select>
-        </div>
-        <div class="control-group">
-          <label for="stroke-width">Stroke:</label>
           <select id="stroke-width">
             <option value="1" ${state.strokeWidth == 1 ? 'selected' : ''}>1px</option>
             <option value="2" ${state.strokeWidth == 2 ? 'selected' : ''}>2px</option>
@@ -244,7 +312,39 @@ export class PlaygroundFooter extends HTMLElement {
             <option value="10" ${state.strokeWidth == 10 ? 'selected' : ''}>10px</option>
           </select>
         </div>
+
+        <div class="separator"></div>
+
+        <div class="control-group">
+          <label for="fill-enabled">Fill</label>
+          <input type="checkbox" id="fill-enabled" ${state.fillEnabled ? 'checked' : ''}>
+          <input type="color" id="fill" value="${state.fill}" ${state.fillEnabled ? '' : 'disabled'}>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="control-group">
+          <label for="bg">BG</label>
+          <input type="color" id="bg" value="${state.background}">
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="control-group">
+          <label for="grid-enabled">Grid</label>
+          <input type="checkbox" id="grid-enabled" ${state.gridEnabled ? 'checked' : ''}>
+          <input type="color" id="grid-color" value="${state.gridColor}">
+          <select id="grid-size">
+            <option value="10" ${state.gridSize == 10 ? 'selected' : ''}>10px</option>
+            <option value="20" ${state.gridSize == 20 ? 'selected' : ''}>20px</option>
+            <option value="25" ${state.gridSize == 25 ? 'selected' : ''}>25px</option>
+            <option value="50" ${state.gridSize == 50 ? 'selected' : ''}>50px</option>
+            <option value="100" ${state.gridSize == 100 ? 'selected' : ''}>100px</option>
+          </select>
+        </div>
+
         <div class="spacer"></div>
+
         <button id="docs-btn">Docs</button>
       </div>
     `;

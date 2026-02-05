@@ -3,32 +3,15 @@
 
 /* CSS Custom Properties for shell */
 :root {
-  --header-height: 48px;
-  --breadcrumb-height: 32px;
-  --shell-bg: var(--bg-primary, #ffffff);
-  --header-bg: var(--bg-secondary, #f5f5f5);
-  --border-color: #e0e0e0;
-  --text-secondary: #666666;
-  --text-tertiary: #999999;
-  --accent-hover: #0052a3;
-  --bg-hover: rgba(0, 0, 0, 0.05);
-}
-
-/* Dark mode support (future) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --shell-bg: #1a1a1a;
-    --header-bg: #2a2a2a;
-    --border-color: #404040;
-    --text-secondary: #999999;
-    --text-tertiary: #666666;
-    --bg-hover: rgba(255, 255, 255, 0.05);
-  }
+  --header-height: 56px;
+  --breadcrumb-height: 36px;
+  --shell-bg: var(--bg-primary);
+  --header-bg: var(--bg-secondary);
 }
 
 /* Global transitions for route changes */
 app-shell main > * {
-  transition: opacity 0.15s ease;
+  transition: opacity var(--transition-base, 0.15s ease);
 }
 
 app-shell main > *.active {
@@ -38,8 +21,8 @@ app-shell main > *.active {
 /* Focus styles for navigation */
 app-header .nav-link:focus,
 app-breadcrumb .breadcrumb-link:focus {
-  outline: 2px solid var(--accent-color, #0066cc);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 /* Skip link for accessibility */
@@ -47,11 +30,14 @@ app-breadcrumb .breadcrumb-link:focus {
   position: absolute;
   top: -40px;
   left: 0;
-  background: var(--accent-color, #0066cc);
-  color: white;
-  padding: 8px 16px;
-  z-index: 100;
+  background: var(--accent-color);
+  color: var(--accent-text, #ffffff);
+  padding: 0.5rem 1rem;
+  border-radius: 0 0 var(--radius-md, 8px) 0;
+  z-index: var(--z-tooltip, 400);
   text-decoration: none;
+  font-weight: 500;
+  transition: top var(--transition-base, 0.15s ease);
 }
 
 .skip-link:focus {
@@ -79,9 +65,16 @@ app-breadcrumb .breadcrumb-link:focus {
 }
 
 /* Responsive adjustments */
+@media (max-width: 768px) {
+  :root {
+    --header-height: 52px;
+    --breadcrumb-height: 32px;
+  }
+}
+
 @media (max-width: 480px) {
   :root {
-    --header-height: 44px;
+    --header-height: 48px;
     --breadcrumb-height: 28px;
   }
 }

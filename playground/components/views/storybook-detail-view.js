@@ -303,7 +303,7 @@ const styles = `
   .toggle-button.on {
     background: var(--accent-color, #0066cc);
     border-color: var(--accent-color, #0066cc);
-    color: white;
+    color: var(--accent-text, #ffffff);
   }
 
   .no-controls {

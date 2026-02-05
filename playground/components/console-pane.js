@@ -91,10 +91,11 @@ export class ConsolePane extends HTMLElement {
           display: flex;
           flex-direction: column;
           min-width: 0;
-          border-right: 1px solid var(--border-color, #ddd);
+          border-right: 1px solid var(--border-color, #e2e8f0);
           position: relative;
           overflow: hidden;
-          transition: flex-basis 0.3s ease;
+          transition: flex-basis var(--transition-slow, 0.3s ease);
+          background: var(--bg-secondary, #ffffff);
         }
 
         :host(.open) {
@@ -105,42 +106,48 @@ export class ConsolePane extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 6px 12px;
-          background: var(--bg-secondary, #f5f5f5);
-          border-bottom: 1px solid var(--border-color, #ddd);
+          padding: 0.5rem 0.75rem;
+          background: var(--bg-tertiary, #f0f1f2);
+          border-bottom: 1px solid var(--border-color, #e2e8f0);
           font-size: 0.75rem;
-          color: var(--text-secondary, #666);
+          color: var(--text-secondary, #64748b);
         }
 
         .header span {
-          font-weight: 500;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.025em;
         }
 
         .clear-btn {
-          padding: 4px 10px;
-          font-size: 0.75rem;
+          padding: 0.25rem 0.625rem;
+          font-size: 0.6875rem;
           font-family: inherit;
-          background: var(--bg-primary, #ffffff);
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
+          font-weight: 500;
+          background: var(--bg-secondary, #ffffff);
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-sm, 4px);
           cursor: pointer;
-          opacity: 1;
-          transition: opacity 0.15s;
+          color: var(--text-secondary, #64748b);
+          transition: all var(--transition-base, 0.15s ease);
         }
 
         .clear-btn:hover {
-          background: var(--bg-secondary, #f5f5f5);
+          background: var(--hover-bg, rgba(0, 0, 0, 0.04));
+          border-color: var(--border-strong, #cbd5e1);
+          color: var(--text-primary, #1a1a2e);
         }
 
         #output {
           flex: 1;
           overflow: auto;
-          background: #1e1e1e;
-          padding: 12px;
-          font-family: var(--font-mono, 'SF Mono', Monaco, monospace);
-          font-size: 0.75rem;
-          line-height: 1.5;
-          color: #d4d4d4;
+          background: #1a1a1a;
+          padding: 0.75rem 1rem;
+          font-family: var(--font-mono, 'Inconsolata', monospace);
+          font-size: 0.8125rem;
+          font-weight: 500;
+          line-height: 1.6;
+          color: #e0e0e0;
         }
 
         .empty {
@@ -152,7 +159,7 @@ export class ConsolePane extends HTMLElement {
           :host {
             flex-basis: 0;
             border-right: none;
-            border-bottom: 1px solid var(--border-color, #ddd);
+            border-bottom: 1px solid var(--border-color, #e2e8f0);
           }
 
           :host(.open) {

@@ -1,20 +1,209 @@
 /* CSS Custom Properties (Theme) */
+/* Visual design inspired by modern app interfaces with light/dark mode support */
 
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #e8e8e8;
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
-  --border-color: #ddd;
-  --accent-color: #0066cc;
-  --error-bg: #fee;
-  --error-text: #c00;
-  --success-color: #28a745;
+  /* ===== Light Theme (Default) ===== */
+
+  /* Backgrounds - off-white with white cards */
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f1f2;
+  --bg-elevated: #ffffff;
+
+  /* Text */
+  --text-primary: #1a1a2e;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* Borders & Dividers */
+  --border-color: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-strong: #cbd5e1;
+
+  /* Primary Accent - Teal/Emerald */
+  --accent-color: #10b981;
+  --accent-hover: #059669;
+  --accent-subtle: rgba(16, 185, 129, 0.1);
+  --accent-text: #ffffff;
+
+  /* Secondary Accent - Amber */
+  --secondary-accent: #f59e0b;
+  --secondary-accent-hover: #d97706;
+  --secondary-accent-subtle: rgba(245, 158, 11, 0.1);
+
+  /* Status Colors */
+  --success-color: #10b981;
+  --success-bg: #ecfdf5;
+  --success-border: #a7f3d0;
+
+  --warning-color: #f59e0b;
+  --warning-bg: #fffbeb;
+  --warning-border: #fde68a;
+
+  --error-color: #ef4444;
+  --error-bg: #fef2f2;
+  --error-border: #fecaca;
+  --error-text: #dc2626;
+
+  --info-color: #3b82f6;
+  --info-bg: #eff6ff;
+  --info-border: #bfdbfe;
+
+  /* Interactive States */
+  --hover-bg: rgba(0, 0, 0, 0.04);
+  --active-bg: rgba(0, 0, 0, 0.08);
+  --focus-ring: rgba(16, 185, 129, 0.4);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.1s ease;
+  --transition-base: 0.15s ease;
+  --transition-slow: 0.3s ease;
 
   /* Font stacks */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --font-mono: 'Inconsolata', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+
+  /* Z-index layers */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 300;
+  --z-tooltip: 400;
+}
+
+/* ===== Dark Theme ===== */
+[data-theme="dark"] {
+  /* Backgrounds - warm dark grays */
+  --bg-primary: #242220;
+  --bg-secondary: #1f1e1c;
+  --bg-tertiary: #2a2826;
+  --bg-elevated: #2c2a28;
+
+  /* Text - slightly warm */
+  --text-primary: #f5f3f0;
+  --text-secondary: #a39e96;
+  --text-tertiary: #6e6962;
+  --text-inverse: #1a1a1a;
+
+  /* Borders & Dividers */
+  --border-color: #353230;
+  --border-subtle: #2c2a28;
+  --border-strong: #464340;
+
+  /* Primary Accent - Pale Yellow */
+  --accent-color: #ccbf6b;
+  --accent-hover: #d6cb78;
+  --accent-subtle: rgba(204, 191, 107, 0.15);
+  --accent-text: #2c2822;
+
+  /* Secondary Accent - Warm Rose */
+  --secondary-accent: #c9736e;
+  --secondary-accent-hover: #d8908b;
+  --secondary-accent-subtle: rgba(201, 115, 110, 0.15);
+
+  /* Status Colors */
+  --success-color: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.15);
+  --success-border: rgba(34, 197, 94, 0.3);
+
+  --warning-color: #e0a840;
+  --warning-bg: rgba(224, 168, 64, 0.15);
+  --warning-border: rgba(224, 168, 64, 0.3);
+
+  --error-color: #ef4444;
+  --error-bg: rgba(239, 68, 68, 0.15);
+  --error-border: rgba(239, 68, 68, 0.3);
+  --error-text: #f87171;
+
+  --info-color: #3b82f6;
+  --info-bg: rgba(59, 130, 246, 0.15);
+  --info-border: rgba(59, 130, 246, 0.3);
+
+  /* Interactive States */
+  --hover-bg: rgba(255, 255, 255, 0.06);
+  --active-bg: rgba(255, 255, 255, 0.1);
+  --focus-ring: rgba(204, 191, 107, 0.4);
+
+  /* Shadows - subtler in dark mode */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* Auto dark mode based on system preference (when no explicit theme set) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Backgrounds - warm dark grays */
+    --bg-primary: #242220;
+    --bg-secondary: #1f1e1c;
+    --bg-tertiary: #2a2826;
+    --bg-elevated: #2c2a28;
+
+    /* Text - slightly warm */
+    --text-primary: #f5f3f0;
+    --text-secondary: #a39e96;
+    --text-tertiary: #6e6962;
+    --text-inverse: #1a1a1a;
+
+    /* Borders & Dividers */
+    --border-color: #353230;
+    --border-subtle: #2c2a28;
+    --border-strong: #464340;
+
+    /* Primary Accent - Pale Yellow */
+    --accent-color: #ccbf6b;
+    --accent-hover: #d6cb78;
+    --accent-subtle: rgba(204, 191, 107, 0.15);
+    --accent-text: #2c2822;
+
+    /* Secondary Accent - Warm Rose */
+    --secondary-accent: #c9736e;
+    --secondary-accent-hover: #d8908b;
+    --secondary-accent-subtle: rgba(201, 115, 110, 0.15);
+
+    /* Status Colors */
+    --success-color: #22c55e;
+    --success-bg: rgba(34, 197, 94, 0.15);
+    --success-border: rgba(34, 197, 94, 0.3);
+
+    --warning-color: #e0a840;
+    --warning-bg: rgba(224, 168, 64, 0.15);
+    --warning-border: rgba(224, 168, 64, 0.3);
+
+    --error-color: #ef4444;
+    --error-bg: rgba(239, 68, 68, 0.15);
+    --error-border: rgba(239, 68, 68, 0.3);
+    --error-text: #f87171;
+
+    --info-color: #3b82f6;
+    --info-bg: rgba(59, 130, 246, 0.15);
+    --info-border: rgba(59, 130, 246, 0.3);
+
+    /* Interactive States */
+    --hover-bg: rgba(255, 255, 255, 0.06);
+    --active-bg: rgba(255, 255, 255, 0.1);
+    --focus-ring: rgba(204, 191, 107, 0.4);
+
+    /* Shadows - subtler in dark mode */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+  }
 }
 
 /* Reset */
@@ -22,4 +211,9 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Smooth theme transitions */
+body {
+  transition: background-color var(--transition-slow), color var(--transition-slow);
 }

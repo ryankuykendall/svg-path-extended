@@ -1,5 +1,7 @@
 // Annotated output pane component with read-only CodeMirror
 
+import { themeManager } from '../utils/theme.js';
+
 export class AnnotatedPane extends HTMLElement {
   constructor() {
     super();
@@ -8,11 +10,19 @@ export class AnnotatedPane extends HTMLElement {
     this._editor = null;
     this._content = '// Click "Annotated" to view debug output';
     this._cmModules = null;
+    this._themeCompartment = null;
+    this._themeUnsubscribe = null;
   }
 
   connectedCallback() {
     this.render();
     this.setupEventListeners();
+  }
+
+  disconnectedCallback() {
+    if (this._themeUnsubscribe) {
+      this._themeUnsubscribe();
+    }
   }
 
   setupEventListeners() {
@@ -71,15 +81,32 @@ export class AnnotatedPane extends HTMLElement {
   async loadCodeMirror() {
     if (this._cmModules) return this._cmModules;
 
-    const [state, view, language, langJs] = await Promise.all([
+    const [state, view, language, langJs, oneDark] = await Promise.all([
       import('https://esm.sh/@codemirror/state@6'),
       import('https://esm.sh/@codemirror/view@6'),
       import('https://esm.sh/@codemirror/language@6'),
       import('https://esm.sh/@codemirror/lang-javascript@6'),
+      import('https://esm.sh/@codemirror/theme-one-dark@6'),
     ]);
 
-    this._cmModules = { state, view, language, langJs };
+    this._cmModules = { state, view, language, langJs, oneDark };
     return this._cmModules;
+  }
+
+  _getThemeExtensions() {
+    const { language, oneDark } = this._cmModules;
+    const isDark = themeManager.getActiveTheme() === 'dark';
+
+    if (isDark) {
+      return [
+        oneDark.oneDarkTheme,
+        language.syntaxHighlighting(oneDark.oneDarkHighlightStyle),
+      ];
+    } else {
+      return [
+        language.syntaxHighlighting(language.defaultHighlightStyle),
+      ];
+    }
   }
 
   async createEditor() {
@@ -88,6 +115,8 @@ export class AnnotatedPane extends HTMLElement {
 
     const { state, view, language, langJs } = await this.loadCodeMirror();
 
+    this._themeCompartment = new state.Compartment();
+
     const editorState = state.EditorState.create({
       doc: this._content,
       extensions: [
@@ -95,7 +124,7 @@ export class AnnotatedPane extends HTMLElement {
         view.highlightSpecialChars(),
         view.drawSelection(),
         view.highlightActiveLine(),
-        language.syntaxHighlighting(language.defaultHighlightStyle),
+        this._themeCompartment.of(this._getThemeExtensions()),
         langJs.javascript(),
         view.EditorView.lineWrapping,
         state.EditorState.readOnly.of(true),
@@ -106,6 +135,19 @@ export class AnnotatedPane extends HTMLElement {
     this._editor = new view.EditorView({
       state: editorState,
       parent: container,
+    });
+
+    // Listen for theme changes
+    this._themeUnsubscribe = themeManager.subscribe(() => {
+      this._updateEditorTheme();
+    });
+  }
+
+  _updateEditorTheme() {
+    if (!this._editor || !this._themeCompartment) return;
+
+    this._editor.dispatch({
+      effects: this._themeCompartment.reconfigure(this._getThemeExtensions()),
     });
   }
 
@@ -134,10 +176,11 @@ export class AnnotatedPane extends HTMLElement {
           display: flex;
           flex-direction: column;
           min-width: 0;
-          border-right: 1px solid var(--border-color, #ddd);
+          border-right: 1px solid var(--border-color, #e2e8f0);
           position: relative;
           overflow: hidden;
-          transition: flex-basis 0.3s ease;
+          transition: flex-basis var(--transition-slow, 0.3s ease);
+          background: var(--bg-secondary, #ffffff);
         }
 
         :host(.open) {
@@ -148,49 +191,52 @@ export class AnnotatedPane extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 6px 12px;
-          background: var(--bg-secondary, #f5f5f5);
-          border-bottom: 1px solid var(--border-color, #ddd);
+          padding: 0.5rem 0.75rem;
+          background: var(--bg-tertiary, #f0f1f2);
+          border-bottom: 1px solid var(--border-color, #e2e8f0);
           font-size: 0.75rem;
-          color: var(--text-secondary, #666);
+          color: var(--text-secondary, #64748b);
         }
 
         .header span {
-          font-weight: 500;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.025em;
         }
 
         .copy-btn {
-          padding: 4px 10px;
-          font-size: 0.75rem;
+          padding: 0.25rem 0.625rem;
+          font-size: 0.6875rem;
           font-family: inherit;
-          background: var(--bg-primary, #ffffff);
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
+          font-weight: 500;
+          background: var(--bg-secondary, #ffffff);
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-sm, 4px);
           cursor: pointer;
-          opacity: 1;
-          transition: opacity 0.15s;
+          color: var(--text-secondary, #64748b);
+          transition: all var(--transition-base, 0.15s ease);
         }
 
         .copy-btn:hover {
-          background: var(--bg-secondary, #f5f5f5);
+          background: var(--hover-bg, rgba(0, 0, 0, 0.04));
+          border-color: var(--border-strong, #cbd5e1);
+          color: var(--text-primary, #1a1a2e);
         }
 
         .copy-btn.copied {
-          background: var(--success-color, #28a745);
-          border-color: var(--success-color, #28a745);
+          background: var(--success-color, #10b981);
+          border-color: var(--success-color, #10b981);
           color: white;
         }
 
         #editor-container {
           flex: 1;
           overflow: auto;
-          background: var(--bg-primary, #ffffff);
         }
 
         #editor-container .cm-editor {
           height: 100%;
           font-size: 13px;
-          background: var(--bg-primary, #ffffff);
         }
 
         #editor-container .cm-editor .cm-content {
@@ -210,7 +256,7 @@ export class AnnotatedPane extends HTMLElement {
           :host {
             flex-basis: 0;
             border-right: none;
-            border-bottom: 1px solid var(--border-color, #ddd);
+            border-bottom: 1px solid var(--border-color, #e2e8f0);
           }
 
           :host(.open) {

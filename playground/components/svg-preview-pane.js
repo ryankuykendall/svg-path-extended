@@ -423,8 +423,8 @@ export class SvgPreviewPane extends HTMLElement {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 20px;
-          background: var(--bg-primary, #ffffff);
+          padding: 1.5rem;
+          background: var(--bg-primary, #f8f9fa);
           min-width: 0;
           overflow: auto;
           position: relative;
@@ -433,6 +433,7 @@ export class SvgPreviewPane extends HTMLElement {
         @media (max-width: 800px) {
           :host {
             min-height: 250px;
+            padding: 1rem;
           }
         }
 
@@ -440,6 +441,9 @@ export class SvgPreviewPane extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: center;
+          border-radius: var(--radius-lg, 12px);
+          overflow: hidden;
+          box-shadow: var(--shadow-lg);
         }
 
         #preview {
@@ -459,14 +463,14 @@ export class SvgPreviewPane extends HTMLElement {
         /* Navigator */
         #zoom-navigator {
           position: absolute;
-          top: 8px;
-          left: 8px;
+          top: 1rem;
+          left: 1rem;
           width: 120px;
           height: 120px;
-          background: var(--bg-secondary, #f5f5f5);
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          background: var(--bg-elevated, #ffffff);
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-lg, 12px);
+          box-shadow: var(--shadow-lg);
           overflow: hidden;
           z-index: 10;
         }
@@ -478,69 +482,78 @@ export class SvgPreviewPane extends HTMLElement {
 
         #navigator-viewport {
           cursor: move;
-          fill: rgba(0, 102, 204, 0.1);
+          fill: var(--accent-subtle, rgba(16, 185, 129, 0.15));
         }
 
         /* Zoom controls */
         #zoom-controls {
           position: absolute;
-          bottom: 8px;
+          bottom: 1rem;
           left: 50%;
           transform: translateX(-50%);
           display: flex;
           align-items: center;
-          gap: 8px;
-          background: var(--bg-primary, #ffffff);
-          padding: 6px 12px;
-          border-radius: 4px;
-          border: 1px solid var(--border-color, #ddd);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          gap: 0.5rem;
+          background: var(--bg-elevated, #ffffff);
+          padding: 0.5rem 0.75rem;
+          border-radius: var(--radius-lg, 12px);
+          border: 1px solid var(--border-color, #e2e8f0);
+          box-shadow: var(--shadow-lg);
           z-index: 10;
         }
 
         #zoom-controls button {
-          width: 28px;
-          height: 28px;
+          width: 32px;
+          height: 32px;
           padding: 0;
           display: grid;
           place-items: center;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 4px;
-          background: var(--bg-primary, #ffffff);
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
+          background: var(--bg-secondary, #ffffff);
+          color: var(--text-primary, #1a1a2e);
           cursor: pointer;
           font-family: inherit;
           font-size: 0.875rem;
-          transition: background 0.15s;
+          transition: all var(--transition-base, 0.15s ease);
         }
 
         #zoom-controls button:hover {
-          background: var(--bg-secondary, #f5f5f5);
+          background: var(--hover-bg, rgba(0, 0, 0, 0.04));
+          border-color: var(--accent-color, #10b981);
+          color: var(--accent-color, #10b981);
         }
 
         #zoom-in,
         #zoom-out {
-          font-size: 1.4rem;
-          font-weight: 300;
+          font-size: 1.25rem;
+          font-weight: 400;
           line-height: 0;
         }
 
         #zoom-fit {
-          font-size: 0.96rem;
+          font-size: 0.8125rem;
+          font-weight: 500;
         }
 
         #zoom-level {
-          width: 50px;
-          padding: 2px 4px;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: 3px;
+          width: 56px;
+          padding: 0.375rem 0.5rem;
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: var(--radius-md, 8px);
           font-size: 0.75rem;
-          font-family: inherit;
+          font-family: var(--font-mono, 'Inconsolata', monospace);
+          font-weight: 500;
           text-align: center;
+          background: var(--bg-secondary, #ffffff);
+          color: var(--text-primary, #1a1a2e);
+          transition: all var(--transition-base, 0.15s ease);
         }
 
         #zoom-level:focus {
           outline: none;
-          border-color: var(--accent-color, #0066cc);
+          border-color: var(--accent-color, #10b981);
+          box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.4));
         }
       </style>
 
@@ -548,7 +561,7 @@ export class SvgPreviewPane extends HTMLElement {
         <svg id="navigator-svg">
           <rect id="navigator-bg" width="100%" height="100%"></rect>
           <path id="navigator-path" fill="none"></path>
-          <rect id="navigator-viewport" fill="none" stroke="#0066cc" stroke-width="2"></rect>
+          <rect id="navigator-viewport" fill="none" stroke="var(--accent-color, #10b981)" stroke-width="2"></rect>
         </svg>
       </div>
 
