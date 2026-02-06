@@ -5,6 +5,7 @@ export class LogEntry extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this._data = null;
+    this.shadowRoot.addEventListener('click', (e) => this.handleToggle(e));
   }
 
   connectedCallback() {
@@ -299,8 +300,6 @@ export class LogEntry extends HTMLElement {
       <div class="entry">${partsHTML}</div>
     `;
 
-    // Add click handlers for expandable items
-    this.shadowRoot.addEventListener('click', (e) => this.handleToggle(e));
   }
 }
 
