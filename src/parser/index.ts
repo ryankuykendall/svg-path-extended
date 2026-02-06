@@ -14,6 +14,7 @@ import type {
   MemberExpression,
   PathCommand,
   LetDeclaration,
+  AssignmentStatement,
   ForLoop,
   IfStatement,
   FunctionDefinition,
@@ -487,6 +488,19 @@ const returnStatement: Parsimmon.Parser<ReturnStatement> = P.seqMap(
   })
 );
 
+// Assignment statement: x = expr;
+const assignmentStatement: Parsimmon.Parser<AssignmentStatement> = P.seqMap(
+  nonReservedIdentifier,
+  token(P.regexp(/=(?!=)/)),  // '=' NOT followed by '=' (avoids matching '==')
+  expression,
+  word(';'),
+  (id, _eq, value, _semi) => ({
+    type: 'AssignmentStatement' as const,
+    name: id.name,
+    value,
+  })
+);
+
 // Statement-level function call (like circle(50, 50, 25))
 interface FunctionCallStatement {
   type: 'FunctionCallStatement';
@@ -513,6 +527,7 @@ const statement: Parsimmon.Parser<Statement> = P.alt(
   ifStatement,
   functionDefinition,
   returnStatement,
+  assignmentStatement,
   functionCallStatement,
   pathCommand
 );

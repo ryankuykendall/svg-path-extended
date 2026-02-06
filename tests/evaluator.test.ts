@@ -807,4 +807,38 @@ describe('Evaluator', () => {
       }
     });
   });
+
+  describe('variable reassignment', () => {
+    it('reassigns a variable', () => {
+      expect(compile('let x = 10; x = 20; M x 0')).toBe('M 20 0');
+    });
+
+    it('reassigns variable inside if block (updates outer scope)', () => {
+      expect(compile('let x = 10; if (1) { x = 20; } M x 0')).toBe('M 20 0');
+    });
+
+    it('reassigns with expression', () => {
+      expect(compile('let x = 10; x = calc(x + 5); M x 0')).toBe('M 15 0');
+    });
+
+    it('reassigns inside for loop (updates outer scope)', () => {
+      expect(compile('let sum = 0; for (i in 1..3) { sum = calc(sum + i); } M sum 0')).toBe('M 6 0');
+    });
+
+    it('let in block still shadows (does not affect outer)', () => {
+      expect(compile('let x = 10; if (1) { let x = 20; M x 0 } M x 0')).toBe('M 20 0 M 10 0');
+    });
+
+    it('reassigns closest scope variable', () => {
+      expect(compile('let x = 10; if (1) { let x = 20; x = 30; M x 0 } M x 0')).toBe('M 30 0 M 10 0');
+    });
+
+    it('throws on assigning to undeclared variable', () => {
+      expect(() => compile('x = 10;')).toThrow('Cannot assign to undeclared variable: x');
+    });
+
+    it('reassigns with modulus operator', () => {
+      expect(compile('let x = 5; if (1) { x = calc(x % 3); } M x 0')).toBe('M 2 0');
+    });
+  });
 });

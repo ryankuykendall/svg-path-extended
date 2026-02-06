@@ -5,6 +5,7 @@ import type {
   PathArg,
   PathCommand,
   LetDeclaration,
+  AssignmentStatement,
   ForLoop,
   IfStatement,
   FunctionDefinition,
@@ -145,6 +146,18 @@ function lookupVariable(scope: Scope, name: string): Value {
 
 function setVariable(scope: Scope, name: string, value: Value): void {
   scope.variables.set(name, value);
+}
+
+function updateVariable(scope: Scope, name: string, value: Value): void {
+  let current: Scope | null = scope;
+  while (current) {
+    if (current.variables.has(name)) {
+      current.variables.set(name, value);
+      return;
+    }
+    current = current.parent;
+  }
+  throw new Error(`Cannot assign to undeclared variable: ${name}`);
 }
 
 /**
@@ -873,6 +886,18 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
         return;
       }
       setVariable(scope, stmt.name, value);
+      return;
+    }
+
+    case 'AssignmentStatement': {
+      const value = evaluateExpression(stmt.value, scope);
+      if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathWithResult') {
+        const pwr = value as PathWithResult;
+        updateVariable(scope, stmt.name, pwr.result);
+        if (pwr.path) accum.push(pwr.path);
+        return;
+      }
+      updateVariable(scope, stmt.name, value);
       return;
     }
 

@@ -18,6 +18,7 @@ export type Node =
   | Program
   | Comment
   | LetDeclaration
+  | AssignmentStatement
   | ForLoop
   | IfStatement
   | FunctionDefinition
@@ -39,6 +40,7 @@ export interface Program {
 export type Statement =
   | Comment
   | LetDeclaration
+  | AssignmentStatement
   | ForLoop
   | IfStatement
   | FunctionDefinition
@@ -48,6 +50,13 @@ export type Statement =
 // let x = 10;
 export interface LetDeclaration {
   type: 'LetDeclaration';
+  name: string;
+  value: Expression;
+}
+
+// x = 10;
+export interface AssignmentStatement {
+  type: 'AssignmentStatement';
   name: string;
   value: Expression;
 }

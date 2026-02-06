@@ -485,4 +485,25 @@ L 10 20 // end point`;
       expect(result.comments[1].text).toBe('// end point');
     });
   });
+
+  describe('assignment statement', () => {
+    it('parses variable reassignment', () => {
+      const ast = parse('x = 10;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'AssignmentStatement',
+        name: 'x',
+        value: { type: 'NumberLiteral', value: 10 },
+      });
+    });
+
+    it('parses assignment with expression', () => {
+      const ast = parse('x = calc(y + 1);');
+      expect(ast.body[0]).toMatchObject({ type: 'AssignmentStatement', name: 'x' });
+    });
+
+    it('does not confuse = with ==', () => {
+      const ast = parse('if (x == 1) { M 0 0 }');
+      expect(ast.body[0]).toMatchObject({ type: 'IfStatement' });
+    });
+  });
 });
