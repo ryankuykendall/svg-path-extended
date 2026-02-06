@@ -440,6 +440,10 @@ class AppHeader extends HTMLElement {
         this.dispatchEvent(new CustomEvent('copy-svg', { bubbles: true, composed: true }));
         this.showFeedback('SVG copied!');
         break;
+
+      case 'export-legend':
+        this.dispatchEvent(new CustomEvent('export-legend', { bubbles: true, composed: true }));
+        break;
     }
   }
 
@@ -587,6 +591,14 @@ class AppHeader extends HTMLElement {
                   </svg>
                   Copy SVG
                 </button>
+                <div class="menu-divider"></div>
+                <button data-action="export-legend">
+                  <svg class="menu-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M14 1H2a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V2a1 1 0 00-1-1zM2 0a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V2a2 2 0 00-2-2H2z"/>
+                    <path d="M4 4h4v1H4zM4 6.5h6v1H4zM4 9h5v1H4zM4 11.5h3v1H4z"/>
+                  </svg>
+                  Export with Legend
+                </button>
               </div>
               <span class="copy-feedback"></span>
             </div>
@@ -646,6 +658,14 @@ class AppHeader extends HTMLElement {
                 <path d="M6.5 5a.5.5 0 00-.5.5v5a.5.5 0 001 0V8h1.5a.5.5 0 000-1H7V6h2a.5.5 0 000-1H6.5z"/>
               </svg>
               Copy SVG
+            </button>
+            <div class="menu-divider"></div>
+            <button data-action="export-legend">
+              <svg class="menu-icon" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M14 1H2a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V2a1 1 0 00-1-1zM2 0a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V2a2 2 0 00-2-2H2z"/>
+                <path d="M4 4h4v1H4zM4 6.5h6v1H4zM4 9h5v1H4zM4 11.5h3v1H4z"/>
+              </svg>
+              Export with Legend
             </button>
           </div>
           <span class="copy-feedback"></span>

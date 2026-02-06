@@ -19,6 +19,7 @@ import './console-pane.js';
 import './svg-preview-pane.js';
 import './docs-panel.js';
 import './shared/error-panel.js';
+import './export-legend-modal.js';
 
 export class WorkspaceView extends HTMLElement {
   constructor() {
@@ -100,6 +101,10 @@ export class WorkspaceView extends HTMLElement {
 
   get errorPanel() {
     return this.shadowRoot.querySelector('error-panel');
+  }
+
+  get exportLegendModal() {
+    return this.shadowRoot.querySelector('export-legend-modal');
   }
 
   waitForLibrary(maxWait = 5000) {
@@ -402,6 +407,17 @@ export class WorkspaceView extends HTMLElement {
     };
     document.addEventListener('keydown', this._handleKeydown);
 
+    // Export with legend
+    this._handleExportLegend = () => {
+      if (store.get('currentView') === 'workspace') {
+        const svgElement = this.previewPane.shadowRoot?.querySelector('svg');
+        if (svgElement) {
+          this.exportLegendModal.open(svgElement, store.getAll());
+        }
+      }
+    };
+    document.addEventListener('export-legend', this._handleExportLegend);
+
     // Refresh preview (for random functions)
     this._handleRefreshPreview = () => {
       if (store.get('currentView') === 'workspace') {
@@ -419,6 +435,7 @@ export class WorkspaceView extends HTMLElement {
     document.removeEventListener('toggle-annotated', this._handleToggleAnnotated);
     document.removeEventListener('toggle-console', this._handleToggleConsole);
     document.removeEventListener('keydown', this._handleKeydown);
+    document.removeEventListener('export-legend', this._handleExportLegend);
     document.removeEventListener('refresh-preview', this._handleRefreshPreview);
   }
 
@@ -611,6 +628,8 @@ export class WorkspaceView extends HTMLElement {
       <error-panel></error-panel>
 
       <docs-panel></docs-panel>
+
+      <export-legend-modal></export-legend-modal>
 
       <playground-footer></playground-footer>
     `;
