@@ -240,6 +240,10 @@ L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</
 <td><code>1.5rad</code></td>
 <td>Radians (no conversion)</td>
 </tr>
+<tr>
+<td><code>0.25pi</code></td>
+<td>Multiplied by π (i.e. <code>0.25 * π</code>)</td>
+</tr>
 </tbody></table>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> angle = 90deg;
 M <span class="hljs-title function_">sin</span>(45deg) <span class="hljs-title function_">cos</span>(45deg)
@@ -247,7 +251,13 @@ M <span class="hljs-title function_">sin</span>(45deg) <span class="hljs-title f
 <span class="hljs-comment">// Equivalent to:</span>
 <span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">rad</span>(<span class="hljs-number">90</span>);
 M <span class="hljs-title function_">sin</span>(<span class="hljs-title function_">rad</span>(<span class="hljs-number">45</span>)) <span class="hljs-title function_">cos</span>(<span class="hljs-title function_">rad</span>(<span class="hljs-number">45</span>))
-</code></pre><p>This is especially useful with trigonometric functions and polar coordinates.</p>
+</code></pre><p>The <code>pi</code> suffix multiplies the number by π. This is especially convenient for polar coordinates and angles expressed as fractions of π:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> quarter = <span class="hljs-number">0.</span>25pi;   <span class="hljs-comment">// π/4</span>
+<span class="hljs-keyword">let</span> half = <span class="hljs-number">0.</span>5pi;       <span class="hljs-comment">// π/2</span>
+<span class="hljs-keyword">let</span> full = 2pi;          <span class="hljs-comment">// 2π</span>
+M <span class="hljs-title function_">sin</span>(<span class="hljs-number">0.</span>25pi) <span class="hljs-title function_">cos</span>(<span class="hljs-number">0.</span>25pi)
+</code></pre><p>The <code>pi</code> suffix participates in angle unit mismatch checking: <code>calc(0.25pi + 5)</code> throws an error, while <code>calc(90deg + 0.5pi)</code> is allowed (both have angle units).</p>
+<p><strong>Note</strong>: The <code>pi</code> suffix only works on numeric literals. For expressions or variables, use <code>mpi(x)</code> (see <a href="stdlib.md">Standard Library</a>).</p>
 <h2>For Loops</h2>
 <p>Repeat path commands with <code>for</code>:</p>
 <pre><code class="hljs"><span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.10</span>) {
@@ -571,6 +581,10 @@ M <span class="hljs-title function_">calc</span>(<span class="hljs-title functio
 <tr>
 <td><code>TAU()</code></td>
 <td>6.28318... (2π)</td>
+</tr>
+<tr>
+<td><code>mpi(x)</code></td>
+<td><code>x * π</code> (multiply by π)</td>
 </tr>
 </tbody></table>
 <pre><code class="hljs"><span class="hljs-comment">// Draw a semicircle</span>

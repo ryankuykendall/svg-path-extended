@@ -92,6 +92,7 @@ let x = clamp(150, 0, 100);  // Result: 100
 | `PI()` | 3.14159... |
 | `E()` | 2.71828... |
 | `TAU()` | 6.28318... (2π) |
+| `mpi(x)` | `x * π` (multiply by π) |
 
 ```
 // Draw a semicircle

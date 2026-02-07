@@ -41,6 +41,9 @@ export const mathFunctions = {
   E: () => Math.E,
   TAU: () => Math.PI * 2,
 
+  // Pi multiplier (for use with expressions/variables)
+  mpi: (x: number) => Math.PI * x,
+
   // Interpolation and clamping
   lerp: (a: number, b: number, t: number) => a + (b - a) * t,
   clamp: (value: number, min: number, max: number) => Math.min(Math.max(value, min), max),

@@ -370,6 +370,61 @@ describe('Evaluator', () => {
       });
     });
 
+    describe('pi suffix and mpi()', () => {
+      it('evaluates 0.25pi to Math.PI * 0.25', () => {
+        const result = compile('M 0.25pi 0');
+        const match = result.match(/^M ([\d.]+) 0$/);
+        expect(match).not.toBeNull();
+        expect(parseFloat(match![1])).toBeCloseTo(Math.PI * 0.25);
+      });
+
+      it('evaluates 1pi to Math.PI', () => {
+        const result = compile('M 1pi 0');
+        const match = result.match(/^M ([\d.]+) 0$/);
+        expect(match).not.toBeNull();
+        expect(parseFloat(match![1])).toBeCloseTo(Math.PI);
+      });
+
+      it('evaluates mpi(0.5) to Math.PI * 0.5', () => {
+        const result = compile('M calc(mpi(0.5)) 0');
+        const match = result.match(/^M ([\d.]+) 0$/);
+        expect(match).not.toBeNull();
+        expect(parseFloat(match![1])).toBeCloseTo(Math.PI * 0.5);
+      });
+
+      it('allows calc(0.25pi + 0.25pi)', () => {
+        const result = compile('M calc(0.25pi + 0.25pi) 0');
+        const match = result.match(/^M ([\d.]+) 0$/);
+        expect(match).not.toBeNull();
+        expect(parseFloat(match![1])).toBeCloseTo(Math.PI * 0.5);
+      });
+
+      it('allows calc(90deg + 0.5pi) — both have angle units', () => {
+        const result = compile('M calc(90deg + 0.5pi) 0');
+        const match = result.match(/^M ([\d.]+) 0$/);
+        expect(match).not.toBeNull();
+        expect(parseFloat(match![1])).toBeCloseTo(Math.PI);
+      });
+
+      it('throws on calc(0.25pi + 5) — angle unit mismatch', () => {
+        expect(() => compile('M calc(0.25pi + 5) 0')).toThrow();
+      });
+
+      it('evaluates calc(0.5pi * 2) — multiply pi suffix by scalar', () => {
+        const result = compile('M calc(0.5pi * 2) 0');
+        const match = result.match(/^M ([\d.]+) 0$/);
+        expect(match).not.toBeNull();
+        expect(parseFloat(match![1])).toBeCloseTo(Math.PI);
+      });
+
+      it('evaluates calc(0.5pi / 2) — divide pi suffix by scalar', () => {
+        const result = compile('M calc(0.5pi / 2) 0');
+        const match = result.match(/^M ([\d.]+) 0$/);
+        expect(match).not.toBeNull();
+        expect(parseFloat(match![1])).toBeCloseTo(Math.PI / 4);
+      });
+    });
+
     describe('random', () => {
       it('evaluates random (returns number between 0 and 1)', () => {
         const result = compile('M calc(random()) 0');

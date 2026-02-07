@@ -165,9 +165,12 @@ function updateVariable(scope: Scope, name: string, value: Value): void {
  * - 'deg': converts degrees to radians
  * - 'rad' or undefined: returns value unchanged (radians are internal standard)
  */
-function convertAngleUnit(value: number, unit?: 'deg' | 'rad'): number {
+function convertAngleUnit(value: number, unit?: 'deg' | 'rad' | 'pi'): number {
   if (unit === 'deg') {
     return value * Math.PI / 180;
+  }
+  if (unit === 'pi') {
+    return value * Math.PI;
   }
   return value; // rad or no unit = radians (internal standard)
 }
@@ -459,7 +462,7 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
 function evaluatePathArg(arg: PathArg, scope: Scope): string {
   switch (arg.type) {
     case 'NumberLiteral':
-      return formatNum(arg.value);
+      return formatNum(convertAngleUnit(arg.value, arg.unit));
 
     case 'Identifier': {
       const value = lookupVariable(scope, arg.name);
@@ -517,7 +520,7 @@ function getNumericArgs(args: PathArg[], scope: Scope): number[] {
   const numericArgs: number[] = [];
   for (const arg of args) {
     if (arg.type === 'NumberLiteral') {
-      numericArgs.push(arg.value);
+      numericArgs.push(convertAngleUnit(arg.value, arg.unit));
     } else if (arg.type === 'Identifier') {
       const value = lookupVariable(scope, arg.name);
       if (typeof value === 'number') {

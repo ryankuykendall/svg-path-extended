@@ -195,6 +195,37 @@ describe('Parser', () => {
         });
       }
     });
+
+    it('parses number with pi suffix', () => {
+      const ast = parse('let x = 0.25pi;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        name: 'x',
+        value: { type: 'NumberLiteral', value: 0.25, unit: 'pi' },
+      });
+    });
+
+    it('parses integer with pi suffix', () => {
+      const ast = parse('let x = 1pi;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        name: 'x',
+        value: { type: 'NumberLiteral', value: 1, unit: 'pi' },
+      });
+    });
+
+    it('parses negative number with pi suffix via unary negation', () => {
+      const ast = parse('let x = -2pi;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        name: 'x',
+        value: {
+          type: 'UnaryExpression',
+          operator: '-',
+          argument: { type: 'NumberLiteral', value: 2, unit: 'pi' },
+        },
+      });
+    });
   });
 
   describe('expressions', () => {

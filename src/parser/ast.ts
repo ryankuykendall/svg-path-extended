@@ -149,7 +149,7 @@ export interface Identifier {
 export interface NumberLiteral {
   type: 'NumberLiteral';
   value: number;
-  unit?: 'deg' | 'rad';  // Optional angle unit
+  unit?: 'deg' | 'rad' | 'pi';  // Optional angle unit
 }
 
 // String literal (for log messages)

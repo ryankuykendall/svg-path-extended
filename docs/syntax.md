@@ -85,6 +85,7 @@ Numbers can have angle unit suffixes for convenience:
 |--------|-------------|
 | `45deg` | Degrees (converted to radians internally) |
 | `1.5rad` | Radians (no conversion) |
+| `0.25pi` | Multiplied by π (i.e. `0.25 * π`) |
 
 ```
 let angle = 90deg;
@@ -95,7 +96,18 @@ let angle = rad(90);
 M sin(rad(45)) cos(rad(45))
 ```
 
-This is especially useful with trigonometric functions and polar coordinates.
+The `pi` suffix multiplies the number by π. This is especially convenient for polar coordinates and angles expressed as fractions of π:
+
+```
+let quarter = 0.25pi;   // π/4
+let half = 0.5pi;       // π/2
+let full = 2pi;          // 2π
+M sin(0.25pi) cos(0.25pi)
+```
+
+The `pi` suffix participates in angle unit mismatch checking: `calc(0.25pi + 5)` throws an error, while `calc(90deg + 0.5pi)` is allowed (both have angle units).
+
+**Note**: The `pi` suffix only works on numeric literals. For expressions or variables, use `mpi(x)` (see [Standard Library](stdlib.md)).
 
 ## For Loops
 

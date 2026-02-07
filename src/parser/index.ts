@@ -53,16 +53,16 @@ function keyword(str: string): Parsimmon.Parser<string> {
   return token(P.regexp(new RegExp(str + '(?![a-zA-Z0-9_])')));
 }
 
-// Number literal: 123, 45.67, -89, .5, optionally with angle unit suffix (deg/rad)
+// Number literal: 123, 45.67, -89, .5, optionally with angle unit suffix (deg/rad/pi)
 // Uses negative lookahead to avoid consuming '.' when followed by '..' (range operator)
 const numberLiteral: Parsimmon.Parser<NumberLiteral> = token(
-  P.regexp(/-?(?:\d+(?:\.(?!\.))\d*|\.\d+|\d+)(deg|rad)?/)
+  P.regexp(/-?(?:\d+(?:\.(?!\.))\d*|\.\d+|\d+)(deg|rad|pi)?/)
 ).map((str) => {
-  const match = str.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+|\d+))(deg|rad)?$/);
+  const match = str.match(/^(-?(?:\d+(?:\.\d*)?|\.\d+|\d+))(deg|rad|pi)?$/);
   return {
     type: 'NumberLiteral' as const,
     value: parseFloat(match![1]),
-    unit: match![2] as 'deg' | 'rad' | undefined,
+    unit: match![2] as 'deg' | 'rad' | 'pi' | undefined,
   };
 });
 
