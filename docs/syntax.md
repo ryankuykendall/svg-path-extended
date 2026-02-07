@@ -147,19 +147,21 @@ This creates a 3x3 grid (rows 0, 1, 2 and cols 0, 1, 2).
 
 ## Conditionals
 
-Use `if` and `else` for conditional path generation:
+Use `if`, `else if`, and `else` for conditional path generation:
 
 ```
 let size = 100;
 
-if (size > 50) {
+if (size > 75) {
   M 0 0 L 100 100
+} else if (size > 50) {
+  M 0 0 L 75 75
 } else {
   M 0 0 L 50 50
 }
 ```
 
-Comparison results are numeric: `1` for true, `0` for false.
+You can chain as many `else if` blocks as needed. Comparison results are numeric: `1` for true, `0` for false.
 
 ## Functions
 

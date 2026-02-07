@@ -351,6 +351,43 @@ describe('Parser', () => {
       expect(stmt.type === 'IfStatement' && stmt.alternate).not.toBeNull();
     });
 
+    it('parses else if as nested IfStatement in alternate', () => {
+      const ast = parse('if (x > 0) { M 10 10 } else if (x < 0) { M 20 20 }');
+      const stmt = ast.body[0];
+      expect(stmt).toMatchObject({
+        type: 'IfStatement',
+        condition: { type: 'BinaryExpression', operator: '>' },
+      });
+      if (stmt.type === 'IfStatement') {
+        expect(stmt.alternate).toHaveLength(1);
+        expect(stmt.alternate![0]).toMatchObject({
+          type: 'IfStatement',
+          condition: { type: 'BinaryExpression', operator: '<' },
+          alternate: null,
+        });
+      }
+    });
+
+    it('parses else if ... else if ... else chain', () => {
+      const ast = parse('if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else if (x == 3) { M 3 0 } else { M 0 0 }');
+      const stmt = ast.body[0];
+      if (stmt.type === 'IfStatement') {
+        // first else if
+        const elseIf1 = stmt.alternate![0];
+        expect(elseIf1).toMatchObject({ type: 'IfStatement', condition: { type: 'BinaryExpression', left: { name: 'x' }, right: { value: 2 } } });
+        // second else if
+        if (elseIf1.type === 'IfStatement') {
+          const elseIf2 = elseIf1.alternate![0];
+          expect(elseIf2).toMatchObject({ type: 'IfStatement', condition: { type: 'BinaryExpression', left: { name: 'x' }, right: { value: 3 } } });
+          // final else
+          if (elseIf2.type === 'IfStatement') {
+            expect(elseIf2.alternate).toHaveLength(1);
+            expect(elseIf2.alternate![0]).toMatchObject({ type: 'PathCommand', command: 'M' });
+          }
+        }
+      }
+    });
+
     it('parses if with calc() in condition', () => {
       const ast = parse('if (calc(x % 2) == 0) { M 10 10 }');
       expect(ast.body[0]).toMatchObject({

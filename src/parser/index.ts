@@ -452,7 +452,10 @@ const ifStatement: Parsimmon.Parser<IfStatement> = P.seqMap(
   expression,
   word(')'),
   block,
-  P.seq(keyword('else'), block).map(([, b]) => b).fallback(null),
+  P.seq(keyword('else'), P.alt(
+    P.lazy(() => ifStatement).map(stmt => [stmt]),
+    block
+  )).map(([, b]) => b).fallback(null),
   (_if, _lp, condition, _rp, consequent, alternate) => ({
     type: 'IfStatement' as const,
     condition,

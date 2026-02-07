@@ -610,6 +610,28 @@ describe('Evaluator', () => {
       expect(compile('let x = 0; if (x > 0) { M 10 10 } else { M 0 0 }')).toBe('M 0 0');
     });
 
+    it('evaluates else if picking correct branch', () => {
+      expect(compile('let x = 2; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else { M 0 0 }')).toBe('M 2 0');
+    });
+
+    it('evaluates multi-branch else if chain with final else', () => {
+      expect(compile('let x = 3; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else if (x == 3) { M 3 0 } else { M 0 0 }')).toBe('M 3 0');
+      expect(compile('let x = 9; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else if (x == 3) { M 3 0 } else { M 0 0 }')).toBe('M 0 0');
+    });
+
+    it('evaluates else if without final else (no match returns empty)', () => {
+      expect(compile('let x = 5; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 }')).toBe('');
+    });
+
+    it('evaluates else if inside a loop', () => {
+      const result = compile(`
+        for (i in 1..3) {
+          if (i == 1) { M 10 0 } else if (i == 2) { M 20 0 } else { M 30 0 }
+        }
+      `);
+      expect(result).toBe('M 10 0 M 20 0 M 30 0');
+    });
+
     it('evaluates if with calc() in condition', () => {
       expect(compile('let x = 4; if (calc(x % 2) == 0) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
       expect(compile('let x = 3; if (calc(x % 2) == 0) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
