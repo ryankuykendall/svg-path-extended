@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-02-09
+
+### Added
+
+#### Core
+- `else if` conditional chains — chain as many `else if` blocks as needed between `if` and `else`.
+- `pi` numeric suffix for angle literals (e.g., `0.25pi`, `2pi`) and `mpi(x)` stdlib function for multiplying expressions by pi.
+- Variable reassignment support (`x = value;`) — reassign previously declared variables without `let`.
+- `toFixed` number precision post-processing — available as a `compile()` option and CLI flag (`--precision`).
+- Async interpreter execution via Web Worker (`src/worker.ts`) for non-blocking compilation.
+
+#### Playground
+- Export with Legend feature — modal for exporting SVG with a customizable code legend overlay.
+- Light/dark theme system with visual refresh and system preference detection.
+- Refresh button for recompiling programs that use random functions.
+- Persist workspace preferences (canvas size, stroke, fill, grid) on change via autosave service.
+- Copy workspace form workflow and increased canvas size limit.
+- Toggle publish action on workspace cards.
+- Async compilation via Web Worker with performance optimizations.
+
+### Fixed
+
+#### Playground
+- Width/height input max validation in footer.
+- Console log objects not expandable in console pane.
+
+### Changed
+
+#### Branding
+- Playground rebranded to **Pathogen**.
+
+#### Deployment
+- Migrated from GitHub Pages to Cloudflare Pages; removed GitHub Actions deploy workflow.
+
 ## [Unreleased] - 2026-02-02
 
 ### Added
