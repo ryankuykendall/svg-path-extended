@@ -217,15 +217,23 @@ const styles = `
   .zoom-bar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
+    position: relative;
     padding: 0.5rem 0.75rem;
     background: var(--bg-secondary, #ffffff);
     border-top: 1px solid var(--border-color, #e2e8f0);
     flex-shrink: 0;
   }
 
-  .zoom-bar button {
+  .zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .zoom-bar button:not(.snap-toggle) {
     width: 32px;
     height: 32px;
     padding: 0;
@@ -241,7 +249,7 @@ const styles = `
     transition: all 0.15s ease;
   }
 
-  .zoom-bar button:hover {
+  .zoom-bar button:not(.snap-toggle):hover {
     background: var(--hover-bg, rgba(0, 0, 0, 0.04));
     border-color: var(--accent-color, #10b981);
     color: var(--accent-color, #10b981);
@@ -271,6 +279,80 @@ const styles = `
     outline: none;
     border-color: var(--accent-color, #10b981);
     box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.4));
+  }
+
+  /* Snap controls in zoom bar */
+  .snap-group {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: auto;
+  }
+
+  .snap-toggle {
+    position: relative;
+    width: 32px;
+    height: 18px;
+    border-radius: 9px;
+    background: var(--border-color, #cbd5e1);
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .snap-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 0.15s ease;
+  }
+
+  .snap-toggle.active {
+    background: var(--accent-color, #10b981);
+  }
+
+  .snap-toggle.active::after {
+    transform: translateX(14px);
+  }
+
+  .snap-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary, #64748b);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .snap-group .snap-size {
+    width: 48px;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: var(--radius-md, 8px);
+    font-size: 0.75rem;
+    font-family: var(--font-mono, 'Inconsolata', monospace);
+    font-weight: 500;
+    text-align: center;
+    background: var(--bg-secondary, #ffffff);
+    color: var(--text-primary, #1a1a2e);
+  }
+
+  .snap-group .snap-size:focus {
+    outline: none;
+    border-color: var(--accent-color, #10b981);
+    box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.2));
+  }
+
+  .snap-group .snap-size:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 
   /* Legend cursor feedback */
@@ -323,6 +405,10 @@ class ExportLegendModal extends HTMLElement {
     // Scale factor: all legend dimensions are multiplied by this
     this._scaleFactor = 1;
 
+    // Snap-to-grid
+    this._snapEnabled = true;
+    this._snapSize = 10;
+
     // Form data
     this._formData = {
       name: '',
@@ -371,6 +457,18 @@ class ExportLegendModal extends HTMLElement {
     return baseValue * this._scaleFactor;
   }
 
+  _snap(value) {
+    if (!this._snapEnabled || this._snapSize <= 0) return value;
+    return Math.round(value / this._snapSize) * this._snapSize;
+  }
+
+  _updateLegendPosition() {
+    const legendG = this._svg?.querySelector('#pathogen-legend');
+    if (legendG) {
+      legendG.setAttribute('transform', `translate(${this._legendX}, ${this._legendY})`);
+    }
+  }
+
   // --- Public API ---
 
   open(svgElement, storeState) {
@@ -385,6 +483,9 @@ class ExportLegendModal extends HTMLElement {
       creator: '',
       code: storeState.code || '',
     };
+
+    // Default snap size to match workspace grid
+    this._snapSize = storeState.gridSize || 10;
 
     // Compute scale factor from canvas dimensions
     // Anchor: at scale=1, BASE_WIDTH (560) is the legend width.
@@ -471,9 +572,9 @@ class ExportLegendModal extends HTMLElement {
     this._legendY = 0;
     const legendG = this._buildLegendGroup();
 
-    // Now position at bottom-right using measured height
-    this._legendX = this._canvasWidth - this._legendWidth - margin;
-    this._legendY = this._canvasHeight - this._legendTotalHeight - margin;
+    // Now position at bottom-right using measured height, snapped to grid
+    this._legendX = this._snap(this._canvasWidth - this._legendWidth - margin);
+    this._legendY = this._snap(this._canvasHeight - this._legendTotalHeight - margin);
     legendG.setAttribute('transform', `translate(${this._legendX}, ${this._legendY})`);
     svg.appendChild(legendG);
 
@@ -783,6 +884,16 @@ class ExportLegendModal extends HTMLElement {
     root.querySelector('#legend-date').value = this._formData.date;
     root.querySelector('#legend-creator').value = this._formData.creator;
     root.querySelector('#legend-code').value = this._formData.code;
+    const snapInput = root.querySelector('#legend-snap');
+    const snapToggle = root.querySelector('#snap-toggle');
+    if (snapInput) {
+      snapInput.value = this._snapSize;
+      snapInput.disabled = !this._snapEnabled;
+    }
+    if (snapToggle) {
+      snapToggle.classList.toggle('active', this._snapEnabled);
+      snapToggle.setAttribute('aria-checked', this._snapEnabled);
+    }
   }
 
   // --- Zoom / Pan ---
@@ -933,6 +1044,31 @@ class ExportLegendModal extends HTMLElement {
       });
     });
 
+    // Snap toggle + size input
+    const snapToggle = root.querySelector('#snap-toggle');
+    const snapInput = root.querySelector('#legend-snap');
+    const snapLabel = root.querySelector('#snap-label');
+
+    const updateSnapToggleUI = () => {
+      snapToggle.classList.toggle('active', this._snapEnabled);
+      snapToggle.setAttribute('aria-checked', this._snapEnabled);
+      snapInput.disabled = !this._snapEnabled;
+    };
+
+    snapToggle.addEventListener('click', () => {
+      this._snapEnabled = !this._snapEnabled;
+      updateSnapToggleUI();
+    });
+
+    snapLabel.addEventListener('click', () => {
+      this._snapEnabled = !this._snapEnabled;
+      updateSnapToggleUI();
+    });
+
+    snapInput.addEventListener('input', (e) => {
+      this._snapSize = Math.max(1, parseInt(e.target.value) || 1);
+    });
+
     // Preview area mouse events (pan + legend drag + resize)
     const previewArea = root.querySelector('.preview-area');
 
@@ -1004,12 +1140,9 @@ class ExportLegendModal extends HTMLElement {
       // Legend drag
       if (this._isDragging) {
         const svgPt = this._screenToSvg(e.clientX, e.clientY);
-        this._legendX = svgPt.x - this._dragStartX;
-        this._legendY = svgPt.y - this._dragStartY;
-        const legendG = this._svg.querySelector('#pathogen-legend');
-        if (legendG) {
-          legendG.setAttribute('transform', `translate(${this._legendX}, ${this._legendY})`);
-        }
+        this._legendX = this._snap(svgPt.x - this._dragStartX);
+        this._legendY = this._snap(svgPt.y - this._dragStartY);
+        this._updateLegendPosition();
         return;
       }
 
@@ -1049,6 +1182,23 @@ class ExportLegendModal extends HTMLElement {
       if (e.key === 'Escape') {
         e.stopPropagation();
         this.close();
+        return;
+      }
+
+      // Arrow keys move legend (skip when focus is in a text field)
+      const origin = e.composedPath()[0];
+      const tag = origin?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const arrowMap = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+      const dir = arrowMap[e.key];
+      if (dir && this._svg) {
+        e.preventDefault();
+        const multiplier = e.shiftKey ? 10 : 1;
+        const base = this._snapEnabled && this._snapSize > 0 ? this._snapSize : 1;
+        const step = base * multiplier;
+        this._legendX += dir[0] * step;
+        this._legendY += dir[1] * step;
+        this._updateLegendPosition();
       }
     };
 
@@ -1106,10 +1256,17 @@ class ExportLegendModal extends HTMLElement {
         <div class="preview-panel">
           <div class="preview-area"></div>
           <div class="zoom-bar">
-            <button class="zoom-out" title="Zoom out">&#x2212;</button>
-            <button class="zoom-fit" title="Fit to view">Fit</button>
-            <button class="zoom-in" title="Zoom in">&#x002B;</button>
-            <input type="text" class="zoom-level" value="100%" title="Enter zoom percentage">
+            <div class="zoom-controls">
+              <button class="zoom-out" title="Zoom out">&#x2212;</button>
+              <button class="zoom-fit" title="Fit to view">Fit</button>
+              <button class="zoom-in" title="Zoom in">&#x002B;</button>
+              <input type="text" class="zoom-level" value="100%" title="Enter zoom percentage">
+            </div>
+            <div class="snap-group">
+              <span class="snap-label" id="snap-label">Snap</span>
+              <button class="snap-toggle active" id="snap-toggle" role="switch" aria-checked="true" aria-labelledby="snap-label" title="Toggle snap to grid"></button>
+              <input type="number" class="snap-size" id="legend-snap" min="1" step="1" value="10" title="Snap grid size">
+            </div>
           </div>
         </div>
       </div>
