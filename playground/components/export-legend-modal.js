@@ -355,6 +355,78 @@ const styles = `
     cursor: default;
   }
 
+  /* Advanced settings */
+  .advanced-settings {
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: var(--radius-md, 8px);
+    overflow: hidden;
+  }
+
+  .advanced-settings summary {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .advanced-settings summary::-webkit-details-marker { display: none; }
+
+  .advanced-settings summary::before {
+    content: '▶';
+    font-size: 0.5rem;
+    transition: transform 0.15s ease;
+  }
+
+  .advanced-settings[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .advanced-body {
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    border-top: 1px solid var(--border-color, #e2e8f0);
+  }
+
+  .advanced-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .advanced-row label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary, #64748b);
+  }
+
+  .advanced-row input[type="color"] {
+    width: 32px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: var(--radius-md, 8px);
+    background: var(--bg-primary, #f8f9fa);
+    cursor: pointer;
+  }
+
+  .advanced-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-color, #10b981);
+    cursor: pointer;
+  }
+
   /* Legend cursor feedback */
   .legend-group { cursor: move; }
   .legend-group.dragging { cursor: grabbing; }
@@ -374,6 +446,8 @@ const styles = `
 `;
 
 class ExportLegendModal extends HTMLElement {
+  static _fontCache = {};
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -417,6 +491,15 @@ class ExportLegendModal extends HTMLElement {
       creator: '',
       code: '',
     };
+
+    // Snapshot of workspace state at modal open time
+    this._workspaceState = null;
+
+    // Export overrides (non-null values override workspace state in preview)
+    this._exportOverrides = { gridEnabled: null, gridColor: null, background: null, stroke: null };
+
+    // Debounce handle for preview rebuilds
+    this._rebuildRafId = null;
 
     // Base dimensions (at scale factor 1.0, fits 80 monospace chars)
     // Base width: 80 chars * (11 * 0.6) charWidth + 2 * 16 padding ≈ 560
@@ -472,6 +555,10 @@ class ExportLegendModal extends HTMLElement {
   // --- Public API ---
 
   open(svgElement, storeState) {
+    // Snapshot workspace state for override merging
+    this._workspaceState = { ...storeState };
+    this._exportOverrides = { gridEnabled: null, gridColor: null, background: null, stroke: null };
+
     this._canvasWidth = storeState.width;
     this._canvasHeight = storeState.height;
 
@@ -500,7 +587,7 @@ class ExportLegendModal extends HTMLElement {
     this._panY = 0;
 
     // Build the preview SVG with legend
-    this._buildPreviewSvg(svgElement, storeState);
+    this._buildPreviewSvg(svgElement, this._getEffectiveState());
     this._populateForm();
     this._updateZoomDisplay();
 
@@ -511,6 +598,48 @@ class ExportLegendModal extends HTMLElement {
   close() {
     this.classList.remove('open');
     this._removeDocumentListeners();
+  }
+
+  _getEffectiveState() {
+    const s = { ...this._workspaceState };
+    for (const [key, val] of Object.entries(this._exportOverrides)) {
+      if (val !== null) s[key] = val;
+    }
+    return s;
+  }
+
+  _scheduleRebuild() {
+    if (this._rebuildRafId) cancelAnimationFrame(this._rebuildRafId);
+    this._rebuildRafId = requestAnimationFrame(() => {
+      this._rebuildRafId = null;
+      this._rebuildPreview();
+    });
+  }
+
+  _rebuildPreview() {
+    // Save legend position and zoom/pan
+    const savedX = this._legendX;
+    const savedY = this._legendY;
+    const savedZoom = this._zoom;
+    const savedPanX = this._panX;
+    const savedPanY = this._panY;
+    const savedWidth = this._legendWidth;
+    const savedScale = this._scaleFactor;
+
+    // Rebuild with effective state
+    this._legendWidth = savedWidth;
+    this._scaleFactor = savedScale;
+    this._buildPreviewSvg(null, this._getEffectiveState());
+
+    // Restore legend position and zoom/pan
+    this._legendX = savedX;
+    this._legendY = savedY;
+    this._zoom = savedZoom;
+    this._panX = savedPanX;
+    this._panY = savedPanY;
+    this._updateLegendPosition();
+    this._updateViewBox();
+    this._updateZoomDisplay();
   }
 
   // --- SVG building ---
@@ -676,7 +805,7 @@ class ExportLegendModal extends HTMLElement {
 
     const boxHeight = y + pad;
 
-    // Background rect with accent border
+    // Background rect with neutral border (persists in downloaded SVG)
     const rect = document.createElementNS(ns, 'rect');
     rect.setAttribute('rx', borderRadius);
     rect.setAttribute('ry', borderRadius);
@@ -684,10 +813,22 @@ class ExportLegendModal extends HTMLElement {
     rect.setAttribute('height', boxHeight);
     rect.setAttribute('fill', 'white');
     rect.setAttribute('fill-opacity', '0.92');
-    rect.setAttribute('stroke', ACCENT);
-    rect.setAttribute('stroke-width', strokeWidth * 1.5);
+    rect.setAttribute('stroke', '#e2e8f0');
+    rect.setAttribute('stroke-width', strokeWidth);
     rect.classList.add('legend-bg');
     g.appendChild(rect);
+
+    // Accent border overlay (visible in preview, stripped on download)
+    const accentRect = document.createElementNS(ns, 'rect');
+    accentRect.setAttribute('rx', borderRadius);
+    accentRect.setAttribute('ry', borderRadius);
+    accentRect.setAttribute('width', this._legendWidth);
+    accentRect.setAttribute('height', boxHeight);
+    accentRect.setAttribute('fill', 'none');
+    accentRect.setAttribute('stroke', ACCENT);
+    accentRect.setAttribute('stroke-width', strokeWidth * 1.5);
+    accentRect.setAttribute('data-interactive', 'true');
+    g.appendChild(accentRect);
 
     // Append text elements on top of rect
     elements.forEach(el => g.appendChild(el));
@@ -706,8 +847,8 @@ class ExportLegendModal extends HTMLElement {
 
     const brandSpan1 = document.createElementNS(ns, 'tspan');
     brandSpan1.setAttribute('font-size', pathogenFontSize);
-    brandSpan1.setAttribute('font-weight', '600');
-    brandSpan1.setAttribute('font-family', "'Inter', -apple-system, BlinkMacSystemFont, sans-serif");
+    brandSpan1.setAttribute('font-weight', '400');
+    brandSpan1.setAttribute('font-family', "'Baumans', cursive");
     brandSpan1.textContent = 'Pathogen';
 
     const brandSpan2 = document.createElementNS(ns, 'tspan');
@@ -814,6 +955,7 @@ class ExportLegendModal extends HTMLElement {
     text.setAttribute('font-size', fSize);
     text.setAttribute('font-family', "'Inconsolata', 'Consolas', 'Monaco', monospace");
     text.setAttribute('dominant-baseline', 'hanging');
+    text.style.whiteSpace = 'pre';
     if (opts.color) text.setAttribute('fill', opts.color);
     if (opts.cls) text.classList.add(opts.cls);
 
@@ -894,6 +1036,13 @@ class ExportLegendModal extends HTMLElement {
       snapToggle.classList.toggle('active', this._snapEnabled);
       snapToggle.setAttribute('aria-checked', this._snapEnabled);
     }
+    // Populate advanced export settings from workspace state
+    if (this._workspaceState) {
+      root.querySelector('#export-grid-enabled').checked = this._workspaceState.gridEnabled;
+      root.querySelector('#export-grid-color').value = this._workspaceState.gridColor || '#cccccc';
+      root.querySelector('#export-background').value = this._workspaceState.background || '#ffffff';
+      root.querySelector('#export-stroke').value = this._workspaceState.stroke || '#000000';
+    }
   }
 
   // --- Zoom / Pan ---
@@ -954,26 +1103,115 @@ class ExportLegendModal extends HTMLElement {
     return pt.matrixTransform(this._svg.getScreenCTM().inverse());
   }
 
+  // --- Font embedding ---
+
+  async _embedFonts(svgClone) {
+    const fonts = [
+      {
+        family: 'Baumans',
+        url: 'https://fonts.googleapis.com/css2?family=Baumans&text=Pathogen',
+      },
+      {
+        family: 'Inconsolata',
+        // All printable ASCII for code block coverage
+        url: 'https://fonts.googleapis.com/css2?family=Inconsolata&text=' +
+          encodeURIComponent(' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'),
+      },
+    ];
+
+    const fontFaceRules = [];
+
+    for (const font of fonts) {
+      try {
+        // Check session cache
+        if (ExportLegendModal._fontCache[font.family]) {
+          fontFaceRules.push(ExportLegendModal._fontCache[font.family]);
+          continue;
+        }
+
+        // Fetch CSS from Google Fonts
+        const cssRes = await fetch(font.url);
+        if (!cssRes.ok) throw new Error(`CSS fetch failed: ${cssRes.status}`);
+        const css = await cssRes.text();
+
+        // Extract src url and format from @font-face rule
+        const srcMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\(['"]([^'"]+)['"]\)/);
+        if (!srcMatch) throw new Error('Could not parse font CSS');
+
+        const fontUrl = srcMatch[1];
+        const fontFormat = srcMatch[2];
+
+        // Fetch font binary
+        const fontRes = await fetch(fontUrl);
+        if (!fontRes.ok) throw new Error(`Font fetch failed: ${fontRes.status}`);
+        const buffer = await fontRes.arrayBuffer();
+
+        // Convert to base64 using chunked approach to avoid call stack limits
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 8192;
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, i + chunkSize);
+          binary += String.fromCharCode.apply(null, chunk);
+        }
+        const b64 = btoa(binary);
+
+        // Determine MIME type
+        const mime = fontFormat === 'woff2' ? 'font/woff2' : 'font/ttf';
+
+        // Build @font-face rule with data URI
+        const rule = `@font-face {\n  font-family: '${font.family}';\n  src: url(data:${mime};base64,${b64}) format('${fontFormat}');\n}`;
+
+        ExportLegendModal._fontCache[font.family] = rule;
+        fontFaceRules.push(rule);
+      } catch (err) {
+        console.warn(`Font embedding failed for ${font.family}:`, err);
+      }
+    }
+
+    if (fontFaceRules.length === 0) return;
+
+    // Inject into <defs> <style>
+    const ns = 'http://www.w3.org/2000/svg';
+    let defs = svgClone.querySelector('defs');
+    if (!defs) {
+      defs = document.createElementNS(ns, 'defs');
+      svgClone.insertBefore(defs, svgClone.firstChild);
+    }
+
+    const styleEl = document.createElementNS(ns, 'style');
+    styleEl.textContent = fontFaceRules.join('\n');
+    defs.appendChild(styleEl);
+  }
+
   // --- Export / Download ---
 
   async _download() {
-    const clone = this._svg.cloneNode(true);
-
-    // Reset viewBox to full canvas
-    clone.setAttribute('viewBox', `0 0 ${this._canvasWidth} ${this._canvasHeight}`);
-
-    // Strip interactive elements (resize handles)
-    clone.querySelectorAll('[data-interactive="true"]').forEach(el => el.remove());
-
-    const serializer = new XMLSerializer();
-    const svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + serializer.serializeToString(clone);
-    const blob = new Blob([svgString], { type: 'image/svg+xml' });
-
-    const workspaceName = this._formData.name || 'untitled';
-    const safeName = workspaceName.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-');
-    const suggestedName = `${safeName}-with-legend.svg`;
+    const downloadBtn = this.shadowRoot.querySelector('.download-btn');
+    const originalText = downloadBtn.innerHTML;
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = 'Preparing...';
 
     try {
+      const clone = this._svg.cloneNode(true);
+
+      // Reset viewBox to full canvas
+      clone.setAttribute('viewBox', `0 0 ${this._canvasWidth} ${this._canvasHeight}`);
+
+      // Strip interactive elements (resize handles, accent border overlay)
+      clone.querySelectorAll('[data-interactive="true"]').forEach(el => el.remove());
+
+      // Embed fonts for self-contained SVG
+      await this._embedFonts(clone);
+
+      const serializer = new XMLSerializer();
+      const svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + serializer.serializeToString(clone);
+      const blob = new Blob([svgString], { type: 'image/svg+xml' });
+
+      const workspaceName = this._formData.name || 'untitled';
+      const safeName = workspaceName.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-');
+      const suggestedName = `${safeName}-with-legend.svg`;
+
       if ('showSaveFilePicker' in window) {
         const handle = await window.showSaveFilePicker({
           suggestedName,
@@ -997,6 +1235,9 @@ class ExportLegendModal extends HTMLElement {
       if (err.name !== 'AbortError') {
         console.error('Export failed:', err);
       }
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.innerHTML = originalText;
     }
   }
 
@@ -1067,6 +1308,24 @@ class ExportLegendModal extends HTMLElement {
 
     snapInput.addEventListener('input', (e) => {
       this._snapSize = Math.max(1, parseInt(e.target.value) || 1);
+    });
+
+    // Advanced export settings
+    root.querySelector('#export-grid-enabled').addEventListener('change', (e) => {
+      this._exportOverrides.gridEnabled = e.target.checked;
+      this._scheduleRebuild();
+    });
+    root.querySelector('#export-grid-color').addEventListener('input', (e) => {
+      this._exportOverrides.gridColor = e.target.value;
+      this._scheduleRebuild();
+    });
+    root.querySelector('#export-background').addEventListener('input', (e) => {
+      this._exportOverrides.background = e.target.value;
+      this._scheduleRebuild();
+    });
+    root.querySelector('#export-stroke').addEventListener('input', (e) => {
+      this._exportOverrides.stroke = e.target.value;
+      this._scheduleRebuild();
     });
 
     // Preview area mouse events (pan + legend drag + resize)
@@ -1249,6 +1508,27 @@ class ExportLegendModal extends HTMLElement {
             <label for="legend-code">SVGX Code</label>
             <textarea id="legend-code" rows="6" class="code-input" readonly></textarea>
           </div>
+          <details class="advanced-settings">
+            <summary>Advanced Export Settings</summary>
+            <div class="advanced-body">
+              <div class="advanced-row">
+                <label for="export-grid-enabled">Show Grid</label>
+                <input type="checkbox" id="export-grid-enabled">
+              </div>
+              <div class="advanced-row">
+                <label for="export-grid-color">Grid Color</label>
+                <input type="color" id="export-grid-color">
+              </div>
+              <div class="advanced-row">
+                <label for="export-background">Background</label>
+                <input type="color" id="export-background">
+              </div>
+              <div class="advanced-row">
+                <label for="export-stroke">Stroke Color</label>
+                <input type="color" id="export-stroke">
+              </div>
+            </div>
+          </details>
           <div class="form-spacer"></div>
           <button class="btn cancel-btn">Cancel</button>
         </div>
