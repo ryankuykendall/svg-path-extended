@@ -279,15 +279,17 @@ M <span class="hljs-title function_">sin</span>(<span class="hljs-number">0.</sp
 }
 </code></pre><p>This creates a 3x3 grid (rows 0, 1, 2 and cols 0, 1, 2).</p>
 <h2>Conditionals</h2>
-<p>Use <code>if</code> and <code>else</code> for conditional path generation:</p>
+<p>Use <code>if</code>, <code>else if</code>, and <code>else</code> for conditional path generation:</p>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> size = <span class="hljs-number">100</span>;
 
-<span class="hljs-keyword">if</span> (size &gt; <span class="hljs-number">50</span>) {
+<span class="hljs-keyword">if</span> (size &gt; <span class="hljs-number">75</span>) {
   M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+} <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (size &gt; <span class="hljs-number">50</span>) {
+  M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">75</span> <span class="hljs-number">75</span>
 } <span class="hljs-keyword">else</span> {
   M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">50</span> <span class="hljs-number">50</span>
 }
-</code></pre><p>Comparison results are numeric: <code>1</code> for true, <code>0</code> for false.</p>
+</code></pre><p>You can chain as many <code>else if</code> blocks as needed. Comparison results are numeric: <code>1</code> for true, <code>0</code> for false.</p>
 <h2>Functions</h2>
 <h3>Defining Functions</h3>
 <p>Create reusable path generators with <code>fn</code>:</p>
