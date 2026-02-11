@@ -164,7 +164,7 @@ const styles = `
     transition: all var(--transition-base, 0.15s ease);
     box-shadow: var(--shadow-sm);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 1rem;
   }
 
@@ -175,8 +175,8 @@ const styles = `
   }
 
   .workspace-thumb-sm {
-    width: 48px;
-    height: 48px;
+    width: 128px;
+    height: 128px;
     border-radius: var(--radius-md, 8px);
     overflow: hidden;
     background: var(--bg-primary, #f1f5f9);
@@ -196,7 +196,7 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
+    font-size: 2.5rem;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.9);
     text-transform: uppercase;

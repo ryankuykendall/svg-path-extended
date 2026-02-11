@@ -21,6 +21,8 @@ const styles = `
   :host(.open) {
     display: flex;
     flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
   }
 
   .backdrop {
@@ -118,9 +120,10 @@ const styles = `
     background: var(--bg-primary, #f8f9fa);
   }
 
-  /* Preview strip (left panel) */
+  /* Preview strip (left panel) — 256px content + padding */
   .preview-strip {
-    width: 200px;
+    width: calc(256px + 1.25rem * 2);
+    box-sizing: border-box;
     flex-shrink: 0;
     background: var(--bg-secondary, #ffffff);
     border-right: 1px solid var(--border-color, #e2e8f0);
@@ -154,12 +157,16 @@ const styles = `
   }
 
   .preview-size canvas {
-    width: 100%;
     aspect-ratio: 1;
     border-radius: var(--radius-md, 8px);
     border: 1px solid var(--border-color, #e2e8f0);
     background: #ffffff;
   }
+
+  /* 1024 is the reference size (full width); 512 and 256 scale proportionally */
+  #preview-1024 { width: 100%; }
+  #preview-512  { width: 50%; }
+  #preview-256  { width: 25%; }
 
   .reset-btn {
     margin-top: auto;
@@ -171,6 +178,8 @@ const styles = `
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .preview-area {
@@ -193,13 +202,14 @@ const styles = `
     max-width: 100%;
     max-height: 100%;
     box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.08));
-    border-radius: var(--radius-lg, 12px);
+    overflow: visible;
   }
 
   /* Zoom bar */
   .zoom-bar {
     display: flex;
     align-items: center;
+    justify-content: center;
     padding: 0.5rem 0.75rem;
     background: var(--bg-secondary, #ffffff);
     border-top: 1px solid var(--border-color, #e2e8f0);
@@ -210,13 +220,6 @@ const styles = `
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  .zoom-bar {
-    position: relative;
   }
 
   .zoom-bar button {
@@ -267,13 +270,6 @@ const styles = `
     box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.4));
   }
 
-  /* Crop overlay cursors */
-  .crop-area { cursor: move; }
-  .crop-handle { cursor: nwse-resize; }
-  .crop-handle-ne { cursor: nesw-resize; }
-  .crop-handle-sw { cursor: nesw-resize; }
-  .crop-handle-nw { cursor: nwse-resize; }
-  .crop-handle-se { cursor: nwse-resize; }
 
   @media (max-width: 700px) {
     .content {
@@ -517,33 +513,103 @@ class ThumbnailCropModal extends HTMLElement {
       group.appendChild(r);
     }
 
-    // Crop border
-    const border = document.createElementNS(ns, 'rect');
-    border.setAttribute('x', cx); border.setAttribute('y', cy);
-    border.setAttribute('width', cs); border.setAttribute('height', cs);
-    border.setAttribute('fill', 'none');
-    border.setAttribute('stroke', ACCENT);
-    border.setAttribute('stroke-width', 2 / this._zoom);
-    border.classList.add('crop-area');
-    group.appendChild(border);
+    // Scale factor: how many SVG units = 1 CSS pixel
+    const s = this._svgScale();
+    const nss = 'vector-effect'; // shorthand for the attribute name
 
-    // Corner handles
-    const handleSize = 8 / this._zoom;
+    // Invisible drag surface for the crop area (cursor: move)
+    const dragSurface = document.createElementNS(ns, 'rect');
+    dragSurface.setAttribute('x', cx); dragSurface.setAttribute('y', cy);
+    dragSurface.setAttribute('width', cs); dragSurface.setAttribute('height', cs);
+    dragSurface.setAttribute('fill', 'transparent');
+    dragSurface.style.cursor = 'move';
+    dragSurface.classList.add('crop-area');
+    group.appendChild(dragSurface);
+
+    // Accent border (solid, like export legend) — non-scaling-stroke keeps it at 2 CSS px
+    const accentBorder = document.createElementNS(ns, 'rect');
+    accentBorder.setAttribute('x', cx); accentBorder.setAttribute('y', cy);
+    accentBorder.setAttribute('width', cs); accentBorder.setAttribute('height', cs);
+    accentBorder.setAttribute('fill', 'none');
+    accentBorder.setAttribute('stroke', ACCENT);
+    accentBorder.setAttribute('stroke-width', '2');
+    accentBorder.setAttribute(nss, 'non-scaling-stroke');
+    accentBorder.setAttribute('pointer-events', 'none');
+    group.appendChild(accentBorder);
+
+    // Marching ants overlay — non-scaling-stroke so dashes are always ~8 CSS px
+    const ants = document.createElementNS(ns, 'rect');
+    ants.setAttribute('x', cx); ants.setAttribute('y', cy);
+    ants.setAttribute('width', cs); ants.setAttribute('height', cs);
+    ants.setAttribute('fill', 'none');
+    ants.setAttribute('stroke', '#ffffff');
+    ants.setAttribute('stroke-width', '1.5');
+    ants.setAttribute(nss, 'non-scaling-stroke');
+    ants.setAttribute('stroke-dasharray', '8 8');
+    ants.setAttribute('pointer-events', 'none');
+    const animate = document.createElementNS(ns, 'animate');
+    animate.setAttribute('attributeName', 'stroke-dashoffset');
+    animate.setAttribute('from', '0');
+    animate.setAttribute('to', '-16');
+    animate.setAttribute('dur', '0.4s');
+    animate.setAttribute('repeatCount', 'indefinite');
+    ants.appendChild(animate);
+    group.appendChild(ants);
+
+    // Rule-of-thirds guides inside crop area — non-scaling-stroke
+    const thirdLineColor = 'rgba(255, 255, 255, 0.3)';
+    for (let i = 1; i <= 2; i++) {
+      const vLine = document.createElementNS(ns, 'line');
+      vLine.setAttribute('x1', cx + cs * i / 3); vLine.setAttribute('y1', cy);
+      vLine.setAttribute('x2', cx + cs * i / 3); vLine.setAttribute('y2', cy + cs);
+      vLine.setAttribute('stroke', thirdLineColor);
+      vLine.setAttribute('stroke-width', '1');
+      vLine.setAttribute(nss, 'non-scaling-stroke');
+      vLine.setAttribute('pointer-events', 'none');
+      group.appendChild(vLine);
+
+      const hLine = document.createElementNS(ns, 'line');
+      hLine.setAttribute('x1', cx); hLine.setAttribute('y1', cy + cs * i / 3);
+      hLine.setAttribute('x2', cx + cs); hLine.setAttribute('y2', cy + cs * i / 3);
+      hLine.setAttribute('stroke', thirdLineColor);
+      hLine.setAttribute('stroke-width', '1');
+      hLine.setAttribute(nss, 'non-scaling-stroke');
+      hLine.setAttribute('pointer-events', 'none');
+      group.appendChild(hLine);
+    }
+
+    // Corner handles — sizes in SVG units derived from CSS pixels via CTM
+    const handleSize = 10 * s;
+    const hitSize = 24 * s;
     const corners = [
-      { cls: 'crop-handle-nw', x: cx - handleSize/2, y: cy - handleSize/2 },
-      { cls: 'crop-handle-ne', x: cx + cs - handleSize/2, y: cy - handleSize/2 },
-      { cls: 'crop-handle-sw', x: cx - handleSize/2, y: cy + cs - handleSize/2 },
-      { cls: 'crop-handle-se', x: cx + cs - handleSize/2, y: cy + cs - handleSize/2 },
+      { cls: 'crop-handle-nw', x: cx, y: cy, cursor: 'nwse-resize' },
+      { cls: 'crop-handle-ne', x: cx + cs, y: cy, cursor: 'nesw-resize' },
+      { cls: 'crop-handle-sw', x: cx, y: cy + cs, cursor: 'nesw-resize' },
+      { cls: 'crop-handle-se', x: cx + cs, y: cy + cs, cursor: 'nwse-resize' },
     ];
 
     for (const corner of corners) {
+      // Invisible hit area
+      const hit = document.createElementNS(ns, 'rect');
+      hit.setAttribute('x', corner.x - hitSize / 2);
+      hit.setAttribute('y', corner.y - hitSize / 2);
+      hit.setAttribute('width', hitSize); hit.setAttribute('height', hitSize);
+      hit.setAttribute('fill', 'transparent');
+      hit.style.cursor = corner.cursor;
+      hit.classList.add('crop-handle', corner.cls);
+      group.appendChild(hit);
+
+      // Visible handle
       const h = document.createElementNS(ns, 'rect');
-      h.setAttribute('x', corner.x); h.setAttribute('y', corner.y);
+      h.setAttribute('x', corner.x - handleSize / 2);
+      h.setAttribute('y', corner.y - handleSize / 2);
       h.setAttribute('width', handleSize); h.setAttribute('height', handleSize);
-      h.setAttribute('fill', '#ffffff');
+      h.setAttribute('fill', ACCENT_LIGHT);
       h.setAttribute('stroke', ACCENT);
-      h.setAttribute('stroke-width', 1.5 / this._zoom);
-      h.classList.add('crop-handle', corner.cls);
+      h.setAttribute('stroke-width', '2');
+      h.setAttribute(nss, 'non-scaling-stroke');
+      h.setAttribute('rx', 2 * s);
+      h.setAttribute('pointer-events', 'none');
       group.appendChild(h);
     }
   }
@@ -618,6 +684,14 @@ class ThumbnailCropModal extends HTMLElement {
     };
     img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
+  }
+
+  // How many SVG units = 1 CSS pixel at the current zoom/viewBox
+  _svgScale() {
+    if (!this._svg) return 1;
+    const ctm = this._svg.getScreenCTM();
+    if (!ctm) return 1;
+    return 1 / ctm.a;
   }
 
   // --- Zoom / Pan ---

@@ -50,19 +50,25 @@ async function processInWorker(bitmap) {
   initWorker();
 
   if (worker && workerReady) {
-    return new Promise((resolve, reject) => {
-      const handler = (e) => {
-        worker.removeEventListener('message', handler);
-        if (e.data.success) {
-          resolve(e.data.results);
-        } else {
-          reject(new Error(e.data.error || 'Worker processing failed'));
-        }
-      };
+    try {
+      return await new Promise((resolve, reject) => {
+        const handler = (e) => {
+          worker.removeEventListener('message', handler);
+          if (e.data.success) {
+            resolve(e.data.results);
+          } else {
+            reject(new Error(e.data.error || 'Worker processing failed'));
+          }
+        };
 
-      worker.addEventListener('message', handler);
-      worker.postMessage({ bitmap, sizes: SIZES }, [bitmap]);
-    });
+        worker.addEventListener('message', handler);
+        worker.postMessage({ bitmap, sizes: SIZES }, [bitmap]);
+      });
+    } catch (err) {
+      console.warn('Worker processing failed, falling back to main thread:', err);
+      // bitmap was transferred and is neutered — re-create it
+      return null;
+    }
   }
 
   // Fallback: main-thread OffscreenCanvas
@@ -185,11 +191,18 @@ async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion
         image.src = url;
       });
 
-      // 6. Create ImageBitmap
-      const bitmap = await createImageBitmap(img);
+      // 6. Create ImageBitmap and process through worker (or main thread fallback)
+      let blobs = null;
 
-      // 7. Process through worker to get PNG blobs
-      const blobs = await processInWorker(bitmap);
+      // Try worker first
+      const bitmap = await createImageBitmap(img);
+      blobs = await processInWorker(bitmap);
+
+      // If worker failed (bitmap was transferred and neutered), retry on main thread
+      if (!blobs) {
+        const fallbackBitmap = await createImageBitmap(img);
+        blobs = await processOnMainThread(fallbackBitmap);
+      }
 
       // 8. Upload via API
       const result = await thumbnailApi.upload(workspaceId, blobs);

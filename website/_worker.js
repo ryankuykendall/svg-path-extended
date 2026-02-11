@@ -101,6 +101,7 @@ const apiHandlers = {
             isPublic: ws.isPublic,
             createdAt: ws.createdAt,
             updatedAt: ws.updatedAt,
+            thumbnailAt: ws.thumbnailAt || null,
           };
         })
       );
@@ -355,6 +356,124 @@ const apiHandlers = {
       return errorResponse('Failed to save preferences: ' + err.message, 500);
     }
   },
+
+  // PUT /api/workspace/:id/thumbnail - Upload thumbnails (3 sizes via FormData)
+  async uploadThumbnail(request, env, id) {
+    const userId = getUserId(request);
+    if (!userId) {
+      return errorResponse('User ID required', 401);
+    }
+
+    try {
+      const wsJson = await env.WORKSPACES.get(`workspace:${id}`);
+      if (!wsJson) return errorResponse('Workspace not found', 404);
+      const workspace = JSON.parse(wsJson);
+      if (workspace.userId !== userId) return errorResponse('Access denied', 403);
+
+      const formData = await request.formData();
+      const sizes = ['1024', '512', '256'];
+
+      for (const size of sizes) {
+        const file = formData.get(size);
+        if (!file) return errorResponse(`Missing ${size} thumbnail`, 400);
+        await env.THUMBNAILS.put(`${id}/${size}.png`, file.stream(), {
+          httpMetadata: { contentType: 'image/png' },
+        });
+      }
+
+      // Update workspace metadata with thumbnail timestamp
+      workspace.thumbnailAt = new Date().toISOString();
+      await env.WORKSPACES.put(`workspace:${id}`, JSON.stringify(workspace));
+
+      return jsonResponse({ thumbnailAt: workspace.thumbnailAt });
+    } catch (err) {
+      return errorResponse('Failed to upload thumbnail: ' + err.message, 500);
+    }
+  },
+
+  // GET /api/thumbnail/:id/:size - Serve thumbnail from R2
+  async getThumbnail(request, env, id, size) {
+    try {
+      const object = await env.THUMBNAILS.get(`${id}/${size}.png`);
+      if (!object) return errorResponse('Thumbnail not found', 404);
+
+      return new Response(object.body, {
+        headers: {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=3600',
+          ...corsHeaders,
+        },
+      });
+    } catch (err) {
+      return errorResponse('Failed to get thumbnail: ' + err.message, 500);
+    }
+  },
+
+  // DELETE /api/workspace/:id/thumbnail - Delete thumbnails from R2
+  async deleteThumbnail(request, env, id) {
+    const userId = getUserId(request);
+    if (!userId) {
+      return errorResponse('User ID required', 401);
+    }
+
+    try {
+      const wsJson = await env.WORKSPACES.get(`workspace:${id}`);
+      if (!wsJson) return errorResponse('Workspace not found', 404);
+      const workspace = JSON.parse(wsJson);
+      if (workspace.userId !== userId) return errorResponse('Access denied', 403);
+
+      const sizes = ['1024', '512', '256'];
+      await Promise.all(sizes.map(s => env.THUMBNAILS.delete(`${id}/${s}.png`)));
+
+      delete workspace.thumbnailAt;
+      await env.WORKSPACES.put(`workspace:${id}`, JSON.stringify(workspace));
+
+      return jsonResponse({ success: true });
+    } catch (err) {
+      return errorResponse('Failed to delete thumbnail: ' + err.message, 500);
+    }
+  },
+
+  // GET /api/admin/workspaces-without-thumbnails - Admin: list workspaces missing thumbnails
+  async adminListWithoutThumbnails(request, env) {
+    const url = new URL(request.url);
+    const token = url.searchParams.get('token');
+    if (!token || token !== env.ADMIN_TOKEN) {
+      return errorResponse('Unauthorized', 401);
+    }
+
+    try {
+      // List all workspace keys in KV
+      const allKeys = [];
+      let cursor = null;
+      do {
+        const result = await env.WORKSPACES.list({ prefix: 'workspace:', cursor });
+        allKeys.push(...result.keys);
+        cursor = result.list_complete ? null : result.cursor;
+      } while (cursor);
+
+      // Filter to workspace data keys (not user: keys) and check for thumbnailAt
+      const workspaces = [];
+      for (const key of allKeys) {
+        const wsJson = await env.WORKSPACES.get(key.name);
+        if (!wsJson) continue;
+        const ws = JSON.parse(wsJson);
+        if (!ws.thumbnailAt) {
+          workspaces.push({
+            id: ws.id,
+            name: ws.name,
+            slug: ws.slug,
+            userId: ws.userId,
+            updatedAt: ws.updatedAt,
+          });
+        }
+      }
+
+      return jsonResponse(workspaces);
+    } catch (err) {
+      return errorResponse('Failed to list workspaces: ' + err.message, 500);
+    }
+  },
 };
 
 // Route API requests
@@ -406,6 +525,25 @@ async function handleApiRequest(request, env, apiPath) {
   const copyMatch = apiPath.match(/^\/workspace\/([^\/]+)\/copy$/);
   if (copyMatch && method === 'POST') {
     return apiHandlers.copyWorkspace(request, env, copyMatch[1]);
+  }
+
+  // Match /api/workspace/:id/thumbnail
+  const thumbUploadMatch = apiPath.match(/^\/workspace\/([^\/]+)\/thumbnail$/);
+  if (thumbUploadMatch) {
+    const id = thumbUploadMatch[1];
+    if (method === 'PUT') return apiHandlers.uploadThumbnail(request, env, id);
+    if (method === 'DELETE') return apiHandlers.deleteThumbnail(request, env, id);
+  }
+
+  // Match /api/thumbnail/:id/:size
+  const thumbGetMatch = apiPath.match(/^\/thumbnail\/([^\/]+)\/(\d+)$/);
+  if (thumbGetMatch && method === 'GET') {
+    return apiHandlers.getThumbnail(request, env, thumbGetMatch[1], thumbGetMatch[2]);
+  }
+
+  // GET /api/admin/workspaces-without-thumbnails
+  if (apiPath === '/admin/workspaces-without-thumbnails' && method === 'GET') {
+    return apiHandlers.adminListWithoutThumbnails(request, env);
   }
 
   return errorResponse('Not found', 404);
