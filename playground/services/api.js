@@ -96,7 +96,47 @@ export const preferencesApi = {
   },
 };
 
+// Thumbnail API
+export const thumbnailApi = {
+  // Upload thumbnail blobs (3 sizes)
+  async upload(workspaceId, blobs) {
+    const userId = getUserId();
+    const formData = new FormData();
+    formData.append('1024', blobs['1024'], '1024.png');
+    formData.append('512', blobs['512'], '512.png');
+    formData.append('256', blobs['256'], '256.png');
+
+    const response = await fetch(`${API_BASE}/workspace/${workspaceId}/thumbnail`, {
+      method: 'PUT',
+      headers: { 'X-User-Id': userId },
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const error = new Error(data.error || 'Thumbnail upload failed');
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  },
+
+  // Get thumbnail URL for a workspace
+  url(workspaceId, size = 256) {
+    return `${API_BASE}/thumbnail/${workspaceId}/${size}`;
+  },
+
+  // Delete thumbnails for a workspace
+  async delete(workspaceId) {
+    return apiRequest(`/workspace/${workspaceId}/thumbnail`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 export default {
   workspaceApi,
   preferencesApi,
+  thumbnailApi,
 };

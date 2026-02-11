@@ -177,6 +177,29 @@ To test against real CloudFlare KV (requires authentication):
 npx wrangler pages dev public --port 3000 --remote
 ```
 
+**Thumbnail Infrastructure (R2):**
+
+Workspace thumbnails are stored in CloudFlare R2. Two buckets are required:
+
+```bash
+npx wrangler r2 bucket create svg-path-extended-thumbnails
+npx wrangler r2 bucket create svg-path-extended-thumbnails-preview
+```
+
+The admin backfill endpoint (`/pathogen/admin/thumbnails`) requires an `ADMIN_TOKEN` secret. To set or rotate it:
+
+```bash
+npx wrangler pages secret put ADMIN_TOKEN --project-name svg-path-extended
+```
+
+To view the current token value, go to **Cloudflare Dashboard → Pages → svg-path-extended → Settings → Environment variables**. Secrets are write-only via CLI, so the dashboard is the only way to retrieve it.
+
+Access the admin backfill screen at:
+
+```
+https://pedestal.design/pathogen/admin/thumbnails?token=<ADMIN_TOKEN>
+```
+
 ### Blog
 
 Create a new blog post:
