@@ -317,11 +317,14 @@ class AdminThumbnailsView extends HTMLElement {
         pathData: result.path,
       };
 
-      // Create a temporary SVG element for rasterization (no need to append to DOM —
-      // generateThumbnail clones it and serializes the clone independently)
-      const svgEl = this._createTempSvg(wsState);
+      // Build the SVG string directly — bypasses DOM createElementNS + XMLSerializer
+      // which can produce namespace/serialization artifacts that break SVG-as-image rendering.
+      const svgString = this._buildSvgString(wsState);
 
-      const uploadResult = await thumbnailService.generateThumbnail(workspaceId, svgEl, wsState, null, { adminToken: this._token });
+      const uploadResult = await thumbnailService.generateThumbnail(workspaceId, null, wsState, null, {
+        adminToken: this._token,
+        svgString,
+      });
       if (!uploadResult) {
         throw new Error('generateThumbnail returned null — generation was blocked or timed out');
       }
@@ -334,28 +337,22 @@ class AdminThumbnailsView extends HTMLElement {
     this._renderContent();
   }
 
-  _createTempSvg(state) {
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('xmlns', ns);
-    svg.setAttribute('width', state.width);
-    svg.setAttribute('height', state.height);
-    svg.setAttribute('viewBox', `0 0 ${state.width} ${state.height}`);
+  _buildSvgString(state) {
+    // Compute auto center-crop and raster size (mirrors generateThumbnail logic)
+    const w = state.width;
+    const h = state.height;
+    const cropSize = Math.min(w, h);
+    const cropX = (w - cropSize) / 2;
+    const cropY = (h - cropSize) / 2;
+    const rasterSize = Math.max(1024, Math.min(Math.ceil(cropSize), 4096));
+    const fill = state.fillEnabled ? state.fill : 'none';
 
-    const bg = document.createElementNS(ns, 'rect');
-    bg.setAttribute('width', state.width);
-    bg.setAttribute('height', state.height);
-    bg.setAttribute('fill', state.background);
-    svg.appendChild(bg);
+    // Escape path data for XML attribute (only & and " need escaping in path data)
+    const d = (state.pathData || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;');
 
-    const path = document.createElementNS(ns, 'path');
-    path.setAttribute('d', state.pathData || '');
-    path.setAttribute('stroke', state.stroke);
-    path.setAttribute('stroke-width', state.strokeWidth);
-    path.setAttribute('fill', state.fillEnabled ? state.fill : 'none');
-    svg.appendChild(path);
-
-    return svg;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${rasterSize}" height="${rasterSize}" viewBox="${cropX} ${cropY} ${cropSize} ${cropSize}"><rect width="${w}" height="${h}" fill="${state.background}"/><path d="${d}" stroke="${state.stroke}" stroke-width="${state.strokeWidth}" fill="${fill}"/></svg>`;
   }
 
   async _autoGenerateAll() {

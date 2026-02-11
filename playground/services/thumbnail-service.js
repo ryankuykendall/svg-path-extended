@@ -171,7 +171,8 @@ function cloneSvgWithoutGrid(svgElement) {
  * @param {SVGElement} svgElement - The live SVG element to rasterize
  * @param {Object} storeState - Current store state (for canvas dimensions)
  * @param {Object} [cropRegion] - Optional crop region { x, y, size } in SVG coordinates
- * @param {Object} [options] - Optional { adminToken } to bypass ownership check
+ * @param {Object} [options] - Optional { adminToken, svgString } to bypass ownership
+ *        check or provide a pre-built SVG string (skips clone/serialize)
  * @returns {Promise<{thumbnailAt: string}>}
  */
 async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion, options) {
@@ -190,41 +191,50 @@ async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion
   _generating = true;
 
   try {
-    // 1. Clone SVG and remove grid
-    const clone = cloneSvgWithoutGrid(svgElement);
+    let svgString;
 
-    // 2. Determine crop viewBox
-    const canvasWidth = storeState.width || 200;
-    const canvasHeight = storeState.height || 200;
-
-    let cropSize;
-    if (cropRegion) {
-      // User-defined crop
-      clone.setAttribute('viewBox', `${cropRegion.x} ${cropRegion.y} ${cropRegion.size} ${cropRegion.size}`);
-      cropSize = cropRegion.size;
+    if (options?.svgString) {
+      // Pre-built SVG string provided (admin backfill) — use directly,
+      // bypassing DOM clone/serialize which can produce namespace issues.
+      svgString = options.svgString;
     } else {
-      // Auto center-crop: square crop = min(width, height), centered
-      cropSize = Math.min(canvasWidth, canvasHeight);
-      const cropX = (canvasWidth - cropSize) / 2;
-      const cropY = (canvasHeight - cropSize) / 2;
-      clone.setAttribute('viewBox', `${cropX} ${cropY} ${cropSize} ${cropSize}`);
+      // 1. Clone SVG and remove grid
+      const clone = cloneSvgWithoutGrid(svgElement);
+
+      // 2. Determine crop viewBox
+      const canvasWidth = storeState.width || 200;
+      const canvasHeight = storeState.height || 200;
+
+      let cropSize;
+      if (cropRegion) {
+        // User-defined crop
+        clone.setAttribute('viewBox', `${cropRegion.x} ${cropRegion.y} ${cropRegion.size} ${cropRegion.size}`);
+        cropSize = cropRegion.size;
+      } else {
+        // Auto center-crop: square crop = min(width, height), centered
+        cropSize = Math.min(canvasWidth, canvasHeight);
+        const cropX = (canvasWidth - cropSize) / 2;
+        const cropY = (canvasHeight - cropSize) / 2;
+        clone.setAttribute('viewBox', `${cropX} ${cropY} ${cropSize} ${cropSize}`);
+      }
+
+      // 3. Supersample: rasterize at up to 1:1 SVG-unit-to-pixel, capped at MAX_RASTER_SIZE.
+      //    For a crop of 800 units → rasterize at 800px (1:1).
+      //    For a crop of 8192 units → rasterize at 4096px (cap), then downscale.
+      //    Minimum is 1024 so small crops don't produce tiny rasters.
+      const rasterSize = Math.max(1024, Math.min(Math.ceil(cropSize), MAX_RASTER_SIZE));
+      clone.setAttribute('width', String(rasterSize));
+      clone.setAttribute('height', String(rasterSize));
+
+      // 4. Strip inline styles (e.g. positioning from off-screen elements) that
+      //    could interfere with SVG-as-image rendering
+      clone.removeAttribute('style');
+
+      // 5. Serialize SVG → Blob → object URL
+      const serializer = new XMLSerializer();
+      svgString = serializer.serializeToString(clone);
     }
 
-    // 3. Supersample: rasterize at up to 1:1 SVG-unit-to-pixel, capped at MAX_RASTER_SIZE.
-    //    For a crop of 800 units → rasterize at 800px (1:1).
-    //    For a crop of 8192 units → rasterize at 4096px (cap), then downscale.
-    //    Minimum is 1024 so small crops don't produce tiny rasters.
-    const rasterSize = Math.max(1024, Math.min(Math.ceil(cropSize), MAX_RASTER_SIZE));
-    clone.setAttribute('width', String(rasterSize));
-    clone.setAttribute('height', String(rasterSize));
-
-    // 4. Strip inline styles (e.g. positioning from off-screen elements) that
-    //    could interfere with SVG-as-image rendering
-    clone.removeAttribute('style');
-
-    // 5. Serialize SVG → Blob → object URL
-    const serializer = new XMLSerializer();
-    const svgString = serializer.serializeToString(clone);
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
 
