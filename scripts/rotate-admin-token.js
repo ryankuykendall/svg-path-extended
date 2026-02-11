@@ -25,7 +25,7 @@ console.log('Setting ADMIN_TOKEN via wrangler...\n');
 
 try {
   execSync(
-    `echo "${token}" | npx wrangler pages secret put ADMIN_TOKEN --project-name ${PROJECT_NAME}`,
+    `printf '%s' "${token}" | npx wrangler pages secret put ADMIN_TOKEN --project-name ${PROJECT_NAME}`,
     { stdio: ['pipe', 'inherit', 'inherit'] }
   );
 } catch (err) {

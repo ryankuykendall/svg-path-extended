@@ -286,9 +286,23 @@ class AdminThumbnailsView extends HTMLElement {
 
       // Compile the code to get path data
       const code = workspace.code || '';
+      if (!code.trim()) {
+        console.warn(`Workspace ${workspaceId} has no code, skipping`);
+        this._statuses[workspaceId] = 'done';
+        this._renderContent();
+        return;
+      }
+
       const toFixed = workspace.preferences?.toFixed ?? null;
       const compileOptions = toFixed != null ? { toFixed } : undefined;
       const result = await compilerWorker.compileWithContext(code, 0, () => false, compileOptions);
+
+      if (!result.path || !result.path.trim()) {
+        console.warn(`Workspace ${workspaceId} compiled to empty path, skipping`);
+        this._statuses[workspaceId] = 'done';
+        this._renderContent();
+        return;
+      }
 
       // Build workspace state for thumbnail generation
       const prefs = workspace.preferences || {};
@@ -303,16 +317,15 @@ class AdminThumbnailsView extends HTMLElement {
         pathData: result.path,
       };
 
-      // Create a temporary SVG element for rasterization
+      // Create a temporary SVG element for rasterization (no need to append to DOM —
+      // generateThumbnail clones it and serializes the clone independently)
       const svgEl = this._createTempSvg(wsState);
-      document.body.appendChild(svgEl);
 
-      try {
-        await thumbnailService.generateThumbnail(workspaceId, svgEl, wsState, null, { adminToken: this._token });
-        this._statuses[workspaceId] = 'done';
-      } finally {
-        document.body.removeChild(svgEl);
+      const uploadResult = await thumbnailService.generateThumbnail(workspaceId, svgEl, wsState, null, { adminToken: this._token });
+      if (!uploadResult) {
+        throw new Error('generateThumbnail returned null — generation was blocked or timed out');
       }
+      this._statuses[workspaceId] = 'done';
     } catch (err) {
       console.error(`Auto-generate failed for ${workspaceId}:`, err);
       this._statuses[workspaceId] = 'error';
@@ -328,9 +341,6 @@ class AdminThumbnailsView extends HTMLElement {
     svg.setAttribute('width', state.width);
     svg.setAttribute('height', state.height);
     svg.setAttribute('viewBox', `0 0 ${state.width} ${state.height}`);
-    svg.style.position = 'absolute';
-    svg.style.left = '-9999px';
-    svg.style.top = '-9999px';
 
     const bg = document.createElementNS(ns, 'rect');
     bg.setAttribute('width', state.width);

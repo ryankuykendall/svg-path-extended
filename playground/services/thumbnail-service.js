@@ -175,9 +175,16 @@ function cloneSvgWithoutGrid(svgElement) {
  * @returns {Promise<{thumbnailAt: string}>}
  */
 async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion, options) {
+  // Wait for any in-progress generation to finish (up to 30s)
   if (_generating) {
-    console.warn('Thumbnail generation already in progress');
-    return null;
+    const start = Date.now();
+    while (_generating && Date.now() - start < 30000) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+    if (_generating) {
+      console.warn('Thumbnail generation timed out waiting for previous generation');
+      return null;
+    }
   }
 
   _generating = true;
@@ -211,14 +218,18 @@ async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion
     clone.setAttribute('width', String(rasterSize));
     clone.setAttribute('height', String(rasterSize));
 
-    // 4. Serialize SVG → Blob → object URL
+    // 4. Strip inline styles (e.g. positioning from off-screen elements) that
+    //    could interfere with SVG-as-image rendering
+    clone.removeAttribute('style');
+
+    // 5. Serialize SVG → Blob → object URL
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(clone);
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
 
     try {
-      // 5. Load Image from URL
+      // 6. Load Image from URL
       const img = await new Promise((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
@@ -226,7 +237,7 @@ async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion
         image.src = url;
       });
 
-      // 6. Create ImageBitmap and process through worker (or main thread fallback)
+      // 7. Create ImageBitmap and process through worker (or main thread fallback)
       let blobs = null;
 
       // Try worker first
@@ -239,7 +250,7 @@ async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion
         blobs = await processOnMainThread(fallbackBitmap);
       }
 
-      // 8. Upload via API
+      // 8. Upload via API (returns { thumbnailAt } or null if skipped)
       const result = await thumbnailApi.upload(workspaceId, blobs, options);
 
       // 9. Update tracking
