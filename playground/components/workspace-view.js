@@ -9,6 +9,7 @@ import { autosave, SaveStatus } from '../services/autosave.js';
 import { getUserId } from '../services/user-id.js';
 import { BASE_PATH, parseWorkspaceSlugId, buildWorkspaceSlugId } from '../utils/router.js';
 import compilerWorker from '../services/compiler-worker.js';
+import thumbnailService from '../services/thumbnail-service.js';
 
 // Import all sub-components
 import './playground-main.js';
@@ -20,6 +21,7 @@ import './svg-preview-pane.js';
 import './docs-panel.js';
 import './shared/error-panel.js';
 import './export-legend-modal.js';
+import './thumbnail-crop-modal.js';
 
 export class WorkspaceView extends HTMLElement {
   constructor() {
@@ -75,6 +77,14 @@ export class WorkspaceView extends HTMLElement {
       // Stop autosave when leaving workspace view
       if (this._initialized) {
         autosave.stop();
+
+        // Generate thumbnail if content changed since last thumbnail
+        thumbnailService.generateIfDirty(
+          this._currentWorkspaceId,
+          () => this.previewPane?.shadowRoot?.querySelector('svg'),
+          store.getAll()
+        );
+        thumbnailService.stopAutoGeneration();
       }
     }
   }
@@ -105,6 +115,10 @@ export class WorkspaceView extends HTMLElement {
 
   get exportLegendModal() {
     return this.shadowRoot.querySelector('export-legend-modal');
+  }
+
+  get thumbnailCropModal() {
+    return this.shadowRoot.querySelector('thumbnail-crop-modal');
   }
 
   waitForLibrary(maxWait = 5000) {
@@ -259,6 +273,10 @@ export class WorkspaceView extends HTMLElement {
       if (workspace.userId === userId) {
         autosave.init(workspace.id, workspace.contentHash);
 
+        // Start thumbnail auto-generation tracking
+        thumbnailService.startAutoGeneration(workspace.id);
+        thumbnailService.setThumbnailContentHash(workspace.thumbnailContentHash || null);
+
         // Store initial preferences state for change detection
         autosave.setInitialPreferences({
           width: store.get('width'),
@@ -302,6 +320,10 @@ export class WorkspaceView extends HTMLElement {
 
       // Trigger autosave
       autosave.onChange(code);
+
+      // Track content change for thumbnail auto-generation
+      // Use a simple hash of the code for comparison
+      thumbnailService.onContentChanged(this._simpleHash(code));
     });
 
     // Style changes from footer
@@ -426,6 +448,42 @@ export class WorkspaceView extends HTMLElement {
       }
     };
     document.addEventListener('refresh-preview', this._handleRefreshPreview);
+
+    // Set thumbnail (crop modal)
+    this._handleSetThumbnail = () => {
+      if (store.get('currentView') === 'workspace') {
+        const svgElement = this.previewPane.shadowRoot?.querySelector('svg');
+        if (svgElement) {
+          this.thumbnailCropModal.open(svgElement, store.getAll());
+        }
+      }
+    };
+    document.addEventListener('set-thumbnail', this._handleSetThumbnail);
+
+    // Auto-generate thumbnail (fired by thumbnail service idle timer)
+    this._handleThumbnailAutoGenerate = (e) => {
+      if (store.get('currentView') !== 'workspace') return;
+      const { workspaceId } = e.detail;
+      if (workspaceId !== this._currentWorkspaceId) return;
+
+      const svgElement = this.previewPane?.shadowRoot?.querySelector('svg');
+      if (svgElement) {
+        thumbnailService.generateIfDirty(workspaceId, () => svgElement, store.getAll());
+      }
+    };
+    document.addEventListener('thumbnail-auto-generate', this._handleThumbnailAutoGenerate);
+
+    // beforeunload: fire-and-forget thumbnail generation
+    this._handleBeforeUnload = () => {
+      if (store.get('currentView') === 'workspace' && this._currentWorkspaceId) {
+        thumbnailService.generateIfDirty(
+          this._currentWorkspaceId,
+          () => this.previewPane?.shadowRoot?.querySelector('svg'),
+          store.getAll()
+        );
+      }
+    };
+    window.addEventListener('beforeunload', this._handleBeforeUnload);
   }
 
   cleanupEventListeners() {
@@ -437,6 +495,9 @@ export class WorkspaceView extends HTMLElement {
     document.removeEventListener('keydown', this._handleKeydown);
     document.removeEventListener('export-legend', this._handleExportLegend);
     document.removeEventListener('refresh-preview', this._handleRefreshPreview);
+    document.removeEventListener('set-thumbnail', this._handleSetThumbnail);
+    document.removeEventListener('thumbnail-auto-generate', this._handleThumbnailAutoGenerate);
+    window.removeEventListener('beforeunload', this._handleBeforeUnload);
   }
 
   copyCode() {
@@ -594,6 +655,18 @@ export class WorkspaceView extends HTMLElement {
     }
   }
 
+  // Simple string hash for content change tracking (not cryptographic)
+  _simpleHash(str) {
+    if (!str) return '0';
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const ch = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + ch;
+      hash |= 0;
+    }
+    return hash.toString(36);
+  }
+
   render() {
     this.shadowRoot.innerHTML = `
       <style>
@@ -630,6 +703,8 @@ export class WorkspaceView extends HTMLElement {
       <docs-panel></docs-panel>
 
       <export-legend-modal></export-legend-modal>
+
+      <thumbnail-crop-modal></thumbnail-crop-modal>
 
       <playground-footer></playground-footer>
     `;

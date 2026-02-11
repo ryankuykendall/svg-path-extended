@@ -444,6 +444,10 @@ class AppHeader extends HTMLElement {
       case 'export-legend':
         this.dispatchEvent(new CustomEvent('export-legend', { bubbles: true, composed: true }));
         break;
+
+      case 'set-thumbnail':
+        this.dispatchEvent(new CustomEvent('set-thumbnail', { bubbles: true, composed: true }));
+        break;
     }
   }
 
@@ -599,6 +603,15 @@ class AppHeader extends HTMLElement {
                   </svg>
                   Export with Legend
                 </button>
+                ${hasWorkspace ? `
+                  <div class="menu-divider"></div>
+                  <button data-action="set-thumbnail">
+                    <svg class="menu-icon" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M14.5 3l-6 6-2-2-6 6v1.5h16V3h-2zM2 1a2 2 0 100 4 2 2 0 000-4z"/>
+                    </svg>
+                    Set Thumbnail
+                  </button>
+                ` : ''}
               </div>
               <span class="copy-feedback"></span>
             </div>
@@ -667,6 +680,15 @@ class AppHeader extends HTMLElement {
               </svg>
               Export with Legend
             </button>
+            ${hasWorkspace ? `
+              <div class="menu-divider"></div>
+              <button data-action="set-thumbnail">
+                <svg class="menu-icon" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M14.5 3l-6 6-2-2-6 6v1.5h16V3h-2zM2 1a2 2 0 100 4 2 2 0 000-4z"/>
+                </svg>
+                Set Thumbnail
+              </button>
+            ` : ''}
           </div>
           <span class="copy-feedback"></span>
         </div>

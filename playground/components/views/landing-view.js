@@ -2,7 +2,7 @@
 // Route: /
 
 import { store } from '../../state/store.js';
-import { workspaceApi } from '../../services/api.js';
+import { workspaceApi, thumbnailApi } from '../../services/api.js';
 import { navigateTo, buildWorkspaceSlugId } from '../../utils/router.js';
 
 const styles = `
@@ -94,7 +94,7 @@ const styles = `
   }
 
   .workspace-list.grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.25rem;
   }
 
@@ -102,32 +102,123 @@ const styles = `
     grid-template-columns: 1fr;
   }
 
-  .workspace-item {
+  /* Grid view: image-on-top layout */
+  .workspace-list.grid .workspace-item {
     position: relative;
-    padding: 1.25rem;
+    padding: 0;
     border: 1px solid var(--border-color, #e2e8f0);
     border-radius: var(--radius-lg, 12px);
     background: var(--bg-secondary, #ffffff);
     cursor: pointer;
     transition: all var(--transition-base, 0.15s ease);
     box-shadow: var(--shadow-sm);
+    overflow: hidden;
   }
 
-  .workspace-item:hover {
+  .workspace-list.grid .workspace-item:hover {
     border-color: var(--accent-color, #10b981);
     box-shadow: var(--shadow-md);
     transform: translateY(-2px);
   }
 
-  .workspace-item h3 {
-    margin: 0 0 0.625rem 0;
+  .workspace-thumb {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--bg-primary, #f1f5f9);
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+  }
+
+  .workspace-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    text-transform: uppercase;
+    user-select: none;
+  }
+
+  .workspace-list.grid .workspace-info {
+    padding: 1rem 1.25rem;
+    position: relative;
+  }
+
+  /* List view: thumbnail on left, text on right */
+  .workspace-list.list .workspace-item {
+    position: relative;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: var(--radius-lg, 12px);
+    background: var(--bg-secondary, #ffffff);
+    cursor: pointer;
+    transition: all var(--transition-base, 0.15s ease);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .workspace-list.list .workspace-item:hover {
+    border-color: var(--accent-color, #10b981);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .workspace-thumb-sm {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md, 8px);
+    overflow: hidden;
+    background: var(--bg-primary, #f1f5f9);
+    flex-shrink: 0;
+  }
+
+  .workspace-thumb-sm img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .thumb-placeholder-sm {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    text-transform: uppercase;
+    user-select: none;
+    border-radius: var(--radius-md, 8px);
+  }
+
+  .workspace-list.list .workspace-info {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+  }
+
+  .workspace-info h3 {
+    margin: 0 0 0.375rem 0;
     font-size: 1.0625rem;
     font-weight: 600;
     color: var(--text-primary, #1a1a2e);
     padding-right: 2.5rem;
   }
 
-  .workspace-item p {
+  .workspace-info p {
     margin: 0;
     font-size: 0.875rem;
     color: var(--text-secondary, #64748b);
@@ -141,7 +232,7 @@ const styles = `
   .workspace-meta {
     display: flex;
     gap: 1rem;
-    margin-top: 1rem;
+    margin-top: 0.75rem;
     font-size: 0.75rem;
     color: var(--text-tertiary, #94a3b8);
     font-family: var(--font-mono, 'Inconsolata', monospace);
@@ -302,6 +393,32 @@ const styles = `
     font-size: 0.9375rem;
   }
 
+  /* Menu positioning in grid view (inside workspace-info) */
+  .workspace-list.grid .menu-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .workspace-list.grid .menu-dropdown {
+    position: absolute;
+    top: 2.5rem;
+    right: 0.5rem;
+  }
+
+  /* Menu positioning in list view (inside workspace-info) */
+  .workspace-list.list .menu-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .workspace-list.list .menu-dropdown {
+    position: absolute;
+    top: 2rem;
+    right: 0;
+  }
+
   @media (max-width: 600px) {
     :host {
       padding: 1rem;
@@ -352,6 +469,32 @@ class LandingView extends HTMLElement {
 
     // Close menu on outside click
     document.addEventListener('click', this._handleOutsideClick);
+
+    // Listen for thumbnail updates to refresh cards
+    this._handleThumbnailUpdated = (e) => {
+      const workspaceId = e.detail?.workspaceId;
+      if (workspaceId) {
+        // Update the specific card's thumbnail (bust cache with timestamp)
+        const imgs = this.shadowRoot.querySelectorAll(`[data-id="${workspaceId}"] img`);
+        const timestamp = Date.now();
+        imgs.forEach(img => {
+          const base = img.src.split('?')[0];
+          img.src = `${base}?v=${timestamp}`;
+        });
+
+        // Also update the workspace data in store so re-renders show the thumbnail
+        const workspaces = store.get('workspaces') || [];
+        const ws = workspaces.find(w => w.id === workspaceId);
+        if (ws && !ws.thumbnailAt) {
+          ws.thumbnailAt = new Date().toISOString();
+          store.set('workspaces', [...workspaces]);
+        }
+      } else {
+        // Full refresh
+        this.loadWorkspaces();
+      }
+    };
+    document.addEventListener('thumbnail-updated', this._handleThumbnailUpdated);
   }
 
   disconnectedCallback() {
@@ -359,6 +502,9 @@ class LandingView extends HTMLElement {
       this._unsubscribe();
     }
     document.removeEventListener('click', this._handleOutsideClick);
+    if (this._handleThumbnailUpdated) {
+      document.removeEventListener('thumbnail-updated', this._handleThumbnailUpdated);
+    }
   }
 
   _handleOutsideClick = (e) => {
@@ -550,28 +696,71 @@ class LandingView extends HTMLElement {
     } else {
       content = `
         <div class="workspace-list ${this.viewMode}">
-          ${workspaces.map(ws => `
-            <div class="workspace-item" data-id="${ws.id}" data-slug="${ws.slug || ''}">
-              <button class="menu-btn" data-id="${ws.id}" title="More options">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                  <circle cx="8" cy="3" r="1.5"/>
-                  <circle cx="8" cy="8" r="1.5"/>
-                  <circle cx="8" cy="13" r="1.5"/>
-                </svg>
-              </button>
-              <div class="menu-dropdown ${this._openMenuId === ws.id ? 'open' : ''}">
-                <button data-action="copy">Duplicate</button>
-                <button data-action="toggle-publish">${ws.isPublic ? 'Make Private' : 'Make Public'}</button>
-                <button data-action="delete" class="danger">Delete</button>
-              </div>
-              <h3>${this.escapeHtml(ws.name)}</h3>
-              <p>${this.escapeHtml(ws.description) || 'No description'}</p>
-              <div class="workspace-meta">
-                <span>Modified: ${this.formatDate(ws.updatedAt)}</span>
-                ${ws.isPublic ? '<span class="public-badge">Public</span>' : ''}
-              </div>
-            </div>
-          `).join('')}
+          ${workspaces.map(ws => {
+            const initial = (ws.name || '?')[0];
+            const color = this.generateColor(ws.id);
+            if (this.viewMode === 'grid') {
+              return `
+              <div class="workspace-item" data-id="${ws.id}" data-slug="${ws.slug || ''}">
+                <div class="workspace-thumb">
+                  ${ws.thumbnailAt
+                    ? `<img src="${thumbnailApi.url(ws.id, 512)}" alt="" loading="lazy" />`
+                    : `<div class="thumb-placeholder" style="background:${color}">${this.escapeHtml(initial)}</div>`
+                  }
+                </div>
+                <div class="workspace-info">
+                  <button class="menu-btn" data-id="${ws.id}" title="More options">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                      <circle cx="8" cy="3" r="1.5"/>
+                      <circle cx="8" cy="8" r="1.5"/>
+                      <circle cx="8" cy="13" r="1.5"/>
+                    </svg>
+                  </button>
+                  <div class="menu-dropdown ${this._openMenuId === ws.id ? 'open' : ''}">
+                    <button data-action="copy">Duplicate</button>
+                    <button data-action="toggle-publish">${ws.isPublic ? 'Make Private' : 'Make Public'}</button>
+                    <button data-action="delete" class="danger">Delete</button>
+                  </div>
+                  <h3>${this.escapeHtml(ws.name)}</h3>
+                  <p>${this.escapeHtml(ws.description) || 'No description'}</p>
+                  <div class="workspace-meta">
+                    <span>Modified: ${this.formatDate(ws.updatedAt)}</span>
+                    ${ws.isPublic ? '<span class="public-badge">Public</span>' : ''}
+                  </div>
+                </div>
+              </div>`;
+            } else {
+              return `
+              <div class="workspace-item" data-id="${ws.id}" data-slug="${ws.slug || ''}">
+                <div class="workspace-thumb-sm">
+                  ${ws.thumbnailAt
+                    ? `<img src="${thumbnailApi.url(ws.id, 256)}" alt="" loading="lazy" />`
+                    : `<div class="thumb-placeholder-sm" style="background:${color}">${this.escapeHtml(initial)}</div>`
+                  }
+                </div>
+                <div class="workspace-info">
+                  <button class="menu-btn" data-id="${ws.id}" title="More options">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                      <circle cx="8" cy="3" r="1.5"/>
+                      <circle cx="8" cy="8" r="1.5"/>
+                      <circle cx="8" cy="13" r="1.5"/>
+                    </svg>
+                  </button>
+                  <div class="menu-dropdown ${this._openMenuId === ws.id ? 'open' : ''}">
+                    <button data-action="copy">Duplicate</button>
+                    <button data-action="toggle-publish">${ws.isPublic ? 'Make Private' : 'Make Public'}</button>
+                    <button data-action="delete" class="danger">Delete</button>
+                  </div>
+                  <h3>${this.escapeHtml(ws.name)}</h3>
+                  <p>${this.escapeHtml(ws.description) || 'No description'}</p>
+                  <div class="workspace-meta">
+                    <span>Modified: ${this.formatDate(ws.updatedAt)}</span>
+                    ${ws.isPublic ? '<span class="public-badge">Public</span>' : ''}
+                  </div>
+                </div>
+              </div>`;
+            }
+          }).join('')}
         </div>
       `;
     }
@@ -592,6 +781,17 @@ class LandingView extends HTMLElement {
 
       ${content}
     `;
+  }
+
+  // Deterministic color from workspace ID
+  generateColor(id) {
+    if (!id) return 'hsl(200, 40%, 60%)';
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 55%, 55%)`;
   }
 
   escapeHtml(text) {

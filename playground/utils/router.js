@@ -18,6 +18,7 @@ export const routes = [
   { path: '/storybook/:component', view: 'storybook-detail' },
   { path: '/blog', view: 'blog' },
   { path: '/blog/:slug', view: 'blog-post' },
+  { path: '/admin/thumbnails', view: 'admin-thumbnails' },
 ];
 
 // Build workspace URL segment from slug and id
