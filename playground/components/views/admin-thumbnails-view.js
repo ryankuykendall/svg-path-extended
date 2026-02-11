@@ -281,8 +281,8 @@ class AdminThumbnailsView extends HTMLElement {
     this._renderContent();
 
     try {
-      // Fetch workspace data
-      const workspace = await workspaceApi.get(workspaceId);
+      // Fetch workspace data (admin token bypasses ownership check)
+      const workspace = await workspaceApi.get(workspaceId, { adminToken: this._token });
 
       // Compile the code to get path data
       const code = workspace.code || '';
@@ -308,7 +308,7 @@ class AdminThumbnailsView extends HTMLElement {
       document.body.appendChild(svgEl);
 
       try {
-        await thumbnailService.generateThumbnail(workspaceId, svgEl, wsState);
+        await thumbnailService.generateThumbnail(workspaceId, svgEl, wsState, null, { adminToken: this._token });
         this._statuses[workspaceId] = 'done';
       } finally {
         document.body.removeChild(svgEl);

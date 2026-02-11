@@ -172,9 +172,12 @@ const apiHandlers = {
 
       const workspace = JSON.parse(wsJson);
       const userId = getUserId(request);
+      const url = new URL(request.url);
+      const adminToken = url.searchParams.get('token');
+      const isAdmin = adminToken && env.ADMIN_TOKEN && adminToken === env.ADMIN_TOKEN;
 
-      // Check access - allow if public or owned by user
-      if (!workspace.isPublic && workspace.userId !== userId) {
+      // Check access - allow if public, owned by user, or admin
+      if (!isAdmin && !workspace.isPublic && workspace.userId !== userId) {
         return errorResponse('Access denied', 403);
       }
 
@@ -360,7 +363,11 @@ const apiHandlers = {
   // PUT /api/workspace/:id/thumbnail - Upload thumbnails (3 sizes via FormData)
   async uploadThumbnail(request, env, id) {
     const userId = getUserId(request);
-    if (!userId) {
+    const url = new URL(request.url);
+    const adminToken = url.searchParams.get('token');
+    const isAdmin = adminToken && env.ADMIN_TOKEN && adminToken === env.ADMIN_TOKEN;
+
+    if (!userId && !isAdmin) {
       return errorResponse('User ID required', 401);
     }
 
@@ -368,7 +375,7 @@ const apiHandlers = {
       const wsJson = await env.WORKSPACES.get(`workspace:${id}`);
       if (!wsJson) return errorResponse('Workspace not found', 404);
       const workspace = JSON.parse(wsJson);
-      if (workspace.userId !== userId) return errorResponse('Access denied', 403);
+      if (!isAdmin && workspace.userId !== userId) return errorResponse('Access denied', 403);
 
       const formData = await request.formData();
       const sizes = ['1024', '512', '256'];

@@ -42,9 +42,10 @@ export const workspaceApi = {
     return apiRequest('/workspaces');
   },
 
-  // Get a single workspace by ID
-  async get(id) {
-    return apiRequest(`/workspace/${id}`);
+  // Get a single workspace by ID. Pass adminToken to access any workspace.
+  async get(id, { adminToken } = {}) {
+    const tokenParam = adminToken ? `?token=${encodeURIComponent(adminToken)}` : '';
+    return apiRequest(`/workspace/${id}${tokenParam}`);
   },
 
   // Create a new workspace
@@ -98,15 +99,16 @@ export const preferencesApi = {
 
 // Thumbnail API
 export const thumbnailApi = {
-  // Upload thumbnail blobs (3 sizes)
-  async upload(workspaceId, blobs) {
+  // Upload thumbnail blobs (3 sizes). Pass adminToken to bypass ownership check.
+  async upload(workspaceId, blobs, { adminToken } = {}) {
     const userId = getUserId();
     const formData = new FormData();
     formData.append('1024', blobs['1024'], '1024.png');
     formData.append('512', blobs['512'], '512.png');
     formData.append('256', blobs['256'], '256.png');
 
-    const response = await fetch(`${API_BASE}/workspace/${workspaceId}/thumbnail`, {
+    const tokenParam = adminToken ? `?token=${encodeURIComponent(adminToken)}` : '';
+    const response = await fetch(`${API_BASE}/workspace/${workspaceId}/thumbnail${tokenParam}`, {
       method: 'PUT',
       headers: { 'X-User-Id': userId },
       body: formData,

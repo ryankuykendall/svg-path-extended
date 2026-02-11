@@ -171,9 +171,10 @@ function cloneSvgWithoutGrid(svgElement) {
  * @param {SVGElement} svgElement - The live SVG element to rasterize
  * @param {Object} storeState - Current store state (for canvas dimensions)
  * @param {Object} [cropRegion] - Optional crop region { x, y, size } in SVG coordinates
+ * @param {Object} [options] - Optional { adminToken } to bypass ownership check
  * @returns {Promise<{thumbnailAt: string}>}
  */
-async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion) {
+async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion, options) {
   if (_generating) {
     console.warn('Thumbnail generation already in progress');
     return null;
@@ -239,7 +240,7 @@ async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion
       }
 
       // 8. Upload via API
-      const result = await thumbnailApi.upload(workspaceId, blobs);
+      const result = await thumbnailApi.upload(workspaceId, blobs, options);
 
       // 9. Update tracking
       _thumbnailContentHash = _latestContentHash;
