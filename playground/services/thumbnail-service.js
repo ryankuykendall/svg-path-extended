@@ -4,6 +4,7 @@
 import { thumbnailApi } from './api.js';
 
 const SIZES = [1024, 512, 256];
+const MAX_RASTER_SIZE = 4096; // Supersample ceiling (pixels) — balances quality vs memory
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const MIN_AUTO_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes between auto-generations
 
@@ -71,36 +72,68 @@ async function processInWorker(bitmap) {
 }
 
 /**
- * Fallback: process on main thread using OffscreenCanvas (or regular canvas).
+ * Fallback: process on main thread with step-down halving for quality.
  */
 async function processOnMainThread(bitmap) {
   const results = {};
+  const sorted = [...SIZES].sort((a, b) => b - a);
+  let src = bitmap;
 
-  for (const size of SIZES) {
+  for (const size of sorted) {
+    // Step-down halve until within 2x of target
+    while (src.width > size * 2) {
+      const halfW = Math.max(size, Math.ceil(src.width / 2));
+      const halfH = Math.max(size, Math.ceil(src.height / 2));
+
+      if (typeof OffscreenCanvas !== 'undefined') {
+        const half = new OffscreenCanvas(halfW, halfH);
+        const hCtx = half.getContext('2d');
+        hCtx.imageSmoothingEnabled = true;
+        hCtx.imageSmoothingQuality = 'high';
+        hCtx.drawImage(src, 0, 0, halfW, halfH);
+        if (src !== bitmap) src.close?.();
+        src = await createImageBitmap(half);
+      } else {
+        const half = document.createElement('canvas');
+        half.width = halfW;
+        half.height = halfH;
+        const hCtx = half.getContext('2d');
+        hCtx.imageSmoothingEnabled = true;
+        hCtx.imageSmoothingQuality = 'high';
+        hCtx.drawImage(src, 0, 0, halfW, halfH);
+        if (src !== bitmap) src.close?.();
+        src = await createImageBitmap(half);
+      }
+    }
+
+    // Final draw to target size
     let blob;
-
     if (typeof OffscreenCanvas !== 'undefined') {
       const canvas = new OffscreenCanvas(size, size);
       const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, size, size);
-      ctx.drawImage(bitmap, 0, 0, size, size);
+      ctx.drawImage(src, 0, 0, size, size);
       blob = await canvas.convertToBlob({ type: 'image/png' });
     } else {
-      // Final fallback: regular canvas
       const canvas = document.createElement('canvas');
       canvas.width = size;
       canvas.height = size;
       const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, size, size);
-      ctx.drawImage(bitmap, 0, 0, size, size);
+      ctx.drawImage(src, 0, 0, size, size);
       blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     }
 
     results[size] = blob;
   }
 
+  if (src !== bitmap) src.close?.();
   bitmap.close();
   return results;
 }
@@ -156,20 +189,26 @@ async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion
     const canvasWidth = storeState.width || 200;
     const canvasHeight = storeState.height || 200;
 
+    let cropSize;
     if (cropRegion) {
       // User-defined crop
       clone.setAttribute('viewBox', `${cropRegion.x} ${cropRegion.y} ${cropRegion.size} ${cropRegion.size}`);
+      cropSize = cropRegion.size;
     } else {
       // Auto center-crop: square crop = min(width, height), centered
-      const cropSize = Math.min(canvasWidth, canvasHeight);
+      cropSize = Math.min(canvasWidth, canvasHeight);
       const cropX = (canvasWidth - cropSize) / 2;
       const cropY = (canvasHeight - cropSize) / 2;
       clone.setAttribute('viewBox', `${cropX} ${cropY} ${cropSize} ${cropSize}`);
     }
 
-    // 3. Set size to 1024 for best rasterization quality
-    clone.setAttribute('width', '1024');
-    clone.setAttribute('height', '1024');
+    // 3. Supersample: rasterize at up to 1:1 SVG-unit-to-pixel, capped at MAX_RASTER_SIZE.
+    //    For a crop of 800 units → rasterize at 800px (1:1).
+    //    For a crop of 8192 units → rasterize at 4096px (cap), then downscale.
+    //    Minimum is 1024 so small crops don't produce tiny rasters.
+    const rasterSize = Math.max(1024, Math.min(Math.ceil(cropSize), MAX_RASTER_SIZE));
+    clone.setAttribute('width', String(rasterSize));
+    clone.setAttribute('height', String(rasterSize));
 
     // 4. Serialize SVG → Blob → object URL
     const serializer = new XMLSerializer();

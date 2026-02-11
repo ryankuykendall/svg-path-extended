@@ -1,5 +1,6 @@
 // Thumbnail Web Worker
-// Receives an ImageBitmap and produces PNG Blobs at multiple sizes via OffscreenCanvas
+// Receives an ImageBitmap (potentially supersampled) and produces PNG Blobs
+// at multiple sizes via OffscreenCanvas with high-quality downscaling.
 
 self.onmessage = async (e) => {
   const { bitmap, sizes } = e.data; // sizes = [1024, 512, 256]
@@ -7,20 +8,40 @@ self.onmessage = async (e) => {
   try {
     const results = {};
 
-    for (const size of sizes) {
+    // Step-down halving for high-quality downscaling: repeatedly halve until
+    // we're within 2x of the target, then do one final draw to the exact size.
+    // This avoids the quality loss of a single large-ratio drawImage.
+    let src = bitmap;
+
+    // Sort sizes descending so we progressively downscale
+    const sorted = [...sizes].sort((a, b) => b - a);
+
+    for (const size of sorted) {
+      // Step-down halve from current source until within 2x of target
+      while (src.width > size * 2) {
+        const halfW = Math.max(size, Math.ceil(src.width / 2));
+        const halfH = Math.max(size, Math.ceil(src.height / 2));
+        const half = new OffscreenCanvas(halfW, halfH);
+        const hCtx = half.getContext('2d');
+        hCtx.imageSmoothingEnabled = true;
+        hCtx.imageSmoothingQuality = 'high';
+        hCtx.drawImage(src, 0, 0, halfW, halfH);
+        if (src !== bitmap) src.close?.();
+        src = await createImageBitmap(half);
+      }
+
+      // Final draw to target size
       const canvas = new OffscreenCanvas(size, size);
       const ctx = canvas.getContext('2d');
-
-      // White background (so transparent SVG areas aren't black)
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, size, size);
-
-      // Draw bitmap scaled to fit
-      ctx.drawImage(bitmap, 0, 0, size, size);
-      const blob = await canvas.convertToBlob({ type: 'image/png' });
-      results[size] = blob;
+      ctx.drawImage(src, 0, 0, size, size);
+      results[size] = await canvas.convertToBlob({ type: 'image/png' });
     }
 
+    if (src !== bitmap) src.close?.();
     bitmap.close();
     self.postMessage({ success: true, results });
   } catch (err) {
