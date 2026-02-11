@@ -7,7 +7,8 @@
  *
  * 1. Generates a cryptographically random token (48 URL-safe chars)
  * 2. Sets it via `wrangler pages secret put ADMIN_TOKEN`
- * 3. Prints the full admin backfill URL to stdout
+ * 3. Redeploys the Pages project so the new secret takes effect
+ * 4. Prints the full admin backfill URL to stdout
  */
 
 import { execSync } from 'child_process';
@@ -29,6 +30,18 @@ try {
   );
 } catch (err) {
   console.error('\nFailed to set secret. Is wrangler authenticated?');
+  process.exit(1);
+}
+
+console.log('\nRedeploying to pick up new secret...\n');
+
+try {
+  execSync(
+    `npx wrangler pages deploy public --project-name ${PROJECT_NAME}`,
+    { stdio: 'inherit' }
+  );
+} catch (err) {
+  console.error('\nDeploy failed. The secret was set — redeploy manually or push a commit.');
   process.exit(1);
 }
 

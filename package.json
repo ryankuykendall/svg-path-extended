@@ -28,7 +28,7 @@
     "build:website": "npm run build && npm run build:docs && npm run build:blog && node scripts/build-website.js",
     "dev": "tsup --watch",
     "dev:website": "npm run build:website && npx wrangler pages dev public --port 3000",
-    "website:admin-token": "node scripts/rotate-admin-token.js",
+    "website:admin-token": "npm run build:website && node scripts/rotate-admin-token.js",
     "test": "vitest",
     "test:run": "vitest run",
     "cli": "tsx src/cli.ts"
