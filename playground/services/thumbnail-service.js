@@ -22,13 +22,8 @@ function initWorker() {
   if (worker) return;
 
   try {
-    // Detect path based on environment
-    const isDevServer = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    const workerPath = isDevServer
-      ? '../workers/thumbnail.worker.js'
-      : 'workers/thumbnail.worker.js';
-
-    worker = new Worker(new URL(workerPath, import.meta.url), { type: 'module' });
+    // Relative to this file (services/) → up one level to reach workers/
+    worker = new Worker(new URL('../workers/thumbnail.worker.js', import.meta.url), { type: 'module' });
     workerReady = true;
 
     worker.onerror = (e) => {
