@@ -3,6 +3,12 @@
 
 export const blogIndex = [
   {
+    "slug": "svg-serialization-trap",
+    "title": "The SVG Serialization Trap: Why createElementNS Broke Our Thumbnail Pipeline",
+    "date": "2026-02-11",
+    "description": "How programmatically created SVG elements silently produce broken output when serialized with XMLSerializer and loaded as images — and the surprisingly simple fix."
+  },
+  {
     "slug": "cloudflare-pages-spa-routing-struggle",
     "title": "The CloudFlare Pages SPA Routing Odyssey",
     "date": "2026-01-28",
@@ -126,5 +132,114 @@ not_found_handling = <span class="hljs-string">&quot;single-page-application&quo
 <p>What should have been a 10-minute configuration task became a hours-long debugging session. The core issue isn&#39;t that CloudFlare Pages can&#39;t handle SPA routing—it clearly can, with <code>_worker.js</code>. The issue is that the documentation guides developers toward solutions that don&#39;t work (<code>_redirects</code> with 200 rewrites), while the solution that does work (<code>_worker.js</code>) is poorly documented and not presented as the primary approach.</p>
 <p>For developers facing similar struggles: skip the <code>_redirects</code> file for complex SPA routing. Go directly to <code>_worker.js</code>. It gives you full control, works reliably, and once you understand the pattern, it&#39;s actually simpler than trying to make <code>_redirects</code> rules work.</p>
 <p>The CloudFlare Pages platform is powerful, but its documentation needs significant improvement to match that power. Until then, blog posts like this one—born from developer frustration—will have to fill the gaps.</p>
+`,
+  'svg-serialization-trap': `<h1>The SVG Serialization Trap: Why <code>createElementNS</code> Broke Our Thumbnail Pipeline</h1>
+<h2>The Setup</h2>
+<p>We have a web app where users create SVG artwork through code. Each workspace compiles to an SVG path, rendered live in the browser. Thumbnails are generated client-side: clone the SVG, rasterize it to PNG via <code>Image</code> + <code>createImageBitmap</code>, then upload.</p>
+<p>This pipeline worked perfectly for user-initiated thumbnails. But when we built an admin backfill tool to generate thumbnails in bulk for workspaces that didn&#39;t have them yet, every single thumbnail came back blank — just the background color, no path content.</p>
+<h2>Three Paths, One Broken</h2>
+<p>Our app had three ways to generate a thumbnail, all feeding into the same <code>generateThumbnail</code> function:</p>
+<ol>
+<li><strong>Auto-save</strong> (user edits, goes idle): clones the live SVG from the preview pane</li>
+<li><strong>Manual crop</strong> (user picks a crop region): clones the same live SVG</li>
+<li><strong>Admin backfill</strong> (new): compiles the workspace code, builds an SVG programmatically, passes it in</li>
+</ol>
+<p>Paths 1 and 2 worked. Path 3 produced blank images. The shared rasterization pipeline was identical — so the difference had to be in how the SVG element was created.</p>
+<h2>The Working Path</h2>
+<p>The live preview SVG is created by the browser&#39;s HTML parser from a template:</p>
+<pre><code class="hljs language-html"><span class="hljs-tag">&lt;<span class="hljs-name">svg</span> <span class="hljs-attr">id</span>=<span class="hljs-string">&quot;preview&quot;</span> <span class="hljs-attr">xmlns</span>=<span class="hljs-string">&quot;http://www.w3.org/2000/svg&quot;</span>&gt;</span>
+  <span class="hljs-tag">&lt;<span class="hljs-name">rect</span> <span class="hljs-attr">id</span>=<span class="hljs-string">&quot;preview-bg&quot;</span> <span class="hljs-attr">width</span>=<span class="hljs-string">&quot;100%&quot;</span> <span class="hljs-attr">height</span>=<span class="hljs-string">&quot;100%&quot;</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-name">rect</span>&gt;</span>
+  <span class="hljs-tag">&lt;<span class="hljs-name">path</span> <span class="hljs-attr">id</span>=<span class="hljs-string">&quot;preview-path&quot;</span> <span class="hljs-attr">fill</span>=<span class="hljs-string">&quot;none&quot;</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-name">path</span>&gt;</span>
+<span class="hljs-tag">&lt;/<span class="hljs-name">svg</span>&gt;</span>
+</code></pre><p>Attributes are set dynamically via <code>setAttribute()</code>. When it&#39;s time to generate a thumbnail, the code clones this element, adjusts the <code>viewBox</code> for cropping, serializes it, and loads the result as an image:</p>
+<pre><code class="hljs language-javascript"><span class="hljs-keyword">const</span> clone = svgElement.<span class="hljs-title function_">cloneNode</span>(<span class="hljs-literal">true</span>);
+clone.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;viewBox&#x27;</span>, <span class="hljs-string">\`<span class="hljs-subst">\${cropX}</span> <span class="hljs-subst">\${cropY}</span> <span class="hljs-subst">\${cropSize}</span> <span class="hljs-subst">\${cropSize}</span>\`</span>);
+clone.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;width&#x27;</span>, <span class="hljs-title class_">String</span>(rasterSize));
+clone.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;height&#x27;</span>, <span class="hljs-title class_">String</span>(rasterSize));
+
+<span class="hljs-keyword">const</span> svgString = <span class="hljs-keyword">new</span> <span class="hljs-title class_">XMLSerializer</span>().<span class="hljs-title function_">serializeToString</span>(clone);
+<span class="hljs-keyword">const</span> blob = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Blob</span>([svgString], { <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;image/svg+xml;charset=utf-8&#x27;</span> });
+<span class="hljs-keyword">const</span> url = <span class="hljs-variable constant_">URL</span>.<span class="hljs-title function_">createObjectURL</span>(blob);
+
+<span class="hljs-keyword">const</span> img = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Image</span>();
+img.<span class="hljs-property">src</span> = url;
+<span class="hljs-comment">// ... wait for load, createImageBitmap, draw to canvas</span>
+</code></pre><p>This works every time.</p>
+<h2>The Broken Path</h2>
+<p>The admin backfill doesn&#39;t have a live preview — it fetches workspace data from an API, compiles the code to get path data, and constructs an SVG element programmatically:</p>
+<pre><code class="hljs language-javascript"><span class="hljs-title function_">_createTempSvg</span>(<span class="hljs-params">state</span>) {
+  <span class="hljs-keyword">const</span> ns = <span class="hljs-string">&#x27;http://www.w3.org/2000/svg&#x27;</span>;
+  <span class="hljs-keyword">const</span> svg = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">createElementNS</span>(ns, <span class="hljs-string">&#x27;svg&#x27;</span>);
+  svg.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;xmlns&#x27;</span>, ns);
+  svg.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;width&#x27;</span>, state.<span class="hljs-property">width</span>);
+  svg.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;height&#x27;</span>, state.<span class="hljs-property">height</span>);
+  svg.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;viewBox&#x27;</span>, <span class="hljs-string">\`0 0 <span class="hljs-subst">\${state.width}</span> <span class="hljs-subst">\${state.height}</span>\`</span>);
+
+  <span class="hljs-keyword">const</span> bg = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">createElementNS</span>(ns, <span class="hljs-string">&#x27;rect&#x27;</span>);
+  bg.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;width&#x27;</span>, state.<span class="hljs-property">width</span>);
+  bg.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;height&#x27;</span>, state.<span class="hljs-property">height</span>);
+  bg.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;fill&#x27;</span>, state.<span class="hljs-property">background</span>);
+  svg.<span class="hljs-title function_">appendChild</span>(bg);
+
+  <span class="hljs-keyword">const</span> path = <span class="hljs-variable language_">document</span>.<span class="hljs-title function_">createElementNS</span>(ns, <span class="hljs-string">&#x27;path&#x27;</span>);
+  path.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;d&#x27;</span>, state.<span class="hljs-property">pathData</span>);
+  path.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;stroke&#x27;</span>, state.<span class="hljs-property">stroke</span>);
+  path.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;stroke-width&#x27;</span>, state.<span class="hljs-property">strokeWidth</span>);
+  path.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;fill&#x27;</span>, state.<span class="hljs-property">fillEnabled</span> ? state.<span class="hljs-property">fill</span> : <span class="hljs-string">&#x27;none&#x27;</span>);
+  svg.<span class="hljs-title function_">appendChild</span>(path);
+
+  <span class="hljs-keyword">return</span> svg;
+}
+</code></pre><p>This element was then passed through the exact same <code>clone → serialize → Image → bitmap</code> pipeline. Same function, same code path. But the thumbnails were blank.</p>
+<h2>What We Saw</h2>
+<p>The generated thumbnails weren&#39;t completely empty. The background rectangle rendered correctly — a light gray <code>#f5f5f5</code> fill covering the full viewport. But the <code>&lt;path&gt;</code> element, despite having valid <code>d</code> attribute data (verified via console logging), rendered nothing.</p>
+<p>This told us:</p>
+<ul>
+<li>The SVG loaded successfully as an image (background appeared)</li>
+<li>The <code>&lt;path&gt;</code> element was present in the serialized markup</li>
+<li>Something about the serialized output was causing the browser&#39;s SVG-as-image renderer to silently ignore the path</li>
+</ul>
+<h2>The Investigation</h2>
+<p>We verified that <code>result.path</code> from the compiler contained valid, non-empty SVG path data. We verified the <code>viewBox</code>, <code>width</code>, and <code>height</code> were set correctly. We checked for namespace issues, tried stripping inline CSS styles from the element, and even added a wait-and-retry mechanism in case of timing conflicts.</p>
+<p>None of it helped.</p>
+<p>The frustrating part was that both SVGs — the one from the HTML parser and the one from <code>createElementNS</code> — should have been structurally identical after serialization. An SVG is an SVG, right?</p>
+<h2>The Root Cause</h2>
+<p>When you create SVG elements with <code>document.createElementNS()</code> in an HTML document, you&#39;re creating DOM nodes that live in the SVG namespace but exist within the HTML DOM. When <code>XMLSerializer.serializeToString()</code> serializes these nodes back to XML, it can produce subtly different output than what you&#39;d get from a browser-parsed SVG.</p>
+<p>The exact nature of these differences is browser-dependent and poorly documented. They can include redundant namespace declarations on child elements, different attribute ordering, or namespace prefix handling that — while technically valid XML — trips up the browser&#39;s SVG-as-image renderer. The SVG-as-image rendering path (used when loading SVG via <code>new Image()</code>) is more restrictive than the inline SVG rendering path, and it may reject or silently ignore markup that inline rendering handles fine.</p>
+<p>The key insight: <strong>the problem wasn&#39;t in the SVG structure, it was in the serialization roundtrip</strong>. The same logical SVG, when created via DOM APIs and serialized, produced different bytes than when created by the HTML parser and serialized — and those different bytes didn&#39;t survive the <code>Image</code> loading step.</p>
+<h2>The Fix</h2>
+<p>Once we identified that the DOM-to-string roundtrip was the culprit, the fix was almost trivially simple: don&#39;t do the roundtrip. Build the SVG string directly.</p>
+<pre><code class="hljs language-javascript"><span class="hljs-title function_">_buildSvgString</span>(<span class="hljs-params">state</span>) {
+  <span class="hljs-keyword">const</span> w = state.<span class="hljs-property">width</span>;
+  <span class="hljs-keyword">const</span> h = state.<span class="hljs-property">height</span>;
+  <span class="hljs-keyword">const</span> cropSize = <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">min</span>(w, h);
+  <span class="hljs-keyword">const</span> cropX = (w - cropSize) / <span class="hljs-number">2</span>;
+  <span class="hljs-keyword">const</span> cropY = (h - cropSize) / <span class="hljs-number">2</span>;
+  <span class="hljs-keyword">const</span> rasterSize = <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">max</span>(<span class="hljs-number">1024</span>, <span class="hljs-title class_">Math</span>.<span class="hljs-title function_">min</span>(<span class="hljs-title class_">Math</span>.<span class="hljs-title function_">ceil</span>(cropSize), <span class="hljs-number">4096</span>));
+  <span class="hljs-keyword">const</span> fill = state.<span class="hljs-property">fillEnabled</span> ? state.<span class="hljs-property">fill</span> : <span class="hljs-string">&#x27;none&#x27;</span>;
+
+  <span class="hljs-comment">// Escape path data for XML attribute context</span>
+  <span class="hljs-keyword">const</span> d = (state.<span class="hljs-property">pathData</span> || <span class="hljs-string">&#x27;&#x27;</span>)
+    .<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/&amp;/g</span>, <span class="hljs-string">&#x27;&amp;amp;&#x27;</span>)
+    .<span class="hljs-title function_">replace</span>(<span class="hljs-regexp">/&quot;/g</span>, <span class="hljs-string">&#x27;&amp;quot;&#x27;</span>);
+
+  <span class="hljs-keyword">return</span> <span class="hljs-string">\`&lt;svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;<span class="hljs-subst">\${rasterSize}</span>&quot; height=&quot;<span class="hljs-subst">\${rasterSize}</span>&quot; viewBox=&quot;<span class="hljs-subst">\${cropX}</span> <span class="hljs-subst">\${cropY}</span> <span class="hljs-subst">\${cropSize}</span> <span class="hljs-subst">\${cropSize}</span>&quot;&gt;&lt;rect width=&quot;<span class="hljs-subst">\${w}</span>&quot; height=&quot;<span class="hljs-subst">\${h}</span>&quot; fill=&quot;<span class="hljs-subst">\${state.background}</span>&quot;/&gt;&lt;path d=&quot;<span class="hljs-subst">\${d}</span>&quot; stroke=&quot;<span class="hljs-subst">\${state.stroke}</span>&quot; stroke-width=&quot;<span class="hljs-subst">\${state.strokeWidth}</span>&quot; fill=&quot;<span class="hljs-subst">\${fill}</span>&quot;/&gt;&lt;/svg&gt;\`</span>;
+}
+</code></pre><p>This string is passed directly to <code>generateThumbnail</code> via an options parameter, which skips the clone-and-serialize step entirely when a pre-built string is provided:</p>
+<pre><code class="hljs language-javascript"><span class="hljs-keyword">if</span> (options?.<span class="hljs-property">svgString</span>) {
+  svgString = options.<span class="hljs-property">svgString</span>;
+} <span class="hljs-keyword">else</span> {
+  <span class="hljs-keyword">const</span> clone = <span class="hljs-title function_">cloneSvgWithoutGrid</span>(svgElement);
+  <span class="hljs-comment">// ... crop, resize, serialize as before</span>
+  svgString = <span class="hljs-keyword">new</span> <span class="hljs-title class_">XMLSerializer</span>().<span class="hljs-title function_">serializeToString</span>(clone);
+}
+
+<span class="hljs-keyword">const</span> blob = <span class="hljs-keyword">new</span> <span class="hljs-title class_">Blob</span>([svgString], { <span class="hljs-attr">type</span>: <span class="hljs-string">&#x27;image/svg+xml;charset=utf-8&#x27;</span> });
+</code></pre><p>The existing paths (auto-save and manual crop) continue to use the DOM clone pipeline, which works because those SVG elements were created by the HTML parser in the first place. The admin backfill now bypasses the DOM entirely, producing clean SVG markup that the image renderer handles correctly.</p>
+<h2>Takeaways</h2>
+<p><strong><code>XMLSerializer</code> is not a lossless roundtrip.</strong> Creating SVG elements with <code>createElementNS</code>, setting attributes, then serializing with <code>XMLSerializer</code> does not necessarily produce the same output as writing that SVG as a string. The DOM is an abstraction layer, and serialization can introduce artifacts.</p>
+<p><strong>SVG-as-image rendering is stricter than inline SVG.</strong> Browsers apply tighter parsing and security restrictions when loading SVG via <code>&lt;img&gt;</code> or <code>new Image()</code>. Markup that renders perfectly as inline <code>&lt;svg&gt;</code> in your document may silently fail when loaded as an image.</p>
+<p><strong>When you control the input, skip the DOM.</strong> If you&#39;re generating SVG from known data (not cloning a live element), build the string directly. It&#39;s simpler, more predictable, and avoids an entire class of serialization edge cases. Template literals make this clean and readable.</p>
+<p>The irony is that the &quot;proper&quot; approach — using the DOM API to construct a well-formed SVG element — was the one that broke. Sometimes the simplest tool is the right one.</p>
 `,
 };
