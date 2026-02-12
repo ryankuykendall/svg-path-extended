@@ -295,6 +295,40 @@ export function svgPathCompletions(context) {
     }
   }
 
+  // 3.5. Function parameters (scoped to function body)
+  const fnParamRegex = /fn\s+\w+\s*\(([^)]*)\)\s*\{/g;
+  const seenParams = new Set();
+  while ((match = fnParamRegex.exec(doc)) !== null) {
+    const paramsStr = match[1];
+    const openBracePos = match.index + match[0].length - 1;
+
+    // Find matching closing brace via depth counting
+    let depth = 1;
+    let pos = openBracePos + 1;
+    while (pos < doc.length && depth > 0) {
+      if (doc[pos] === '{') depth++;
+      else if (doc[pos] === '}') depth--;
+      pos++;
+    }
+    const closeBracePos = pos - 1;
+
+    // Only add params if cursor is inside this function body
+    if (context.pos > openBracePos && context.pos <= closeBracePos) {
+      const paramNames = paramsStr.split(',').map(p => p.trim()).filter(p => p.length > 0);
+      for (const name of paramNames) {
+        if (!seenParams.has(name) && !seenVars.has(name)) {
+          seenParams.add(name);
+          options.push({
+            label: name,
+            type: 'variable',
+            info: 'Function parameter',
+            boost: boost--,
+          });
+        }
+      }
+    }
+  }
+
   // 4. User-defined functions (fn name(...) { ... })
   const fnRegex = /fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
   const seenFns = new Set();
@@ -336,7 +370,7 @@ export function svgPathCompletions(context) {
   // 6. Stdlib items (lowest priority)
   for (const item of stdlibCompletions) {
     // Skip if user already defined something with same name
-    if (seenVars.has(item.label) || seenFns.has(item.label) || seenLoopVars.has(item.label)) continue;
+    if (seenVars.has(item.label) || seenFns.has(item.label) || seenLoopVars.has(item.label) || seenParams.has(item.label)) continue;
 
     const completion = {
       label: item.label,
