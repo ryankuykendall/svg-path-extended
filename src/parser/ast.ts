@@ -23,6 +23,8 @@ export type Node =
   | IfStatement
   | FunctionDefinition
   | PathCommand
+  | LayerDefinition
+  | LayerApplyBlock
   | CalcExpression
   | FunctionCall
   | BinaryExpression
@@ -45,7 +47,9 @@ export type Statement =
   | IfStatement
   | FunctionDefinition
   | ReturnStatement
-  | PathCommand;
+  | PathCommand
+  | LayerDefinition
+  | LayerApplyBlock;
 
 // let x = 10;
 export interface LetDeclaration {
@@ -156,6 +160,31 @@ export interface NumberLiteral {
 export interface StringLiteral {
   type: 'StringLiteral';
   value: string;
+}
+
+// Style property in a layer definition: stroke: #cc0000;
+export interface StyleProperty {
+  type: 'StyleProperty';
+  name: string;      // e.g. 'stroke', 'stroke-width'
+  value: string;     // raw string e.g. '#cc0000', '4 1 2 3'
+}
+
+// define [default] PathLayer('name') { style declarations }
+export interface LayerDefinition {
+  type: 'LayerDefinition';
+  layerType: 'PathLayer' | 'TextLayer';
+  name: Expression;
+  isDefault: boolean;
+  styles: StyleProperty[];
+  loc?: SourceLocation;
+}
+
+// layer('name').apply { statements }
+export interface LayerApplyBlock {
+  type: 'LayerApplyBlock';
+  layerName: Expression;
+  body: Statement[];
+  loc?: SourceLocation;
 }
 
 export type Expression =

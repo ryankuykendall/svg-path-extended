@@ -13,6 +13,8 @@ import type {
   FunctionCall,
   MemberExpression,
   Comment,
+  LayerDefinition,
+  LayerApplyBlock,
 } from '../parser/ast';
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import { createPathContext, contextToObject, updateContextForCommand, setLastTangent, type PathContext } from './context';
@@ -33,7 +35,11 @@ export interface AnnotatedOutput {
 }
 
 // Value types (same as main evaluator)
-export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult;
+export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult | AnnotatedLayerRef;
+
+export interface AnnotatedLayerRef {
+  type: 'LayerReference';
+}
 
 export interface PathSegment {
   type: 'PathSegment';
@@ -578,10 +584,24 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     throw new Error(formatError(`Cannot access property '${expr.property}' of type ${typeof propValue}`, line));
   }
 
+  // Handle LayerReference — minimal support in annotated mode
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'LayerReference') {
+    // In annotated mode, return dummy values
+    if (expr.property === 'name') return '';
+    if (expr.property === 'ctx') return { type: 'ContextObject' as const, value: { position: { x: 0, y: 0 }, start: { x: 0, y: 0 }, commands: [] } };
+    throw new Error(formatError(`Property '${expr.property}' does not exist on layer reference`, line));
+  }
+
   throw new Error(formatError(`Cannot access property '${expr.property}' on non-object value`, line));
 }
 
 function evaluateFunctionCall(call: FunctionCall, scope: Scope, ctx: AnnotatedContext | null): Value {
+  // Handle layer() function — return a dummy LayerReference in annotated mode
+  if (call.name === 'layer') {
+    call.args.forEach((arg) => evaluateExpression(arg, scope));
+    return { type: 'LayerReference' as const };
+  }
+
   // Special handling for log() function - just evaluate args and return empty
   if (call.name === 'log') {
     // Evaluate args to check for errors, but don't produce output in annotated mode
@@ -832,6 +852,20 @@ function evaluateStatementPlain(stmt: Statement, scope: Scope): string {
       return result;
     }
 
+    case 'LayerDefinition':
+      // Layer definitions are no-ops in annotated mode
+      return '';
+
+    case 'LayerApplyBlock': {
+      // In annotated mode, just evaluate the body normally
+      const results: string[] = [];
+      for (const bodyStmt of stmt.body) {
+        const result = evaluateStatementPlain(bodyStmt, createScope(scope));
+        if (result) results.push(result);
+      }
+      return results.join(' ');
+    }
+
     case 'ReturnStatement': {
       const value = evaluateExpression(stmt.value, scope);
       throw new ReturnSignal(value);
@@ -1065,6 +1099,18 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
           updateContextForCommand(scope.evalState.pathContext, stmt.command, numericArgs);
           updateCtxVariable(scope);
         }
+      }
+      break;
+    }
+
+    case 'LayerDefinition':
+      // Layer definitions are no-ops in annotated mode
+      break;
+
+    case 'LayerApplyBlock': {
+      // In annotated mode, just evaluate the body into the annotated output
+      for (const bodyStmt of stmt.body) {
+        evaluateStatementAnnotated(bodyStmt, createScope(scope), ctx);
       }
       break;
     }

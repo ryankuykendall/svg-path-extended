@@ -555,8 +555,10 @@ export class WorkspaceView extends HTMLElement {
       // Set rendering state before updating the SVG
       store.set('compilationStatus', 'rendering');
 
-      // Use timing method to measure rendering
-      const renderTime = this.previewPane.setPathDataWithTiming(result.path);
+      // Use timing method to measure rendering — pass layers if available
+      const renderTime = result.layers
+        ? this.previewPane.setLayersWithTiming(result.layers)
+        : this.previewPane.setPathDataWithTiming(result.path);
       console.log(`Render time: ${renderTime.toFixed(2)}ms`);
 
       this.previewPane.hideLoading();

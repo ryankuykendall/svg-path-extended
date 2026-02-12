@@ -1,68 +1,68 @@
 import { describe, it, expect } from 'vitest';
-import { compile } from '../src';
+import { compilePath } from './helpers';
 
 describe('Evaluator', () => {
   describe('path commands', () => {
     it('evaluates simple path commands', () => {
-      expect(compile('M 10 20')).toBe('M 10 20');
+      expect(compilePath('M 10 20')).toBe('M 10 20');
     });
 
     it('evaluates multiple path commands', () => {
-      expect(compile('M 0 0 L 10 20 Z')).toBe('M 0 0 L 10 20 Z');
+      expect(compilePath('M 0 0 L 10 20 Z')).toBe('M 0 0 L 10 20 Z');
     });
 
     it('evaluates negative numbers', () => {
-      expect(compile('M -10 -20')).toBe('M -10 -20');
+      expect(compilePath('M -10 -20')).toBe('M -10 -20');
     });
 
     it('evaluates decimal numbers', () => {
-      expect(compile('M 10.5 20.75')).toBe('M 10.5 20.75');
+      expect(compilePath('M 10.5 20.75')).toBe('M 10.5 20.75');
     });
 
     it('evaluates H (horizontal line)', () => {
-      expect(compile('H 50')).toBe('H 50');
+      expect(compilePath('H 50')).toBe('H 50');
     });
 
     it('evaluates V (vertical line)', () => {
-      expect(compile('V 50')).toBe('V 50');
+      expect(compilePath('V 50')).toBe('V 50');
     });
 
     it('evaluates C (cubic bezier)', () => {
-      expect(compile('C 10 20 30 40 50 60')).toBe('C 10 20 30 40 50 60');
+      expect(compilePath('C 10 20 30 40 50 60')).toBe('C 10 20 30 40 50 60');
     });
 
     it('evaluates S (smooth cubic)', () => {
-      expect(compile('S 30 40 50 60')).toBe('S 30 40 50 60');
+      expect(compilePath('S 30 40 50 60')).toBe('S 30 40 50 60');
     });
 
     it('evaluates Q (quadratic bezier)', () => {
-      expect(compile('Q 25 50 50 0')).toBe('Q 25 50 50 0');
+      expect(compilePath('Q 25 50 50 0')).toBe('Q 25 50 50 0');
     });
 
     it('evaluates T (smooth quadratic)', () => {
-      expect(compile('T 50 0')).toBe('T 50 0');
+      expect(compilePath('T 50 0')).toBe('T 50 0');
     });
 
     it('evaluates A (arc)', () => {
-      expect(compile('A 25 25 0 1 1 50 50')).toBe('A 25 25 0 1 1 50 50');
+      expect(compilePath('A 25 25 0 1 1 50 50')).toBe('A 25 25 0 1 1 50 50');
     });
 
     it('evaluates lowercase relative commands', () => {
-      expect(compile('m 10 20 l 30 40 h 10 v 10')).toBe('m 10 20 l 30 40 h 10 v 10');
+      expect(compilePath('m 10 20 l 30 40 h 10 v 10')).toBe('m 10 20 l 30 40 h 10 v 10');
     });
   });
 
   describe('comments', () => {
     it('ignores line comments', () => {
-      expect(compile('// This is a comment\nM 10 20')).toBe('M 10 20');
+      expect(compilePath('// This is a comment\nM 10 20')).toBe('M 10 20');
     });
 
     it('ignores inline comments', () => {
-      expect(compile('M 10 20 // move to point\nL 30 40')).toBe('M 10 20 L 30 40');
+      expect(compilePath('M 10 20 // move to point\nL 30 40')).toBe('M 10 20 L 30 40');
     });
 
     it('handles multiple comments', () => {
-      expect(compile(`
+      expect(compilePath(`
         // First comment
         let x = 10; // define x
         // Another comment
@@ -74,84 +74,84 @@ describe('Evaluator', () => {
   describe('operators', () => {
     describe('comparison operators', () => {
       it('evaluates less than', () => {
-        expect(compile('if (1 < 2) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (2 < 1) { M 1 0 }')).toBe('');
+        expect(compilePath('if (1 < 2) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (2 < 1) { M 1 0 }')).toBe('');
       });
 
       it('evaluates greater than', () => {
-        expect(compile('if (2 > 1) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (1 > 2) { M 1 0 }')).toBe('');
+        expect(compilePath('if (2 > 1) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (1 > 2) { M 1 0 }')).toBe('');
       });
 
       it('evaluates less than or equal', () => {
-        expect(compile('if (1 <= 2) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (2 <= 2) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (3 <= 2) { M 1 0 }')).toBe('');
+        expect(compilePath('if (1 <= 2) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (2 <= 2) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (3 <= 2) { M 1 0 }')).toBe('');
       });
 
       it('evaluates greater than or equal', () => {
-        expect(compile('if (2 >= 1) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (2 >= 2) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (1 >= 2) { M 1 0 }')).toBe('');
+        expect(compilePath('if (2 >= 1) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (2 >= 2) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (1 >= 2) { M 1 0 }')).toBe('');
       });
 
       it('evaluates equal', () => {
-        expect(compile('if (2 == 2) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (1 == 2) { M 1 0 }')).toBe('');
+        expect(compilePath('if (2 == 2) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (1 == 2) { M 1 0 }')).toBe('');
       });
 
       it('evaluates not equal', () => {
-        expect(compile('if (1 != 2) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (2 != 2) { M 1 0 }')).toBe('');
+        expect(compilePath('if (1 != 2) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (2 != 2) { M 1 0 }')).toBe('');
       });
     });
 
     describe('logical operators', () => {
       it('evaluates logical and', () => {
-        expect(compile('if (1 && 1) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (1 && 0) { M 1 0 }')).toBe('');
-        expect(compile('if (0 && 1) { M 1 0 }')).toBe('');
+        expect(compilePath('if (1 && 1) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (1 && 0) { M 1 0 }')).toBe('');
+        expect(compilePath('if (0 && 1) { M 1 0 }')).toBe('');
       });
 
       it('evaluates logical or', () => {
-        expect(compile('if (1 || 0) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (0 || 1) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (0 || 0) { M 1 0 }')).toBe('');
+        expect(compilePath('if (1 || 0) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (0 || 1) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (0 || 0) { M 1 0 }')).toBe('');
       });
 
       it('evaluates compound logical expressions', () => {
-        expect(compile('if ((1 > 0) && (2 > 1)) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if ((1 > 2) || (2 > 1)) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if ((1 > 0) && (2 > 1)) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if ((1 > 2) || (2 > 1)) { M 1 0 }')).toBe('M 1 0');
       });
     });
 
     describe('unary operators', () => {
       it('evaluates unary minus', () => {
-        expect(compile('let x = -5; M x 0')).toBe('M -5 0');
-        expect(compile('M calc(-10) 0')).toBe('M -10 0');
+        expect(compilePath('let x = -5; M x 0')).toBe('M -5 0');
+        expect(compilePath('M calc(-10) 0')).toBe('M -10 0');
       });
 
       it('evaluates unary not', () => {
-        expect(compile('if (!0) { M 1 0 }')).toBe('M 1 0');
-        expect(compile('if (!1) { M 1 0 }')).toBe('');
+        expect(compilePath('if (!0) { M 1 0 }')).toBe('M 1 0');
+        expect(compilePath('if (!1) { M 1 0 }')).toBe('');
       });
     });
 
     describe('arithmetic operators', () => {
       it('evaluates subtraction', () => {
-        expect(compile('M calc(10 - 3) 0')).toBe('M 7 0');
+        expect(compilePath('M calc(10 - 3) 0')).toBe('M 7 0');
       });
 
       it('evaluates division', () => {
-        expect(compile('M calc(10 / 2) 0')).toBe('M 5 0');
+        expect(compilePath('M calc(10 / 2) 0')).toBe('M 5 0');
       });
 
       it('evaluates modulo', () => {
-        expect(compile('M calc(10 % 3) 0')).toBe('M 1 0');
+        expect(compilePath('M calc(10 % 3) 0')).toBe('M 1 0');
       });
 
       it('evaluates complex expressions', () => {
-        expect(compile('M calc(2 + 3 * 4 - 6 / 2) 0')).toBe('M 11 0');
+        expect(compilePath('M calc(2 + 3 * 4 - 6 / 2) 0')).toBe('M 11 0');
       });
     });
   });
@@ -159,266 +159,266 @@ describe('Evaluator', () => {
   describe('variable scoping', () => {
     it('shadows variables in for loop', () => {
       // 0..3 is inclusive: 0, 1, 2, 3
-      const result = compile('let i = 100; for (i in 0..3) { M i 0 } M i 0');
+      const result = compilePath('let i = 100; for (i in 0..3) { M i 0 } M i 0');
       expect(result).toBe('M 0 0 M 1 0 M 2 0 M 3 0 M 100 0');
     });
 
     it('shadows variables in function scope', () => {
-      const result = compile('let x = 100; fn f(x) { M x 0 } f(5) M x 0');
+      const result = compilePath('let x = 100; fn f(x) { M x 0 } f(5) M x 0');
       expect(result).toBe('M 5 0 M 100 0');
     });
 
     it('inner scope does not affect outer scope', () => {
-      const result = compile('let x = 10; if (1) { let x = 20; M x 0 } M x 0');
+      const result = compilePath('let x = 10; if (1) { let x = 20; M x 0 } M x 0');
       expect(result).toBe('M 20 0 M 10 0');
     });
   });
 
   describe('variables', () => {
     it('evaluates variable references', () => {
-      expect(compile('let x = 10; M x 20')).toBe('M 10 20');
+      expect(compilePath('let x = 10; M x 20')).toBe('M 10 20');
     });
 
     it('evaluates multiple variables', () => {
-      expect(compile('let x = 10; let y = 20; M x y')).toBe('M 10 20');
+      expect(compilePath('let x = 10; let y = 20; M x y')).toBe('M 10 20');
     });
 
     it('evaluates variable with expression', () => {
-      expect(compile('let x = 10 + 5; M x 0')).toBe('M 15 0');
+      expect(compilePath('let x = 10 + 5; M x 0')).toBe('M 15 0');
     });
   });
 
   describe('calc expressions', () => {
     it('evaluates calc with addition', () => {
-      expect(compile('M calc(10 + 5) 0')).toBe('M 15 0');
+      expect(compilePath('M calc(10 + 5) 0')).toBe('M 15 0');
     });
 
     it('evaluates calc with multiplication', () => {
-      expect(compile('M calc(10 * 2) 0')).toBe('M 20 0');
+      expect(compilePath('M calc(10 * 2) 0')).toBe('M 20 0');
     });
 
     it('evaluates calc with variables', () => {
-      expect(compile('let x = 10; M calc(x + 5) 0')).toBe('M 15 0');
+      expect(compilePath('let x = 10; M calc(x + 5) 0')).toBe('M 15 0');
     });
 
     it('respects operator precedence', () => {
-      expect(compile('M calc(2 + 3 * 4) 0')).toBe('M 14 0');
+      expect(compilePath('M calc(2 + 3 * 4) 0')).toBe('M 14 0');
     });
 
     it('evaluates nested parentheses', () => {
-      expect(compile('M calc((2 + 3) * 4) 0')).toBe('M 20 0');
+      expect(compilePath('M calc((2 + 3) * 4) 0')).toBe('M 20 0');
     });
   });
 
   describe('stdlib math functions', () => {
     describe('trigonometric', () => {
       it('evaluates sin', () => {
-        expect(compile('M calc(sin(0)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(sin(0)) 0')).toBe('M 0 0');
       });
 
       it('evaluates cos', () => {
-        expect(compile('M calc(cos(0)) 0')).toBe('M 1 0');
+        expect(compilePath('M calc(cos(0)) 0')).toBe('M 1 0');
       });
 
       it('evaluates tan', () => {
-        expect(compile('M calc(tan(0)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(tan(0)) 0')).toBe('M 0 0');
       });
 
       it('evaluates asin', () => {
-        expect(compile('M calc(asin(0)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(asin(0)) 0')).toBe('M 0 0');
       });
 
       it('evaluates acos', () => {
-        const result = compile('M calc(acos(1)) 0');
+        const result = compilePath('M calc(acos(1)) 0');
         expect(result).toBe('M 0 0');
       });
 
       it('evaluates atan', () => {
-        expect(compile('M calc(atan(0)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(atan(0)) 0')).toBe('M 0 0');
       });
 
       it('evaluates atan2', () => {
-        expect(compile('M calc(atan2(0, 1)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(atan2(0, 1)) 0')).toBe('M 0 0');
       });
     });
 
     describe('hyperbolic', () => {
       it('evaluates sinh', () => {
-        expect(compile('M calc(sinh(0)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(sinh(0)) 0')).toBe('M 0 0');
       });
 
       it('evaluates cosh', () => {
-        expect(compile('M calc(cosh(0)) 0')).toBe('M 1 0');
+        expect(compilePath('M calc(cosh(0)) 0')).toBe('M 1 0');
       });
 
       it('evaluates tanh', () => {
-        expect(compile('M calc(tanh(0)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(tanh(0)) 0')).toBe('M 0 0');
       });
     });
 
     describe('exponential and logarithmic', () => {
       it('evaluates exp', () => {
-        expect(compile('M calc(exp(0)) 0')).toBe('M 1 0');
+        expect(compilePath('M calc(exp(0)) 0')).toBe('M 1 0');
       });
 
       it('evaluates log (natural)', () => {
-        expect(compile('M calc(log(1)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(log(1)) 0')).toBe('M 0 0');
       });
 
       it('evaluates log10', () => {
-        expect(compile('M calc(log10(10)) 0')).toBe('M 1 0');
+        expect(compilePath('M calc(log10(10)) 0')).toBe('M 1 0');
       });
 
       it('evaluates log2', () => {
-        expect(compile('M calc(log2(8)) 0')).toBe('M 3 0');
+        expect(compilePath('M calc(log2(8)) 0')).toBe('M 3 0');
       });
 
       it('evaluates pow', () => {
-        expect(compile('M calc(pow(2, 3)) 0')).toBe('M 8 0');
+        expect(compilePath('M calc(pow(2, 3)) 0')).toBe('M 8 0');
       });
 
       it('evaluates sqrt', () => {
-        expect(compile('M calc(sqrt(16)) 0')).toBe('M 4 0');
+        expect(compilePath('M calc(sqrt(16)) 0')).toBe('M 4 0');
       });
 
       it('evaluates cbrt', () => {
-        expect(compile('M calc(cbrt(27)) 0')).toBe('M 3 0');
+        expect(compilePath('M calc(cbrt(27)) 0')).toBe('M 3 0');
       });
     });
 
     describe('rounding', () => {
       it('evaluates floor', () => {
-        expect(compile('M calc(floor(3.7)) 0')).toBe('M 3 0');
+        expect(compilePath('M calc(floor(3.7)) 0')).toBe('M 3 0');
       });
 
       it('evaluates ceil', () => {
-        expect(compile('M calc(ceil(3.2)) 0')).toBe('M 4 0');
+        expect(compilePath('M calc(ceil(3.2)) 0')).toBe('M 4 0');
       });
 
       it('evaluates round', () => {
-        expect(compile('M calc(round(3.5)) 0')).toBe('M 4 0');
-        expect(compile('M calc(round(3.4)) 0')).toBe('M 3 0');
+        expect(compilePath('M calc(round(3.5)) 0')).toBe('M 4 0');
+        expect(compilePath('M calc(round(3.4)) 0')).toBe('M 3 0');
       });
 
       it('evaluates trunc', () => {
-        expect(compile('M calc(trunc(3.9)) 0')).toBe('M 3 0');
-        expect(compile('M calc(trunc(-3.9)) 0')).toBe('M -3 0');
+        expect(compilePath('M calc(trunc(3.9)) 0')).toBe('M 3 0');
+        expect(compilePath('M calc(trunc(-3.9)) 0')).toBe('M -3 0');
       });
     });
 
     describe('utility', () => {
       it('evaluates abs', () => {
-        expect(compile('M calc(abs(-10)) 0')).toBe('M 10 0');
+        expect(compilePath('M calc(abs(-10)) 0')).toBe('M 10 0');
       });
 
       it('evaluates sign', () => {
-        expect(compile('M calc(sign(-10)) calc(sign(10))')).toBe('M -1 1');
-        expect(compile('M calc(sign(0)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(sign(-10)) calc(sign(10))')).toBe('M -1 1');
+        expect(compilePath('M calc(sign(0)) 0')).toBe('M 0 0');
       });
 
       it('evaluates min/max', () => {
-        expect(compile('M calc(min(10, 5)) calc(max(10, 5))')).toBe('M 5 10');
+        expect(compilePath('M calc(min(10, 5)) calc(max(10, 5))')).toBe('M 5 10');
       });
     });
 
     describe('constants', () => {
       it('evaluates PI', () => {
-        const result = compile('M calc(PI()) 0');
+        const result = compilePath('M calc(PI()) 0');
         expect(result).toContain('3.14159');
       });
 
       it('evaluates E', () => {
-        const result = compile('M calc(E()) 0');
+        const result = compilePath('M calc(E()) 0');
         expect(result).toContain('2.718');
       });
 
       it('evaluates TAU', () => {
-        const result = compile('M calc(TAU()) 0');
+        const result = compilePath('M calc(TAU()) 0');
         expect(result).toContain('6.28318');
       });
     });
 
     describe('interpolation and clamping', () => {
       it('evaluates lerp', () => {
-        expect(compile('M calc(lerp(0, 100, 0.5)) 0')).toBe('M 50 0');
-        expect(compile('M calc(lerp(0, 100, 0)) 0')).toBe('M 0 0');
-        expect(compile('M calc(lerp(0, 100, 1)) 0')).toBe('M 100 0');
+        expect(compilePath('M calc(lerp(0, 100, 0.5)) 0')).toBe('M 50 0');
+        expect(compilePath('M calc(lerp(0, 100, 0)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(lerp(0, 100, 1)) 0')).toBe('M 100 0');
       });
 
       it('evaluates clamp', () => {
-        expect(compile('M calc(clamp(15, 0, 10)) 0')).toBe('M 10 0');
-        expect(compile('M calc(clamp(-5, 0, 10)) 0')).toBe('M 0 0');
-        expect(compile('M calc(clamp(5, 0, 10)) 0')).toBe('M 5 0');
+        expect(compilePath('M calc(clamp(15, 0, 10)) 0')).toBe('M 10 0');
+        expect(compilePath('M calc(clamp(-5, 0, 10)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(clamp(5, 0, 10)) 0')).toBe('M 5 0');
       });
 
       it('evaluates map', () => {
-        expect(compile('M calc(map(5, 0, 10, 0, 100)) 0')).toBe('M 50 0');
-        expect(compile('M calc(map(0, 0, 10, 0, 100)) 0')).toBe('M 0 0');
-        expect(compile('M calc(map(10, 0, 10, 0, 100)) 0')).toBe('M 100 0');
+        expect(compilePath('M calc(map(5, 0, 10, 0, 100)) 0')).toBe('M 50 0');
+        expect(compilePath('M calc(map(0, 0, 10, 0, 100)) 0')).toBe('M 0 0');
+        expect(compilePath('M calc(map(10, 0, 10, 0, 100)) 0')).toBe('M 100 0');
       });
     });
 
     describe('angle conversions', () => {
       it('evaluates deg (radians to degrees)', () => {
-        const result = compile('M calc(deg(PI())) 0');
+        const result = compilePath('M calc(deg(PI())) 0');
         expect(result).toBe('M 180 0');
       });
 
       it('evaluates rad (degrees to radians)', () => {
-        const result = compile('M calc(rad(180)) 0');
+        const result = compilePath('M calc(rad(180)) 0');
         expect(result).toContain('3.14159');
       });
     });
 
     describe('pi suffix and mpi()', () => {
       it('evaluates 0.25pi to Math.PI * 0.25', () => {
-        const result = compile('M 0.25pi 0');
+        const result = compilePath('M 0.25pi 0');
         const match = result.match(/^M ([\d.]+) 0$/);
         expect(match).not.toBeNull();
         expect(parseFloat(match![1])).toBeCloseTo(Math.PI * 0.25);
       });
 
       it('evaluates 1pi to Math.PI', () => {
-        const result = compile('M 1pi 0');
+        const result = compilePath('M 1pi 0');
         const match = result.match(/^M ([\d.]+) 0$/);
         expect(match).not.toBeNull();
         expect(parseFloat(match![1])).toBeCloseTo(Math.PI);
       });
 
       it('evaluates mpi(0.5) to Math.PI * 0.5', () => {
-        const result = compile('M calc(mpi(0.5)) 0');
+        const result = compilePath('M calc(mpi(0.5)) 0');
         const match = result.match(/^M ([\d.]+) 0$/);
         expect(match).not.toBeNull();
         expect(parseFloat(match![1])).toBeCloseTo(Math.PI * 0.5);
       });
 
       it('allows calc(0.25pi + 0.25pi)', () => {
-        const result = compile('M calc(0.25pi + 0.25pi) 0');
+        const result = compilePath('M calc(0.25pi + 0.25pi) 0');
         const match = result.match(/^M ([\d.]+) 0$/);
         expect(match).not.toBeNull();
         expect(parseFloat(match![1])).toBeCloseTo(Math.PI * 0.5);
       });
 
       it('allows calc(90deg + 0.5pi) — both have angle units', () => {
-        const result = compile('M calc(90deg + 0.5pi) 0');
+        const result = compilePath('M calc(90deg + 0.5pi) 0');
         const match = result.match(/^M ([\d.]+) 0$/);
         expect(match).not.toBeNull();
         expect(parseFloat(match![1])).toBeCloseTo(Math.PI);
       });
 
       it('throws on calc(0.25pi + 5) — angle unit mismatch', () => {
-        expect(() => compile('M calc(0.25pi + 5) 0')).toThrow();
+        expect(() => compilePath('M calc(0.25pi + 5) 0')).toThrow();
       });
 
       it('evaluates calc(0.5pi * 2) — multiply pi suffix by scalar', () => {
-        const result = compile('M calc(0.5pi * 2) 0');
+        const result = compilePath('M calc(0.5pi * 2) 0');
         const match = result.match(/^M ([\d.]+) 0$/);
         expect(match).not.toBeNull();
         expect(parseFloat(match![1])).toBeCloseTo(Math.PI);
       });
 
       it('evaluates calc(0.5pi / 2) — divide pi suffix by scalar', () => {
-        const result = compile('M calc(0.5pi / 2) 0');
+        const result = compilePath('M calc(0.5pi / 2) 0');
         const match = result.match(/^M ([\d.]+) 0$/);
         expect(match).not.toBeNull();
         expect(parseFloat(match![1])).toBeCloseTo(Math.PI / 4);
@@ -427,7 +427,7 @@ describe('Evaluator', () => {
 
     describe('random', () => {
       it('evaluates random (returns number between 0 and 1)', () => {
-        const result = compile('M calc(random()) 0');
+        const result = compilePath('M calc(random()) 0');
         const match = result.match(/M ([\d.]+) 0/);
         expect(match).not.toBeNull();
         const value = parseFloat(match![1]);
@@ -436,7 +436,7 @@ describe('Evaluator', () => {
       });
 
       it('evaluates randomRange (returns number in range)', () => {
-        const result = compile('M calc(randomRange(10, 20)) 0');
+        const result = compilePath('M calc(randomRange(10, 20)) 0');
         const match = result.match(/M ([\d.]+) 0/);
         expect(match).not.toBeNull();
         const value = parseFloat(match![1]);
@@ -448,23 +448,23 @@ describe('Evaluator', () => {
 
   describe('stdlib path functions', () => {
     it('evaluates circle', () => {
-      const result = compile('circle(50, 50, 25)');
+      const result = compilePath('circle(50, 50, 25)');
       expect(result).toContain('M 25 50');
       expect(result).toContain('A 25 25');
     });
 
     it('evaluates arc', () => {
-      const result = compile('arc(10, 10, 0, 1, 1, 50, 50)');
+      const result = compilePath('arc(10, 10, 0, 1, 1, 50, 50)');
       expect(result).toBe('A 10 10 0 1 1 50 50');
     });
 
     it('evaluates rect', () => {
-      const result = compile('rect(0, 0, 100, 50)');
+      const result = compilePath('rect(0, 0, 100, 50)');
       expect(result).toBe('M 0 0 L 100 0 L 100 50 L 0 50 Z');
     });
 
     it('evaluates roundRect', () => {
-      const result = compile('roundRect(10, 10, 80, 60, 10)');
+      const result = compilePath('roundRect(10, 10, 80, 60, 10)');
       expect(result).toContain('M 20 10'); // Start with radius offset
       expect(result).toContain('Q'); // Quadratic curves for corners
       expect(result).toContain('Z');
@@ -472,13 +472,13 @@ describe('Evaluator', () => {
 
     it('evaluates roundRect with large radius (clamped)', () => {
       // radius is clamped to half the smaller dimension
-      const result = compile('roundRect(0, 0, 40, 20, 50)');
+      const result = compilePath('roundRect(0, 0, 40, 20, 50)');
       expect(result).toContain('Q');
       expect(result).toContain('Z');
     });
 
     it('evaluates polygon', () => {
-      const result = compile('polygon(50, 50, 25, 4)');
+      const result = compilePath('polygon(50, 50, 25, 4)');
       expect(result).toContain('M');
       expect(result).toContain('L');
       expect(result).toContain('Z');
@@ -486,16 +486,16 @@ describe('Evaluator', () => {
 
     it('evaluates polygon with different side counts', () => {
       // Triangle
-      const triangle = compile('polygon(50, 50, 25, 3)');
+      const triangle = compilePath('polygon(50, 50, 25, 3)');
       expect(triangle.match(/L/g)?.length).toBe(2);
 
       // Hexagon
-      const hexagon = compile('polygon(50, 50, 25, 6)');
+      const hexagon = compilePath('polygon(50, 50, 25, 6)');
       expect(hexagon.match(/L/g)?.length).toBe(5);
     });
 
     it('evaluates star', () => {
-      const result = compile('star(50, 50, 30, 15, 5)');
+      const result = compilePath('star(50, 50, 30, 15, 5)');
       expect(result).toContain('M');
       expect(result).toContain('L');
       expect(result).toContain('Z');
@@ -504,37 +504,37 @@ describe('Evaluator', () => {
     });
 
     it('evaluates line', () => {
-      const result = compile('line(10, 20, 30, 40)');
+      const result = compilePath('line(10, 20, 30, 40)');
       expect(result).toBe('M 10 20 L 30 40');
     });
 
     it('evaluates quadratic', () => {
-      const result = compile('quadratic(0, 0, 50, 100, 100, 0)');
+      const result = compilePath('quadratic(0, 0, 50, 100, 100, 0)');
       expect(result).toBe('M 0 0 Q 50 100 100 0');
     });
 
     it('evaluates cubic', () => {
-      const result = compile('cubic(0, 0, 25, 100, 75, 100, 100, 0)');
+      const result = compilePath('cubic(0, 0, 25, 100, 75, 100, 100, 0)');
       expect(result).toBe('M 0 0 C 25 100 75 100 100 0');
     });
 
     it('evaluates moveTo', () => {
-      const result = compile('moveTo(50, 100)');
+      const result = compilePath('moveTo(50, 100)');
       expect(result).toBe('M 50 100');
     });
 
     it('evaluates lineTo', () => {
-      const result = compile('lineTo(50, 100)');
+      const result = compilePath('lineTo(50, 100)');
       expect(result).toBe('L 50 100');
     });
 
     it('evaluates closePath', () => {
-      const result = compile('closePath()');
+      const result = compilePath('closePath()');
       expect(result).toBe('Z');
     });
 
     it('combines multiple path functions', () => {
-      const result = compile('moveTo(0, 0) lineTo(100, 0) lineTo(100, 100) closePath()');
+      const result = compilePath('moveTo(0, 0) lineTo(100, 0) lineTo(100, 100) closePath()');
       expect(result).toBe('M 0 0 L 100 0 L 100 100 Z');
     });
   });
@@ -542,35 +542,35 @@ describe('Evaluator', () => {
   describe('for loops', () => {
     it('evaluates simple for loop', () => {
       // 0..3 is inclusive: 0, 1, 2, 3
-      expect(compile('for (i in 0..3) { L i 0 }')).toBe('L 0 0 L 1 0 L 2 0 L 3 0');
+      expect(compilePath('for (i in 0..3) { L i 0 }')).toBe('L 0 0 L 1 0 L 2 0 L 3 0');
     });
 
     it('evaluates for loop with calc', () => {
       // 0..3 is inclusive: 0, 1, 2, 3
-      expect(compile('for (i in 0..3) { L calc(i * 10) 0 }')).toBe('L 0 0 L 10 0 L 20 0 L 30 0');
+      expect(compilePath('for (i in 0..3) { L calc(i * 10) 0 }')).toBe('L 0 0 L 10 0 L 20 0 L 30 0');
     });
 
     it('evaluates nested for loops', () => {
       // 0..2 is inclusive: 0, 1, 2 (3 values each = 9 total)
-      const result = compile('for (i in 0..2) { for (j in 0..2) { M i j } }');
+      const result = compilePath('for (i in 0..2) { for (j in 0..2) { M i j } }');
       expect(result).toBe('M 0 0 M 0 1 M 0 2 M 1 0 M 1 1 M 1 2 M 2 0 M 2 1 M 2 2');
     });
 
     it('throws error for infinite loop range (Infinity)', () => {
-      expect(() => compile('let n = calc(1/0); for (i in 0..n) { M i 0 }')).toThrow('finite');
+      expect(() => compilePath('let n = calc(1/0); for (i in 0..n) { M i 0 }')).toThrow('finite');
     });
 
     it('throws error for NaN loop range', () => {
-      expect(() => compile('let n = calc(0/0); for (i in 0..n) { M i 0 }')).toThrow('finite');
+      expect(() => compilePath('let n = calc(0/0); for (i in 0..n) { M i 0 }')).toThrow('finite');
     });
 
     it('throws error for excessive iterations', () => {
-      expect(() => compile('for (i in 0..20000) { M i 0 }')).toThrow('max');
+      expect(() => compilePath('for (i in 0..20000) { M i 0 }')).toThrow('max');
     });
 
     it('allows reasonable iteration count', () => {
       // 0..100 is inclusive: 101 iterations (0 through 100)
-      const result = compile('for (i in 0..100) { M i 0 }');
+      const result = compilePath('for (i in 0..100) { M i 0 }');
       expect(result).toContain('M 0 0');
       expect(result).toContain('M 99 0');
       expect(result).toContain('M 100 0');
@@ -578,53 +578,53 @@ describe('Evaluator', () => {
 
     it('evaluates descending for loop', () => {
       // 3..0 is inclusive descending: 3, 2, 1, 0
-      expect(compile('for (i in 3..0) { M i 0 }')).toBe('M 3 0 M 2 0 M 1 0 M 0 0');
+      expect(compilePath('for (i in 3..0) { M i 0 }')).toBe('M 3 0 M 2 0 M 1 0 M 0 0');
     });
 
     it('evaluates descending for loop with larger range', () => {
       // 10..8 is inclusive descending: 10, 9, 8
-      expect(compile('for (i in 10..8) { M i 0 }')).toBe('M 10 0 M 9 0 M 8 0');
+      expect(compilePath('for (i in 10..8) { M i 0 }')).toBe('M 10 0 M 9 0 M 8 0');
     });
 
     it('evaluates descending for loop with negative values', () => {
       // 2..-2 is inclusive descending: 2, 1, 0, -1, -2
-      expect(compile('for (i in 2..-2) { M i 0 }')).toBe('M 2 0 M 1 0 M 0 0 M -1 0 M -2 0');
+      expect(compilePath('for (i in 2..-2) { M i 0 }')).toBe('M 2 0 M 1 0 M 0 0 M -1 0 M -2 0');
     });
 
     it('evaluates ascending for loop with negative values', () => {
       // -2..2 is inclusive ascending: -2, -1, 0, 1, 2
-      expect(compile('for (i in -2..2) { M i 0 }')).toBe('M -2 0 M -1 0 M 0 0 M 1 0 M 2 0');
+      expect(compilePath('for (i in -2..2) { M i 0 }')).toBe('M -2 0 M -1 0 M 0 0 M 1 0 M 2 0');
     });
   });
 
   describe('if statements', () => {
     it('evaluates if true', () => {
-      expect(compile('let x = 1; if (x > 0) { M 10 10 }')).toBe('M 10 10');
+      expect(compilePath('let x = 1; if (x > 0) { M 10 10 }')).toBe('M 10 10');
     });
 
     it('evaluates if false', () => {
-      expect(compile('let x = 0; if (x > 0) { M 10 10 }')).toBe('');
+      expect(compilePath('let x = 0; if (x > 0) { M 10 10 }')).toBe('');
     });
 
     it('evaluates if-else', () => {
-      expect(compile('let x = 0; if (x > 0) { M 10 10 } else { M 0 0 }')).toBe('M 0 0');
+      expect(compilePath('let x = 0; if (x > 0) { M 10 10 } else { M 0 0 }')).toBe('M 0 0');
     });
 
     it('evaluates else if picking correct branch', () => {
-      expect(compile('let x = 2; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else { M 0 0 }')).toBe('M 2 0');
+      expect(compilePath('let x = 2; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else { M 0 0 }')).toBe('M 2 0');
     });
 
     it('evaluates multi-branch else if chain with final else', () => {
-      expect(compile('let x = 3; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else if (x == 3) { M 3 0 } else { M 0 0 }')).toBe('M 3 0');
-      expect(compile('let x = 9; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else if (x == 3) { M 3 0 } else { M 0 0 }')).toBe('M 0 0');
+      expect(compilePath('let x = 3; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else if (x == 3) { M 3 0 } else { M 0 0 }')).toBe('M 3 0');
+      expect(compilePath('let x = 9; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 } else if (x == 3) { M 3 0 } else { M 0 0 }')).toBe('M 0 0');
     });
 
     it('evaluates else if without final else (no match returns empty)', () => {
-      expect(compile('let x = 5; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 }')).toBe('');
+      expect(compilePath('let x = 5; if (x == 1) { M 1 0 } else if (x == 2) { M 2 0 }')).toBe('');
     });
 
     it('evaluates else if inside a loop', () => {
-      const result = compile(`
+      const result = compilePath(`
         for (i in 1..3) {
           if (i == 1) { M 10 0 } else if (i == 2) { M 20 0 } else { M 30 0 }
         }
@@ -633,17 +633,17 @@ describe('Evaluator', () => {
     });
 
     it('evaluates if with calc() in condition', () => {
-      expect(compile('let x = 4; if (calc(x % 2) == 0) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
-      expect(compile('let x = 3; if (calc(x % 2) == 0) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
+      expect(compilePath('let x = 4; if (calc(x % 2) == 0) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+      expect(compilePath('let x = 3; if (calc(x % 2) == 0) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
     });
 
     it('evaluates if with calc() on both sides', () => {
-      expect(compile('let a = 5; let b = 3; if (calc(a + b) > calc(b * 2)) { M 1 0 }')).toBe('M 1 0');
+      expect(compilePath('let a = 5; let b = 3; if (calc(a + b) > calc(b * 2)) { M 1 0 }')).toBe('M 1 0');
     });
 
     it('evaluates complex calc() in loop condition', () => {
       // 0..4 is inclusive: 0, 1, 2, 3, 4. Even values: 0, 2, 4
-      const result = compile(`
+      const result = compilePath(`
         for (i in 0..4) {
           if (calc(i % 2) == 0) { M i 0 }
         }
@@ -652,7 +652,7 @@ describe('Evaluator', () => {
     });
 
     it('evaluates calc() in if after path command', () => {
-      const result = compile(`
+      const result = compilePath(`
         for (i in 1..5) {
           v 20
           if (calc(i % 2) == 0) {
@@ -667,7 +667,7 @@ describe('Evaluator', () => {
     });
 
     it('evaluates calc() in if after M command', () => {
-      const result = compile(`
+      const result = compilePath(`
         M 0 0
         if (calc(5 % 2) == 1) { L 10 10 }
       `);
@@ -675,7 +675,7 @@ describe('Evaluator', () => {
     });
 
     it('evaluates calc() in if after L command', () => {
-      const result = compile(`
+      const result = compilePath(`
         M 0 0
         L 10 10
         if (calc(4 / 2) == 2) { L 20 20 }
@@ -684,7 +684,7 @@ describe('Evaluator', () => {
     });
 
     it('evaluates fingerJoint pattern', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn fingerJoint(thickness, height, fingers) {
           let fingerHeight = calc(height / fingers);
           for (i in 1..fingers) {
@@ -708,21 +708,21 @@ describe('Evaluator', () => {
 
   describe('function definitions', () => {
     it('evaluates user function', () => {
-      expect(compile('fn double(x) { M calc(x * 2) 0 } double(5)')).toBe('M 10 0');
+      expect(compilePath('fn double(x) { M calc(x * 2) 0 } double(5)')).toBe('M 10 0');
     });
 
     it('evaluates function with multiple params', () => {
-      expect(compile('fn add(a, b) { M calc(a + b) 0 } add(3, 7)')).toBe('M 10 0');
+      expect(compilePath('fn add(a, b) { M calc(a + b) 0 } add(3, 7)')).toBe('M 10 0');
     });
 
     it('evaluates function called multiple times', () => {
-      expect(compile('fn point(x) { M x 0 } point(1) point(2) point(3)')).toBe('M 1 0 M 2 0 M 3 0');
+      expect(compilePath('fn point(x) { M x 0 } point(1) point(2) point(3)')).toBe('M 1 0 M 2 0 M 3 0');
     });
   });
 
   describe('return statements', () => {
     it('returns a computed value from a function', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn double(x) {
           return calc(x * 2);
         }
@@ -732,7 +732,7 @@ describe('Evaluator', () => {
     });
 
     it('returns a value usable in expressions', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn mpi(radians) {
           return calc(PI() * radians);
         }
@@ -743,7 +743,7 @@ describe('Evaluator', () => {
     });
 
     it('early return stops execution of remaining statements', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn test() {
           return 42;
           M 999 999
@@ -754,7 +754,7 @@ describe('Evaluator', () => {
     });
 
     it('functions without explicit return use implicit path accumulation', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn square() {
           M 0 0
           L 10 0
@@ -768,7 +768,7 @@ describe('Evaluator', () => {
     });
 
     it('return in path context works correctly', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn halfPi() {
           return calc(PI() / 2);
         }
@@ -779,7 +779,7 @@ describe('Evaluator', () => {
     });
 
     it('return value can be assigned to a variable', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn triple(x) {
           return calc(x * 3);
         }
@@ -790,7 +790,7 @@ describe('Evaluator', () => {
     });
 
     it('return value can be used in calc expression', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn add(a, b) {
           return calc(a + b);
         }
@@ -800,7 +800,7 @@ describe('Evaluator', () => {
     });
 
     it('nested function calls with return work correctly', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn square(x) {
           return calc(x * x);
         }
@@ -814,7 +814,7 @@ describe('Evaluator', () => {
     });
 
     it('return inside conditional works correctly', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn absValue(x) {
           if (x < 0) {
             return calc(x * -1);
@@ -827,7 +827,7 @@ describe('Evaluator', () => {
     });
 
     it('return inside loop exits function immediately', () => {
-      const result = compile(`
+      const result = compilePath(`
         fn findFirst() {
           for (i in 1..10) {
             if (i == 3) {
@@ -844,36 +844,36 @@ describe('Evaluator', () => {
 
   describe('toFixed option', () => {
     it('rounds decimals to specified precision', () => {
-      expect(compile('M calc(10/3) calc(20/7)', { toFixed: 2 })).toBe('M 3.33 2.86');
+      expect(compilePath('M calc(10/3) calc(20/7)', { toFixed: 2 })).toBe('M 3.33 2.86');
     });
 
     it('rounds to 0 decimal places', () => {
-      expect(compile('M calc(10/3) calc(20/7)', { toFixed: 0 })).toBe('M 3 3');
+      expect(compilePath('M calc(10/3) calc(20/7)', { toFixed: 0 })).toBe('M 3 3');
     });
 
     it('rounds to 4 decimal places', () => {
-      expect(compile('M calc(10/3) 0', { toFixed: 4 })).toBe('M 3.3333 0');
+      expect(compilePath('M calc(10/3) 0', { toFixed: 4 })).toBe('M 3.3333 0');
     });
 
     it('does not modify integers', () => {
-      expect(compile('M 100 200', { toFixed: 2 })).toBe('M 100 200');
+      expect(compilePath('M 100 200', { toFixed: 2 })).toBe('M 100 200');
     });
 
     it('preserves arc flags as integers', () => {
-      expect(compile('A 25 25 0 1 1 50 50', { toFixed: 2 })).toBe('A 25 25 0 1 1 50 50');
+      expect(compilePath('A 25 25 0 1 1 50 50', { toFixed: 2 })).toBe('A 25 25 0 1 1 50 50');
     });
 
     it('handles negative decimals', () => {
-      expect(compile('M calc(-10/3) calc(-20/7)', { toFixed: 2 })).toBe('M -3.33 -2.86');
+      expect(compilePath('M calc(-10/3) calc(-20/7)', { toFixed: 2 })).toBe('M -3.33 -2.86');
     });
 
     it('does not round when option not provided', () => {
-      const result = compile('M calc(10/3) 0');
+      const result = compilePath('M calc(10/3) 0');
       expect(result).toBe(`M ${10/3} 0`);
     });
 
     it('works with stdlib functions', () => {
-      const result = compile('circle(100, 100, calc(100/3))', { toFixed: 2 });
+      const result = compilePath('circle(100, 100, calc(100/3))', { toFixed: 2 });
       // All decimals should have at most 2 decimal places
       const numbers = result.match(/-?\d+\.?\d*/g) || [];
       for (const num of numbers) {
@@ -887,35 +887,35 @@ describe('Evaluator', () => {
 
   describe('variable reassignment', () => {
     it('reassigns a variable', () => {
-      expect(compile('let x = 10; x = 20; M x 0')).toBe('M 20 0');
+      expect(compilePath('let x = 10; x = 20; M x 0')).toBe('M 20 0');
     });
 
     it('reassigns variable inside if block (updates outer scope)', () => {
-      expect(compile('let x = 10; if (1) { x = 20; } M x 0')).toBe('M 20 0');
+      expect(compilePath('let x = 10; if (1) { x = 20; } M x 0')).toBe('M 20 0');
     });
 
     it('reassigns with expression', () => {
-      expect(compile('let x = 10; x = calc(x + 5); M x 0')).toBe('M 15 0');
+      expect(compilePath('let x = 10; x = calc(x + 5); M x 0')).toBe('M 15 0');
     });
 
     it('reassigns inside for loop (updates outer scope)', () => {
-      expect(compile('let sum = 0; for (i in 1..3) { sum = calc(sum + i); } M sum 0')).toBe('M 6 0');
+      expect(compilePath('let sum = 0; for (i in 1..3) { sum = calc(sum + i); } M sum 0')).toBe('M 6 0');
     });
 
     it('let in block still shadows (does not affect outer)', () => {
-      expect(compile('let x = 10; if (1) { let x = 20; M x 0 } M x 0')).toBe('M 20 0 M 10 0');
+      expect(compilePath('let x = 10; if (1) { let x = 20; M x 0 } M x 0')).toBe('M 20 0 M 10 0');
     });
 
     it('reassigns closest scope variable', () => {
-      expect(compile('let x = 10; if (1) { let x = 20; x = 30; M x 0 } M x 0')).toBe('M 30 0 M 10 0');
+      expect(compilePath('let x = 10; if (1) { let x = 20; x = 30; M x 0 } M x 0')).toBe('M 30 0 M 10 0');
     });
 
     it('throws on assigning to undeclared variable', () => {
-      expect(() => compile('x = 10;')).toThrow('Cannot assign to undeclared variable: x');
+      expect(() => compilePath('x = 10;')).toThrow('Cannot assign to undeclared variable: x');
     });
 
     it('reassigns with modulus operator', () => {
-      expect(compile('let x = 5; if (1) { x = calc(x % 3); } M x 0')).toBe('M 2 0');
+      expect(compilePath('let x = 5; if (1) { x = calc(x % 3); } M x 0')).toBe('M 2 0');
     });
   });
 });

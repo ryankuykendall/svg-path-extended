@@ -70,6 +70,7 @@ const DOC_FILES = {
   'getting-started.md': 'gettingStarted',
   'syntax.md': 'syntax',
   'stdlib.md': 'stdlib',
+  'layers.md': 'layers',
   'debug.md': 'debug',
   'cli.md': 'cli',
   'examples.md': 'examples',

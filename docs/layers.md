@@ -1,0 +1,273 @@
+# Layers
+
+Layers let you output multiple `<path>` elements from a single program, each with its own styles and independent pen tracking.
+
+## Defining Layers
+
+Use `define` to create a named layer with a style block:
+
+```
+define PathLayer('outline') {
+  stroke: #cc0000;
+  stroke-width: 3;
+  fill: none;
+}
+```
+
+Layer names must be unique strings. The style block uses CSS/SVG property syntax — any SVG presentation attribute works (`stroke`, `fill`, `opacity`, `stroke-dasharray`, etc.).
+
+### Default Layer
+
+Mark one layer as `default` to receive all bare path commands (commands outside any `layer().apply` block):
+
+```
+define default PathLayer('main') {
+  stroke: #333;
+  stroke-width: 2;
+  fill: none;
+}
+
+// These commands go to 'main' automatically
+M 10 10
+L 90 10
+L 90 90
+Z
+```
+
+Without a default layer, bare commands go to an implicit unnamed layer.
+
+## Writing to Layers
+
+Use `layer('name').apply { ... }` to send commands to a specific layer:
+
+```
+define PathLayer('grid') {
+  stroke: #ddd;
+  stroke-width: 0.5;
+}
+
+define default PathLayer('shape') {
+  stroke: #333;
+  stroke-width: 2;
+  fill: none;
+}
+
+// Draw a grid on the 'grid' layer
+layer('grid').apply {
+  for (i in 0..10) {
+    M calc(i * 20) 0
+    V 200
+    M 0 calc(i * 20)
+    H 200
+  }
+}
+
+// These go to 'shape' (the default)
+M 40 40
+L 160 40
+L 100 160
+Z
+```
+
+### Context Isolation
+
+Each layer has its own pen position. Commands in one layer don't affect another layer's `ctx`:
+
+```
+define default PathLayer('a') { stroke: red; }
+define PathLayer('b') { stroke: blue; }
+
+M 100 100    // layer 'a' position: (100, 100)
+
+layer('b').apply {
+  M 50 50    // layer 'b' position: (50, 50)
+}
+
+// Back in layer 'a', position is still (100, 100)
+L 200 200
+```
+
+## Accessing Layer Context
+
+Use `layer('name').ctx` to read a layer's pen state from anywhere:
+
+```
+define default PathLayer('main') { stroke: #333; }
+define PathLayer('markers') { stroke: red; fill: red; }
+
+M 50 50
+L 150 80
+L 100 150
+
+// Draw markers at the main layer's current position
+layer('markers').apply {
+  let px = layer('main').ctx.position.x
+  let py = layer('main').ctx.position.y
+  circle(px, py, 4)
+}
+```
+
+Available context properties:
+
+| Expression | Description |
+|------------|-------------|
+| `layer('name').ctx.position.x` | Current X position |
+| `layer('name').ctx.position.y` | Current Y position |
+| `layer('name').ctx.start.x` | Subpath start X |
+| `layer('name').ctx.start.y` | Subpath start Y |
+| `layer('name').name` | Layer name string |
+
+## Dynamic Layer Names
+
+Layer names can be expressions, including variables:
+
+```
+let target = 'overlay'
+define PathLayer(target) { stroke: blue; }
+
+layer(target).apply {
+  M 0 0 L 100 100
+}
+```
+
+## Style Properties
+
+Style properties map directly to SVG presentation attributes. Common properties:
+
+| Property | Example | Description |
+|----------|---------|-------------|
+| `stroke` | `#cc0000` | Stroke color |
+| `stroke-width` | `3` | Stroke width |
+| `stroke-linecap` | `round` | Line cap style |
+| `stroke-linejoin` | `round` | Line join style |
+| `stroke-dasharray` | `4 2` | Dash pattern |
+| `stroke-dashoffset` | `1` | Dash offset |
+| `stroke-opacity` | `0.5` | Stroke opacity |
+| `fill` | `none` | Fill color |
+| `fill-opacity` | `0.3` | Fill opacity |
+| `opacity` | `0.8` | Overall opacity |
+
+Each property is a semicolon-terminated declaration:
+
+```
+define PathLayer('dashed') {
+  stroke: #0066cc;
+  stroke-width: 2;
+  stroke-dasharray: 8 4;
+  fill: none;
+}
+```
+
+## Output Format
+
+When using the JavaScript API, `compile()` returns a structured result:
+
+```js
+import { compile } from 'svg-path-extended';
+
+const result = compile(`
+  define default PathLayer('bg') {
+    stroke: #ddd;
+    fill: none;
+  }
+  define PathLayer('fg') {
+    stroke: #333;
+    stroke-width: 2;
+    fill: none;
+  }
+
+  M 0 0 H 100 V 100 H 0 Z
+
+  layer('fg').apply {
+    M 20 20 L 80 80
+  }
+`);
+
+// result.layers is an array of LayerOutput:
+// [
+//   {
+//     name: 'bg',
+//     type: 'path',
+//     data: 'M 0 0 H 100 V 100 H 0 Z',
+//     styles: { stroke: '#ddd', fill: 'none' },
+//     isDefault: true
+//   },
+//   {
+//     name: 'fg',
+//     type: 'path',
+//     data: 'M 20 20 L 80 80',
+//     styles: { stroke: '#333', 'stroke-width': '2', fill: 'none' },
+//     isDefault: false
+//   }
+// ]
+```
+
+Programs without any `define` statements produce a single implicit layer:
+
+```js
+compile('M 0 0 L 100 100').layers
+// [{ name: 'default', type: 'path', data: 'M 0 0 L 100 100', styles: {}, isDefault: true }]
+```
+
+## Full Example
+
+A multi-layer illustration with a background grid, main shape, and annotation markers:
+
+```
+// Layer definitions
+define PathLayer('grid') {
+  stroke: #e0e0e0;
+  stroke-width: 0.5;
+}
+
+define default PathLayer('shape') {
+  stroke: #333333;
+  stroke-width: 2;
+  fill: none;
+  stroke-linejoin: round;
+}
+
+define PathLayer('points') {
+  stroke: #cc0000;
+  fill: #cc0000;
+}
+
+// Grid
+layer('grid').apply {
+  for (i in 0..10) {
+    M calc(i * 20) 0  V 200
+    M 0 calc(i * 20)  H 200
+  }
+}
+
+// Shape (goes to default layer)
+let cx = 100
+let cy = 100
+let r = 60
+let sides = 6
+
+for (i in 0..sides) {
+  let angle = calc(i * 360 / sides - 90)
+  let x = calc(cx + r * cos(radians(angle)))
+  let y = calc(cy + r * sin(radians(angle)))
+  if (i == 0) { M x y } else { L x y }
+}
+Z
+
+// Mark each vertex
+layer('points').apply {
+  for (i in 0..sides) {
+    let angle = calc(i * 360 / sides - 90)
+    let x = calc(cx + r * cos(radians(angle)))
+    let y = calc(cy + r * sin(radians(angle)))
+    circle(x, y, 3)
+  }
+}
+```
+
+## Limitations
+
+- **PathLayer only** — `TextLayer` for `<text>` elements is not yet supported
+- **Static style values** — style properties are literal strings, not expressions (you cannot use `calc()` or variables inside style blocks)
+- **No nesting** — `layer().apply` blocks cannot be nested inside each other
+- **Layer order** — layers render in definition order (first defined = bottom)

@@ -12,6 +12,8 @@ import type {
   ReturnStatement,
   FunctionCall,
   MemberExpression,
+  LayerDefinition,
+  LayerApplyBlock,
 } from '../parser/ast';
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import {
@@ -25,7 +27,7 @@ import {
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 
-export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult;
+export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference;
 
 /**
  * Represents an object value that supports property access (like ctx)
@@ -60,6 +62,42 @@ export interface LogPart {
   type: 'string' | 'value';
   label?: string;  // For values: the expression that was logged (e.g., "ctx.position")
   value: string;   // The stringified value
+}
+
+// --- Layer types ---
+
+export interface LayerStyle {
+  [key: string]: string;  // CSS property name (kebab-case stored as-is) → value
+}
+
+export interface LayerState {
+  name: string;
+  layerType: 'PathLayer';
+  isDefault: boolean;
+  styles: LayerStyle;
+  pathContext: PathContext;
+  accum: string[];
+}
+
+export interface LayerReference {
+  type: 'LayerReference';
+  layer: LayerState;
+}
+
+// --- Layer output types ---
+
+export interface LayerOutput {
+  name: string;
+  type: 'path';
+  data: string;               // SVG path data
+  styles: Record<string, string>;  // SVG attribute name → value
+  isDefault: boolean;
+}
+
+export interface CompileResult {
+  layers: LayerOutput[];
+  logs: LogEntry[];
+  calledStdlibFunctions: string[];
 }
 
 /**
@@ -114,6 +152,10 @@ export interface EvaluationState {
   pathContext: PathContext;
   logs: LogEntry[];
   calledStdlibFunctions: Set<string>;  // Stdlib function names invoked during evaluation
+  layers: Map<string, LayerState>;     // Layer definitions by name
+  layerOrder: string[];                // Definition order for z-index
+  activeLayerName: string | null;      // Currently inside layer().apply
+  defaultLayerName: string | null;     // Default layer name
 }
 
 export interface Scope {
@@ -310,6 +352,18 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     throw new Error(`Cannot access property '${expr.property}' of type ${typeof propValue}`);
   }
 
+  // Handle LayerReference property access
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'LayerReference') {
+    const layerRef = obj as LayerReference;
+    if (expr.property === 'ctx') {
+      return { type: 'ContextObject' as const, value: contextToObject(layerRef.layer.pathContext) };
+    }
+    if (expr.property === 'name') {
+      return layerRef.layer.name;
+    }
+    throw new Error(`Property '${expr.property}' does not exist on layer reference`);
+  }
+
   throw new Error(`Cannot access property '${expr.property}' on non-object value`);
 }
 
@@ -390,6 +444,22 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
 
     scope.evalState!.logs.push({ line: lineNumber, parts });
     return { type: 'PathSegment' as const, value: '' };  // Empty path segment
+  }
+
+  // Handle layer() function — returns a LayerReference
+  if (call.name === 'layer' && scope.evalState) {
+    if (call.args.length !== 1) {
+      throw new Error(`layer() expects 1 argument, got ${call.args.length}`);
+    }
+    const nameValue = evaluateExpression(call.args[0], scope);
+    if (typeof nameValue !== 'string') {
+      throw new Error('Layer name must be a string');
+    }
+    const layerState = scope.evalState.layers.get(nameValue);
+    if (!layerState) {
+      throw new Error(`Undefined layer: '${nameValue}'`);
+    }
+    return { type: 'LayerReference' as const, layer: layerState };
   }
 
   // Check if it's a context-aware function
@@ -834,7 +904,13 @@ function evaluatePathCommand(cmd: PathCommand, scope: Scope): string {
   // Update path context if tracking is enabled
   if (scope.evalState && cmd.command !== '') {
     const numericArgs = getNumericArgs(cmd.args, scope);
-    updateContextForCommand(scope.evalState.pathContext, cmd.command, numericArgs);
+    // If bare command (not in apply block) with a default layer, update that layer's context
+    if (scope.evalState.defaultLayerName && !scope.evalState.activeLayerName) {
+      const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName)!;
+      updateContextForCommand(defaultLayer.pathContext, cmd.command, numericArgs);
+    } else {
+      updateContextForCommand(scope.evalState.pathContext, cmd.command, numericArgs);
+    }
     updateCtxVariable(scope);
   }
 
@@ -966,7 +1042,83 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
 
     case 'PathCommand': {
       const result = evaluatePathCommand(stmt, scope);
-      if (result) accum.push(result);
+      if (result) {
+        // Route path commands to default layer if one is defined and we're not in an apply block
+        if (scope.evalState && scope.evalState.defaultLayerName && !scope.evalState.activeLayerName) {
+          const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName)!;
+          defaultLayer.accum.push(result);
+        } else {
+          accum.push(result);
+        }
+      }
+      return;
+    }
+
+    case 'LayerDefinition': {
+      if (!scope.evalState) {
+        throw new Error('Layer definitions require evaluation context');
+      }
+      const nameValue = evaluateExpression(stmt.name, scope);
+      if (typeof nameValue !== 'string') {
+        throw new Error('Layer name must be a string');
+      }
+      if (stmt.layerType === 'TextLayer') {
+        throw new Error('TextLayer is not yet supported');
+      }
+      if (scope.evalState.layers.has(nameValue)) {
+        throw new Error(`Duplicate layer name: '${nameValue}'`);
+      }
+      if (stmt.isDefault && scope.evalState.defaultLayerName !== null) {
+        throw new Error(`Cannot define multiple default layers. '${scope.evalState.defaultLayerName}' is already the default`);
+      }
+      const styles: LayerStyle = {};
+      for (const prop of stmt.styles) {
+        styles[prop.name] = prop.value;
+      }
+      const layerState: LayerState = {
+        name: nameValue,
+        layerType: 'PathLayer',
+        isDefault: stmt.isDefault,
+        styles,
+        pathContext: createPathContext(),
+        accum: [],
+      };
+      scope.evalState.layers.set(nameValue, layerState);
+      scope.evalState.layerOrder.push(nameValue);
+      if (stmt.isDefault) {
+        scope.evalState.defaultLayerName = nameValue;
+      }
+      return;
+    }
+
+    case 'LayerApplyBlock': {
+      if (!scope.evalState) {
+        throw new Error('Layer apply blocks require evaluation context');
+      }
+      const nameValue = evaluateExpression(stmt.layerName, scope);
+      if (typeof nameValue !== 'string') {
+        throw new Error('Layer name must be a string');
+      }
+      const layer = scope.evalState.layers.get(nameValue);
+      if (!layer) {
+        throw new Error(`Undefined layer: '${nameValue}'`);
+      }
+      if (scope.evalState.activeLayerName !== null) {
+        throw new Error(`Cannot nest layer apply blocks. Already inside layer '${scope.evalState.activeLayerName}'`);
+      }
+      // Save current state
+      const prevPathContext = scope.evalState.pathContext;
+      const prevActiveLayerName = scope.evalState.activeLayerName;
+      // Switch to layer's context
+      scope.evalState.pathContext = layer.pathContext;
+      scope.evalState.activeLayerName = nameValue;
+      updateCtxVariable(scope);
+      // Evaluate body into layer's accum
+      evaluateStatementsToAccum(stmt.body, createScope(scope), layer.accum);
+      // Restore previous state
+      scope.evalState.pathContext = prevPathContext;
+      scope.evalState.activeLayerName = prevActiveLayerName;
+      updateCtxVariable(scope);
       return;
     }
 
@@ -999,12 +1151,68 @@ function evaluateStatements(stmts: Statement[], scope: Scope): string {
   return accum.join(' ');
 }
 
-export function evaluate(program: Program, options?: { toFixed?: number }): string {
+/**
+ * Build the CompileResult from evaluation state
+ */
+function buildCompileResult(mainAccum: string[], evalState: EvaluationState): CompileResult {
+  const layers: LayerOutput[] = [];
+
+  if (evalState.layerOrder.length === 0) {
+    // No layers defined: single implicit default layer
+    layers.push({
+      name: 'default',
+      type: 'path',
+      data: mainAccum.join(' '),
+      styles: {},
+      isDefault: true,
+    });
+  } else {
+    // Check if main accum has content that wasn't routed to a default layer
+    const mainContent = mainAccum.join(' ');
+    if (mainContent && !evalState.defaultLayerName) {
+      // Prepend implicit default layer for bare commands
+      layers.push({
+        name: 'default',
+        type: 'path',
+        data: mainContent,
+        styles: {},
+        isDefault: true,
+      });
+    }
+    // Add defined layers in definition order
+    for (const name of evalState.layerOrder) {
+      const layer = evalState.layers.get(name)!;
+      layers.push({
+        name: layer.name,
+        type: 'path',
+        data: layer.accum.join(' '),
+        styles: { ...layer.styles },
+        isDefault: layer.isDefault,
+      });
+    }
+  }
+
+  return {
+    layers,
+    logs: evalState.logs,
+    calledStdlibFunctions: Array.from(evalState.calledStdlibFunctions),
+  };
+}
+
+export function evaluate(program: Program, options?: { toFixed?: number }): CompileResult {
   setNumberFormat(options?.toFixed);
   try {
     const pathContext = createPathContext();
     const logs: LogEntry[] = [];
-    const evalState: EvaluationState = { pathContext, logs, calledStdlibFunctions: new Set() };
+    const evalState: EvaluationState = {
+      pathContext,
+      logs,
+      calledStdlibFunctions: new Set(),
+      layers: new Map(),
+      layerOrder: [],
+      activeLayerName: null,
+      defaultLayerName: null,
+    };
 
     const scope = createScope();
     scope.evalState = evalState;
@@ -1015,7 +1223,10 @@ export function evaluate(program: Program, options?: { toFixed?: number }): stri
       value: contextToObject(pathContext),
     });
 
-    return evaluateStatements(program.body, scope);
+    const accum: string[] = [];
+    evaluateStatementsToAccum(program.body, scope, accum);
+
+    return buildCompileResult(accum, evalState);
   } finally {
     resetNumberFormat();
   }
@@ -1029,6 +1240,7 @@ export interface EvaluateWithContextResult {
   context: PathContext;
   logs: LogEntry[];
   calledStdlibFunctions: string[];  // Stdlib function names invoked during evaluation
+  layers: LayerOutput[];
 }
 
 /**
@@ -1043,7 +1255,7 @@ export interface EvaluateWithContextOptions {
 
 /**
  * Evaluate a program with path context tracking
- * Returns the path string, final context state, and any log() outputs
+ * Returns compile result with layers, context, and log() outputs
  */
 export function evaluateWithContext(program: Program, options: EvaluateWithContextOptions = {}): EvaluateWithContextResult {
   setNumberFormat(options.toFixed);
@@ -1051,7 +1263,15 @@ export function evaluateWithContext(program: Program, options: EvaluateWithConte
     const pathContext = createPathContext({ trackHistory: options.trackHistory ?? false });
     const logs: LogEntry[] = [];
     const calledStdlibFunctions = new Set<string>();
-    const evalState: EvaluationState = { pathContext, logs, calledStdlibFunctions };
+    const evalState: EvaluationState = {
+      pathContext,
+      logs,
+      calledStdlibFunctions,
+      layers: new Map(),
+      layerOrder: [],
+      activeLayerName: null,
+      defaultLayerName: null,
+    };
 
     const scope = createScope();
     scope.evalState = evalState;
@@ -1064,13 +1284,17 @@ export function evaluateWithContext(program: Program, options: EvaluateWithConte
 
     // Note: log() is handled specially in evaluateFunctionCall, not registered here
 
-    const path = evaluateStatements(program.body, scope);
+    const accum: string[] = [];
+    evaluateStatementsToAccum(program.body, scope, accum);
+
+    const compileResult = buildCompileResult(accum, evalState);
 
     return {
-      path,
+      path: compileResult.layers[0]?.data ?? '',
       context: pathContext,
       logs,
       calledStdlibFunctions: Array.from(calledStdlibFunctions),
+      layers: compileResult.layers,
     };
   } finally {
     resetNumberFormat();
@@ -1079,6 +1303,7 @@ export function evaluateWithContext(program: Program, options: EvaluateWithConte
 
 // Re-export types from context module
 export type { PathContext, Point, CommandHistoryEntry } from './context';
+
 
 // Re-export annotated evaluator and formatter
 export { evaluateAnnotated, type AnnotatedOutput, type AnnotatedLine } from './annotated';

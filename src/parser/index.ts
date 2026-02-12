@@ -21,6 +21,9 @@ import type {
   ReturnStatement,
   SourceLocation,
   Comment,
+  StyleProperty,
+  LayerDefinition,
+  LayerApplyBlock,
 } from './ast';
 
 const P = Parsimmon;
@@ -92,7 +95,7 @@ const identifier: Parsimmon.Parser<Identifier> = token(
 }));
 
 // Reserved words that cannot be identifiers
-const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log', 'return'];
+const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log', 'return', 'define', 'default', 'layer', 'apply'];
 
 // Context-aware functions that should be parsed as statements, not path arguments
 // These functions require path context and produce path output
@@ -321,13 +324,13 @@ const functionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
   })
 );
 
-// Primary expression: number, string, calc, identifier (with optional property access), function call, or parenthesized expression
+// Primary expression: number, string, calc, identifier (with optional property access), function call (with optional member access), or parenthesized expression
 const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
   P.alt(
     numberLiteral,
     stringLiteral,
     calcExpression,
-    functionCall,
+    withMemberAccess(functionCall),
     withMemberAccess(nonReservedIdentifier),
     P.seq(word('('), expression, word(')')).map(([, expr]) => expr)
   )
@@ -521,10 +524,67 @@ const functionCallStatement: Parsimmon.Parser<PathCommand> = P.seqMap(
   })
 );
 
+// Style block parser: { stroke: #cc0000; stroke-width: 4; }
+// Parses raw text between { and }, extracts declarations with regex
+const styleBlock: Parsimmon.Parser<StyleProperty[]> = P.seq(
+  word('{'),
+  P.regexp(/[^}]*/),
+  word('}')
+).map(([, raw]) => {
+  const cleaned = raw.replace(/\/\/[^\n]*/g, ''); // strip // comments
+  const decls: StyleProperty[] = [];
+  const re = /([a-zA-Z][a-zA-Z0-9-]*)\s*:\s*([^;\n]+);/g;
+  let m;
+  while ((m = re.exec(cleaned)) !== null) {
+    decls.push({ type: 'StyleProperty', name: m[1].trim(), value: m[2].trim() });
+  }
+  return decls;
+});
+
+// Layer definition: define [default] PathLayer('name') { style declarations }
+const layerDefinition: Parsimmon.Parser<LayerDefinition> = P.seqMap(
+  P.index,
+  keyword('define'),
+  keyword('default').map(() => true).fallback(false),
+  token(P.regexp(/PathLayer|TextLayer/)),
+  word('('),
+  expression,
+  word(')'),
+  styleBlock,
+  (startIndex, _define, isDefault, layerType, _lp, name, _rp, styles) => ({
+    type: 'LayerDefinition' as const,
+    layerType: layerType as 'PathLayer' | 'TextLayer',
+    name,
+    isDefault,
+    styles,
+    loc: indexToLoc(startIndex),
+  })
+);
+
+// Layer apply block: layer('name').apply { statements }
+const layerApplyBlock: Parsimmon.Parser<LayerApplyBlock> = P.seqMap(
+  P.index,
+  keyword('layer'),
+  word('('),
+  expression,
+  word(')'),
+  word('.'),
+  keyword('apply'),
+  block,
+  (startIndex, _layer, _lp, layerName, _rp, _dot, _apply, body) => ({
+    type: 'LayerApplyBlock' as const,
+    layerName,
+    body,
+    loc: indexToLoc(startIndex),
+  })
+);
+
 // Statement
 // Important: functionCallStatement must come BEFORE pathCommand to avoid
 // 'circle(...)' being parsed as path command 'c' + 'ircle(...)'
 const statement: Parsimmon.Parser<Statement> = P.alt(
+  layerDefinition,
+  layerApplyBlock,
   letDeclaration,
   forLoop,
   ifStatement,

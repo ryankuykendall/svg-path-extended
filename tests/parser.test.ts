@@ -574,4 +574,109 @@ L 10 20 // end point`;
       expect(ast.body[0]).toMatchObject({ type: 'IfStatement' });
     });
   });
+
+  describe('layer definitions', () => {
+    it('parses basic PathLayer definition', () => {
+      const ast = parse("define PathLayer('main') {}");
+      expect(ast.body).toHaveLength(1);
+      expect(ast.body[0]).toMatchObject({
+        type: 'LayerDefinition',
+        layerType: 'PathLayer',
+        isDefault: false,
+        styles: [],
+      });
+    });
+
+    it('parses default PathLayer definition', () => {
+      const ast = parse("define default PathLayer('main') {}");
+      expect(ast.body[0]).toMatchObject({
+        type: 'LayerDefinition',
+        layerType: 'PathLayer',
+        isDefault: true,
+      });
+    });
+
+    it('parses TextLayer definition', () => {
+      const ast = parse("define TextLayer('text') {}");
+      expect(ast.body[0]).toMatchObject({
+        type: 'LayerDefinition',
+        layerType: 'TextLayer',
+      });
+    });
+
+    it('parses style properties', () => {
+      const ast = parse("define PathLayer('main') { stroke: #cc0000; stroke-width: 4; }");
+      const def = ast.body[0] as any;
+      expect(def.type).toBe('LayerDefinition');
+      expect(def.styles).toHaveLength(2);
+      expect(def.styles[0]).toEqual({ type: 'StyleProperty', name: 'stroke', value: '#cc0000' });
+      expect(def.styles[1]).toEqual({ type: 'StyleProperty', name: 'stroke-width', value: '4' });
+    });
+
+    it('parses style block with comments', () => {
+      const ast = parse("define PathLayer('main') { // comment\nstroke: red; }");
+      const def = ast.body[0] as any;
+      expect(def.styles).toHaveLength(1);
+      expect(def.styles[0].name).toBe('stroke');
+    });
+
+    it('parses layer name as expression', () => {
+      const ast = parse("define PathLayer(myVar) {}");
+      const def = ast.body[0] as any;
+      expect(def.name).toMatchObject({ type: 'Identifier', name: 'myVar' });
+    });
+  });
+
+  describe('layer apply blocks', () => {
+    it('parses basic apply block', () => {
+      const ast = parse("layer('main').apply { M 10 10 }");
+      expect(ast.body).toHaveLength(1);
+      expect(ast.body[0]).toMatchObject({
+        type: 'LayerApplyBlock',
+        body: [{ type: 'PathCommand', command: 'M' }],
+      });
+    });
+
+    it('parses apply block with multiple statements', () => {
+      const ast = parse("layer('main').apply { M 10 10 L 20 20 Z }");
+      const block = ast.body[0] as any;
+      expect(block.type).toBe('LayerApplyBlock');
+      expect(block.body).toHaveLength(3);
+    });
+
+    it('parses apply block with variable name', () => {
+      const ast = parse("layer(name).apply { M 0 0 }");
+      const block = ast.body[0] as any;
+      expect(block.layerName).toMatchObject({ type: 'Identifier', name: 'name' });
+    });
+  });
+
+  describe('member access on function calls', () => {
+    it('parses function call with member access', () => {
+      const ast = parse("let x = layer('main').ctx;");
+      const decl = ast.body[0] as any;
+      expect(decl.type).toBe('LetDeclaration');
+      expect(decl.value).toMatchObject({
+        type: 'MemberExpression',
+        property: 'ctx',
+        object: {
+          type: 'FunctionCall',
+          name: 'layer',
+        },
+      });
+    });
+
+    it('parses chained member access on function call', () => {
+      const ast = parse("let x = layer('main').ctx.position;");
+      const decl = ast.body[0] as any;
+      expect(decl.value).toMatchObject({
+        type: 'MemberExpression',
+        property: 'position',
+        object: {
+          type: 'MemberExpression',
+          property: 'ctx',
+        },
+      });
+    });
+  });
 });

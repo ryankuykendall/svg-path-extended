@@ -1,7 +1,7 @@
 // Docs View - Full-page documentation
 // Route: /docs
 
-import { gettingStarted, syntax, stdlib, debug, cli, examples, hljsThemeDark } from '../../utils/docs-content.js';
+import { gettingStarted, syntax, stdlib, layers, debug, cli, examples, hljsThemeDark } from '../../utils/docs-content.js';
 
 const styles = `
   :host {
@@ -252,6 +252,7 @@ class DocsView extends HTMLElement {
             <li><a href="javascript:void(0)" data-scroll-to="getting-started">Getting Started</a></li>
             <li><a href="javascript:void(0)" data-scroll-to="syntax">Syntax Reference</a></li>
             <li><a href="javascript:void(0)" data-scroll-to="stdlib">Standard Library</a></li>
+            <li><a href="javascript:void(0)" data-scroll-to="layers">Layers</a></li>
             <li><a href="javascript:void(0)" data-scroll-to="debug">Debug & Console</a></li>
             <li><a href="javascript:void(0)" data-scroll-to="cli">CLI Reference</a></li>
             <li><a href="javascript:void(0)" data-scroll-to="examples">Examples</a></li>
@@ -268,6 +269,10 @@ class DocsView extends HTMLElement {
 
         <section id="stdlib" class="doc-section">
           ${stdlib}
+        </section>
+
+        <section id="layers" class="doc-section">
+          ${layers}
         </section>
 
         <section id="debug" class="doc-section">

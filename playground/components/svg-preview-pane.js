@@ -82,8 +82,75 @@ export class SvgPreviewPane extends HTMLElement {
     return renderTime;
   }
 
+  /**
+   * Set layers and measure rendering time.
+   * Renders multiple <path> elements for multi-layer output.
+   * @param {Array<{name: string, type: string, data: string, styles: Record<string, string>, isDefault: boolean}>} layers
+   * @returns {number} The rendering time in milliseconds
+   */
+  setLayersWithTiming(layers) {
+    const defaultData = layers[0]?.data || '';
+    store.set('pathData', defaultData);
+
+    const start = performance.now();
+
+    // Get the layers container
+    const layersGroup = this.shadowRoot.querySelector('#preview-layers');
+    if (layersGroup) {
+      // Clear existing layer paths
+      layersGroup.innerHTML = '';
+
+      for (const layer of layers) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', layer.data || '');
+        path.setAttribute('fill', 'none');
+
+        // Apply per-layer styles, fall back to store defaults
+        const state = store.getAll();
+        path.setAttribute('stroke', layer.styles['stroke'] || state.stroke);
+        path.setAttribute('stroke-width', layer.styles['stroke-width'] || state.strokeWidth);
+        if (layer.styles['fill']) {
+          path.setAttribute('fill', layer.styles['fill']);
+        } else {
+          path.setAttribute('fill', state.fillEnabled ? state.fill : 'none');
+        }
+        // Apply any additional style attributes
+        for (const [key, value] of Object.entries(layer.styles)) {
+          if (key !== 'stroke' && key !== 'stroke-width' && key !== 'fill') {
+            path.setAttribute(key, value);
+          }
+        }
+        layersGroup.appendChild(path);
+      }
+
+      // Hide the single preview-path when using layers group
+      this.previewPath.setAttribute('d', '');
+    } else {
+      // Fallback: single path
+      this.previewPath.setAttribute('d', defaultData);
+    }
+
+    // Force synchronous layout calculation
+    try {
+      const paths = layersGroup?.querySelectorAll('path') || [this.previewPath];
+      for (const p of paths) {
+        p.getBBox();
+      }
+    } catch (e) {
+      // getBBox can throw if path is empty or invalid
+    }
+
+    const renderTime = performance.now() - start;
+
+    this.updateNavigatorContent();
+
+    return renderTime;
+  }
+
   clear() {
     this.previewPath.setAttribute('d', '');
+    const layersGroup = this.shadowRoot.querySelector('#preview-layers');
+    if (layersGroup) layersGroup.innerHTML = '';
     store.set('pathData', '');
     this.shadowRoot.querySelector('#navigator-path').setAttribute('d', '');
     store.update({ zoomLevel: 1, panX: 0, panY: 0 });
@@ -234,7 +301,16 @@ export class SvgPreviewPane extends HTMLElement {
     const navBg = this.shadowRoot.querySelector('#navigator-bg');
     const navSvg = this.shadowRoot.querySelector('#navigator-svg');
 
-    navPath.setAttribute('d', this.previewPath.getAttribute('d') || '');
+    // Combine all layer paths for navigator display
+    const layersGroup = this.shadowRoot.querySelector('#preview-layers');
+    const layerPaths = layersGroup ? Array.from(layersGroup.querySelectorAll('path')) : [];
+    if (layerPaths.length > 0) {
+      // Combine all layer path data for the navigator
+      const combined = layerPaths.map(p => p.getAttribute('d') || '').filter(Boolean).join(' ');
+      navPath.setAttribute('d', combined);
+    } else {
+      navPath.setAttribute('d', this.previewPath.getAttribute('d') || '');
+    }
     navPath.setAttribute('stroke', store.get('stroke'));
     navPath.setAttribute('stroke-width', 1);
 
@@ -341,6 +417,20 @@ export class SvgPreviewPane extends HTMLElement {
     this.previewPath.setAttribute('stroke', state.stroke);
     this.previewPath.setAttribute('stroke-width', state.strokeWidth);
     this.previewPath.setAttribute('fill', state.fillEnabled ? state.fill : 'none');
+
+    // Update layer paths that don't have per-layer styles
+    const layersGroup = this.shadowRoot.querySelector('#preview-layers');
+    if (layersGroup) {
+      for (const path of layersGroup.querySelectorAll('path')) {
+        // Only update defaults — per-layer styles are set in setLayersWithTiming
+        if (!path.dataset.hasLayerStroke) {
+          path.setAttribute('stroke', state.stroke);
+        }
+        if (!path.dataset.hasLayerStrokeWidth) {
+          path.setAttribute('stroke-width', state.strokeWidth);
+        }
+      }
+    }
 
     const previewBg = this.shadowRoot.querySelector('#preview-bg');
     previewBg.setAttribute('fill', state.background);
@@ -622,6 +712,7 @@ export class SvgPreviewPane extends HTMLElement {
           </defs>
           <rect id="preview-bg" width="100%" height="100%"></rect>
           <rect id="preview-grid" width="100%" height="100%" fill="url(#grid-pattern)"></rect>
+          <g id="preview-layers"></g>
           <path id="preview-path" fill="none"></path>
         </svg>
         <div id="loading-overlay">

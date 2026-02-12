@@ -1,12 +1,13 @@
 import { parse, parseWithComments } from './parser';
 import { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } from './evaluator';
+import type { CompileResult } from './evaluator';
 
 export { parse, parseWithComments } from './parser';
 export { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } from './evaluator';
 export { stdlib } from './stdlib';
 
-export type { Program, Statement, Expression, Node, SourceLocation, Comment } from './parser/ast';
-export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart } from './evaluator';
+export type { Program, Statement, Expression, Node, SourceLocation, Comment, StyleProperty, LayerDefinition, LayerApplyBlock } from './parser/ast';
+export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart, LayerOutput, CompileResult, LayerStyle } from './evaluator';
 export type { FormatOptions } from './evaluator/formatter';
 
 /**
@@ -18,25 +19,25 @@ export interface CompileOptions {
 }
 
 /**
- * Compile extended SVG path syntax to standard SVG path string.
+ * Compile extended SVG path syntax to structured output with layers.
  *
  * @param source - The extended SVG path source code
  * @param options - Optional compilation options
- * @returns The compiled standard SVG path string
+ * @returns A CompileResult with layers, logs, and called stdlib functions
  *
  * @example
  * ```ts
  * import { compile } from 'svg-path-extended';
  *
- * const path = compile(`
+ * const result = compile(`
  *   let r = 50;
  *   M 100 100
  *   A r r 0 1 1 calc(100 + r * 2) 100
  * `);
- * // => "M 100 100 A 50 50 0 1 1 200 100"
+ * // result.layers[0].data => "M 100 100 A 50 50 0 1 1 200 100"
  * ```
  */
-export function compile(source: string, options?: CompileOptions): string {
+export function compile(source: string, options?: CompileOptions): CompileResult {
   const ast = parse(source);
   return evaluate(ast, options);
 }
@@ -77,7 +78,7 @@ export interface CompileWithContextOptions {
 
 /**
  * Compile extended SVG path syntax with context tracking.
- * Returns path string, final context state, and any log() outputs.
+ * Returns path string, layers, final context state, and any log() outputs.
  *
  * The context tracks:
  * - `position`: Current pen position { x, y }
@@ -86,7 +87,7 @@ export interface CompileWithContextOptions {
  *
  * @param source - The extended SVG path source code
  * @param options - Optional settings (trackHistory defaults to false for performance)
- * @returns Object containing path, context, and logs
+ * @returns Object containing path, layers, context, and logs
  *
  * @example
  * ```ts

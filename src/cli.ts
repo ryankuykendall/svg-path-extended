@@ -1,4 +1,5 @@
 import { compile, compileAnnotated } from './index';
+import type { CompileResult } from './index';
 import { readFileSync, writeFileSync } from 'fs';
 
 interface CliOptions {
@@ -47,17 +48,31 @@ Examples:
 `);
 }
 
-function generateSvg(pathData: string, options: CliOptions): string {
+function generateSvg(result: CompileResult, options: CliOptions): string {
   const viewBox = options.viewBox || '0 0 200 200';
   const width = options.width || '200';
   const height = options.height || '200';
-  const stroke = options.stroke || '#000';
-  const fill = options.fill || 'none';
-  const strokeWidth = options.strokeWidth || '2';
+  const defaultStroke = options.stroke || '#000';
+  const defaultFill = options.fill || 'none';
+  const defaultStrokeWidth = options.strokeWidth || '2';
+
+  const paths = result.layers.map((layer) => {
+    const stroke = layer.styles['stroke'] || defaultStroke;
+    const fill = layer.styles['fill'] || defaultFill;
+    const strokeWidth = layer.styles['stroke-width'] || defaultStrokeWidth;
+    // Build additional style attributes from layer styles (excluding the ones we handle explicitly)
+    const handled = new Set(['stroke', 'fill', 'stroke-width']);
+    const extraAttrs = Object.entries(layer.styles)
+      .filter(([key]) => !handled.has(key))
+      .map(([key, value]) => `${key}="${value}"`)
+      .join(' ');
+    const extra = extraAttrs ? ' ' + extraAttrs : '';
+    return `  <path d="${layer.data}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"${extra}/>`;
+  }).join('\n');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
   <rect width="100%" height="100%" fill="#f5f5f5"/>
-  <path d="${pathData}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>
+${paths}
 </svg>`;
 }
 
@@ -216,26 +231,38 @@ function main() {
     }
 
     const compileOptions = options.toFixed != null ? { toFixed: options.toFixed } : undefined;
-    const pathData = compile(source, compileOptions);
+    const result = compile(source, compileOptions);
+    const defaultPath = result.layers[0]?.data ?? '';
 
     // Output as SVG file
     if (options.svgOutput) {
-      const svg = generateSvg(pathData, options);
+      const svg = generateSvg(result, options);
       writeFileSync(options.svgOutput, svg);
       console.log(`SVG written to: ${options.svgOutput}`);
-      console.log(`Path data: ${pathData}`);
+      console.log(`Path data: ${defaultPath}`);
       return;
     }
 
     // Output path to file
     if (outputFile) {
-      writeFileSync(outputFile, pathData);
+      if (result.layers.length > 1) {
+        const output = result.layers.map(l => `[${l.name}] ${l.data}`).join('\n');
+        writeFileSync(outputFile, output);
+      } else {
+        writeFileSync(outputFile, defaultPath);
+      }
       console.log(`Path written to: ${outputFile}`);
       return;
     }
 
     // Output to stdout
-    console.log(pathData);
+    if (result.layers.length > 1) {
+      for (const layer of result.layers) {
+        console.log(`[${layer.name}] ${layer.data}`);
+      }
+    } else {
+      console.log(defaultPath);
+    }
   } catch (err) {
     console.error(`Error: ${(err as Error).message}`);
     process.exit(1);
