@@ -561,7 +561,7 @@ export class SvgPreviewPane extends HTMLElement {
         <svg id="navigator-svg">
           <rect id="navigator-bg" width="100%" height="100%"></rect>
           <path id="navigator-path" fill="none"></path>
-          <rect id="navigator-viewport" fill="none" stroke="var(--accent-color, #10b981)" stroke-width="2"></rect>
+          <rect id="navigator-viewport" fill="none" stroke="var(--accent-color, #10b981)" stroke-width="1" vector-effect="non-scaling-stroke"></rect>
         </svg>
       </div>
 
