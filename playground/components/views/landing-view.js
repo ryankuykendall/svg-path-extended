@@ -156,7 +156,7 @@ const styles = `
   /* List view: thumbnail on left, text on right */
   .workspace-list.list .workspace-item {
     position: relative;
-    padding: 1rem 1.25rem;
+    padding: 0;
     border: 1px solid var(--border-color, #e2e8f0);
     border-radius: var(--radius-lg, 12px);
     background: var(--bg-secondary, #ffffff);
@@ -164,8 +164,8 @@ const styles = `
     transition: all var(--transition-base, 0.15s ease);
     box-shadow: var(--shadow-sm);
     display: flex;
-    align-items: flex-start;
-    gap: 1rem;
+    align-items: stretch;
+    overflow: hidden;
   }
 
   .workspace-list.list .workspace-item:hover {
@@ -176,8 +176,6 @@ const styles = `
 
   .workspace-thumb-sm {
     width: 128px;
-    height: 128px;
-    border-radius: var(--radius-md, 8px);
     overflow: hidden;
     background: var(--bg-primary, #f1f5f9);
     flex-shrink: 0;
@@ -201,13 +199,13 @@ const styles = `
     color: rgba(255, 255, 255, 0.9);
     text-transform: uppercase;
     user-select: none;
-    border-radius: var(--radius-md, 8px);
   }
 
   .workspace-list.list .workspace-info {
     flex: 1;
     min-width: 0;
     position: relative;
+    padding: 1rem 1.25rem;
   }
 
   .workspace-info h3 {
