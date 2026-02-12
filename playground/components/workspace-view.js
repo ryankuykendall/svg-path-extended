@@ -137,6 +137,8 @@ export class WorkspaceView extends HTMLElement {
 
   async initialize() {
     this._initialized = true;
+    this.previewPane.clear();
+    this.previewPane.showLoading();
     const routeParams = store.get('routeParams') || {};
     const routeQuery = store.get('routeQuery') || {};
     // Parse workspace ID from slugId (format: slug--id or just id)
@@ -557,6 +559,7 @@ export class WorkspaceView extends HTMLElement {
       const renderTime = this.previewPane.setPathDataWithTiming(result.path);
       console.log(`Render time: ${renderTime.toFixed(2)}ms`);
 
+      this.previewPane.hideLoading();
       this.consolePane.logs = result.logs || [];
       this.hideError();
       store.update({
@@ -576,6 +579,7 @@ export class WorkspaceView extends HTMLElement {
       if (e.message === 'Stale result') return;
       if (isStale(compilationId)) return;
 
+      this.previewPane.hideLoading();
       this.showError(e.message);
       this.consolePane.logs = [];
       store.update({

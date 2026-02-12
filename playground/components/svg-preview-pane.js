@@ -82,6 +82,22 @@ export class SvgPreviewPane extends HTMLElement {
     return renderTime;
   }
 
+  clear() {
+    this.previewPath.setAttribute('d', '');
+    store.set('pathData', '');
+    this.shadowRoot.querySelector('#navigator-path').setAttribute('d', '');
+    store.update({ zoomLevel: 1, panX: 0, panY: 0 });
+    this.updateViewBox();
+  }
+
+  showLoading() {
+    this.shadowRoot.querySelector('#loading-overlay').style.display = 'flex';
+  }
+
+  hideLoading() {
+    this.shadowRoot.querySelector('#loading-overlay').style.display = 'none';
+  }
+
   // Zoom/Pan methods
   updateViewBox() {
     const width = store.get('width');
@@ -438,6 +454,7 @@ export class SvgPreviewPane extends HTMLElement {
         }
 
         #preview-container {
+          position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -555,6 +572,30 @@ export class SvgPreviewPane extends HTMLElement {
           border-color: var(--accent-color, #10b981);
           box-shadow: 0 0 0 3px var(--focus-ring, rgba(16, 185, 129, 0.4));
         }
+
+        #loading-overlay {
+          display: none;
+          position: absolute;
+          inset: 0;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-primary, #f8f9fa);
+          border-radius: var(--radius-lg, 12px);
+          z-index: 5;
+        }
+
+        .loading-spinner {
+          width: 40px;
+          height: 40px;
+          border: 3px solid var(--border-color, #e2e8f0);
+          border-top-color: var(--accent-color, #10b981);
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
       </style>
 
       <div id="zoom-navigator">
@@ -583,6 +624,9 @@ export class SvgPreviewPane extends HTMLElement {
           <rect id="preview-grid" width="100%" height="100%" fill="url(#grid-pattern)"></rect>
           <path id="preview-path" fill="none"></path>
         </svg>
+        <div id="loading-overlay">
+          <div class="loading-spinner"></div>
+        </div>
       </div>
     `;
   }
