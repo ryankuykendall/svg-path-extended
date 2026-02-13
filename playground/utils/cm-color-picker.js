@@ -1,0 +1,658 @@
+// CodeMirror 6 color picker extension — inline color chips with native OS picker
+// Scans define ... { } blocks for color-accepting properties and renders colored chips
+
+const CSS_NAMED_COLORS = new Set([
+  'aliceblue','antiquewhite','aqua','aquamarine','azure','beige','bisque','black',
+  'blanchedalmond','blue','blueviolet','brown','burlywood','cadetblue','chartreuse',
+  'chocolate','coral','cornflowerblue','cornsilk','crimson','cyan','darkblue',
+  'darkcyan','darkgoldenrod','darkgray','darkgreen','darkgrey','darkkhaki',
+  'darkmagenta','darkolivegreen','darkorange','darkorchid','darkred','darksalmon',
+  'darkseagreen','darkslateblue','darkslategray','darkslategrey','darkturquoise',
+  'darkviolet','deeppink','deepskyblue','dimgray','dimgrey','dodgerblue','firebrick',
+  'floralwhite','forestgreen','fuchsia','gainsboro','ghostwhite','gold','goldenrod',
+  'gray','green','greenyellow','grey','honeydew','hotpink','indianred','indigo',
+  'ivory','khaki','lavender','lavenderblush','lawngreen','lemonchiffon','lightblue',
+  'lightcoral','lightcyan','lightgoldenrodyellow','lightgray','lightgreen','lightgrey',
+  'lightpink','lightsalmon','lightseagreen','lightskyblue','lightslategray',
+  'lightslategrey','lightsteelblue','lightyellow','lime','limegreen','linen','magenta',
+  'maroon','mediumaquamarine','mediumblue','mediumorchid','mediumpurple',
+  'mediumseagreen','mediumslateblue','mediumspringgreen','mediumturquoise',
+  'mediumvioletred','midnightblue','mintcream','mistyrose','moccasin','navajowhite',
+  'navy','oldlace','olive','olivedrab','orange','orangered','orchid','palegoldenrod',
+  'palegreen','paleturquoise','palevioletred','papayawhip','peachpuff','peru','pink',
+  'plum','powderblue','purple','rebeccapurple','red','rosybrown','royalblue',
+  'saddlebrown','salmon','sandybrown','seagreen','seashell','sienna','silver',
+  'skyblue','slateblue','slategray','slategrey','snow','springgreen','steelblue',
+  'tan','teal','thistle','tomato','turquoise','violet','wheat','white','whitesmoke',
+  'yellow','yellowgreen',
+]);
+
+// Properties that accept color values
+const COLOR_PROPERTIES = new Set([
+  'stroke', 'fill', 'color', 'stop-color', 'flood-color', 'lighting-color',
+]);
+
+// ─── Color Conversion Utilities ─────────────────────────────────────────────
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return [h, s, l];
+}
+
+function hslToRgb(h, s, l) {
+  if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return [
+    Math.round(hue2rgb(p, q, h + 1/3) * 255),
+    Math.round(hue2rgb(p, q, h) * 255),
+    Math.round(hue2rgb(p, q, h - 1/3) * 255),
+  ];
+}
+
+/**
+ * Parse any CSS color string into {r, g, b, a, format}.
+ * format: 'hex' | 'rgb' | 'rgba' | 'hsl' | 'hsla' | 'named'
+ */
+export function parseColor(str) {
+  if (!str || str === 'none') return { r: 0, g: 0, b: 0, a: 1, format: 'hex' };
+  str = str.trim();
+
+  // 8-digit hex: #rrggbbaa
+  let m = str.match(/^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/);
+  if (m) return { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16), a: +(parseInt(m[4],16)/255).toFixed(2), format: 'hex' };
+
+  // 6-digit hex
+  m = str.match(/^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/);
+  if (m) return { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16), a: 1, format: 'hex' };
+
+  // 4-digit hex: #rgba
+  m = str.match(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/);
+  if (m) return { r: parseInt(m[1]+m[1],16), g: parseInt(m[2]+m[2],16), b: parseInt(m[3]+m[3],16), a: +(parseInt(m[4]+m[4],16)/255).toFixed(2), format: 'hex' };
+
+  // 3-digit hex
+  m = str.match(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/);
+  if (m) return { r: parseInt(m[1]+m[1],16), g: parseInt(m[2]+m[2],16), b: parseInt(m[3]+m[3],16), a: 1, format: 'hex' };
+
+  // rgba(r, g, b, a)
+  m = str.match(/^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/);
+  if (m) return { r: +m[1], g: +m[2], b: +m[3], a: +m[4], format: 'rgba' };
+
+  // rgb(r, g, b)
+  m = str.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
+  if (m) return { r: +m[1], g: +m[2], b: +m[3], a: 1, format: 'rgb' };
+
+  // hsla(h, s%, l%, a)
+  m = str.match(/^hsla\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*,\s*([\d.]+)\s*\)$/);
+  if (m) {
+    const [r, g, b] = hslToRgb(+m[1]/360, +m[2]/100, +m[3]/100);
+    return { r, g, b, a: +m[4], format: 'hsla' };
+  }
+
+  // hsl(h, s%, l%)
+  m = str.match(/^hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*\)$/);
+  if (m) {
+    const [r, g, b] = hslToRgb(+m[1]/360, +m[2]/100, +m[3]/100);
+    return { r, g, b, a: 1, format: 'hsl' };
+  }
+
+  // Named color → resolve via canvas
+  if (CSS_NAMED_COLORS.has(str.toLowerCase())) {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.fillStyle = str;
+    const resolved = ctx.fillStyle;
+    const parsed = parseColor(resolved);
+    parsed.format = 'named';
+    return parsed;
+  }
+
+  return { r: 0, g: 0, b: 0, a: 1, format: 'hex' };
+}
+
+/**
+ * Format {r, g, b, a} back to a CSS color string in the given format.
+ * If alpha < 1 and format is 'hex', uses 8-digit hex. If format is 'rgb', upgrades to 'rgba'.
+ */
+export function formatColor({ r, g, b, a }, format) {
+  const hasAlpha = a < 1;
+  const hex2 = (n) => Math.round(n).toString(16).padStart(2, '0');
+  const rd = (n, d=2) => +n.toFixed(d);
+
+  switch (format) {
+    case 'hex':
+    case 'named':
+      if (hasAlpha) return `#${hex2(r)}${hex2(g)}${hex2(b)}${hex2(a * 255)}`;
+      return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+    case 'rgb':
+      if (hasAlpha) return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${rd(a)})`;
+      return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+    case 'rgba':
+      return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${rd(a)})`;
+    case 'hsl': {
+      const [h, s, l] = rgbToHsl(r, g, b);
+      if (hasAlpha) return `hsla(${Math.round(h*360)}, ${Math.round(s*100)}%, ${Math.round(l*100)}%, ${rd(a)})`;
+      return `hsl(${Math.round(h*360)}, ${Math.round(s*100)}%, ${Math.round(l*100)}%)`;
+    }
+    case 'hsla': {
+      const [h, s, l] = rgbToHsl(r, g, b);
+      return `hsla(${Math.round(h*360)}, ${Math.round(s*100)}%, ${Math.round(l*100)}%, ${rd(a)})`;
+    }
+    default:
+      return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+  }
+}
+
+// Convert a CSS color string to a 6-digit hex for the native picker
+export function colorToHex(color) {
+  const { r, g, b } = parseColor(color);
+  const hex2 = (n) => Math.round(n).toString(16).padStart(2, '0');
+  return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+}
+
+// ─── Color Picker Popup ─────────────────────────────────────────────────────
+
+// Track the active popup so only one is open at a time
+let activeColorPopup = null;
+
+function closeActiveColorPopup() {
+  if (activeColorPopup) {
+    activeColorPopup.remove();
+    activeColorPopup = null;
+  }
+}
+
+/**
+ * Create a color chip element with a popup picker (native swatch + alpha slider + format selector).
+ * @param {Object} opts
+ * @param {string} opts.color - Initial CSS color value (hex, rgb, rgba, hsl, hsla, named, or 'none')
+ * @param {HTMLElement} opts.container - Element to position/append the popup relative to
+ * @param {(color: string) => void} opts.onChange - Called on each change with the formatted color string
+ * @param {string} [opts.className] - Additional CSS classes for the chip
+ * @param {string} [opts.title] - Tooltip text
+ * @returns {HTMLSpanElement} The chip element (also has `.updateColor(c)` method)
+ */
+export function createColorChip({ color, container, onChange, className, title }) {
+  const chip = document.createElement('span');
+  chip.className = 'cm-color-chip' + (className ? ' ' + className : '');
+  if (title) chip.title = title;
+
+  let parsed = parseColor(color);
+
+  const setChipVisual = () => {
+    const c = formatColor(parsed, 'rgba');
+    if (color === 'none') {
+      chip.style.backgroundColor = 'transparent';
+      chip.style.background = 'linear-gradient(135deg, #fff 45%, #f00 45%, #f00 55%, #fff 55%)';
+    } else {
+      chip.style.background = '';
+      chip.style.backgroundColor = c;
+    }
+  };
+
+  setChipVisual();
+
+  chip.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Close any other open color popup
+    closeActiveColorPopup();
+
+    // Ensure styles are in the correct root (ShadowRoot or Document)
+    ensurePopupStyles(container);
+
+    // Build the popup
+    const popup = document.createElement('div');
+    popup.className = 'cm-color-popup';
+    activeColorPopup = popup;
+
+    // Read current parsed state fresh (in case updateColor was called)
+    let { r, g, b, a, format } = parsed;
+
+    // Determine format cycle order
+    const FORMAT_CYCLE = ['hex', 'rgb', 'hsl'];
+    // Normalize to base format for the toggle
+    let activeFormat = format;
+    if (activeFormat === 'rgba') activeFormat = 'rgb';
+    if (activeFormat === 'hsla') activeFormat = 'hsl';
+    if (activeFormat === 'named') activeFormat = 'hex';
+
+    const emit = () => {
+      // Re-derive the storage format: if alpha < 1 and base is rgb → rgba, etc.
+      let outFormat = activeFormat;
+      if (a < 1) {
+        if (outFormat === 'rgb') outFormat = 'rgba';
+        if (outFormat === 'hsl') outFormat = 'hsla';
+      }
+      parsed = { r, g, b, a, format: outFormat };
+      color = formatColor(parsed, outFormat);
+      setChipVisual();
+      textInput.value = color;
+      onChange(color);
+    };
+
+    // ── Row 1: native color swatch + alpha slider ──
+
+    const row1 = document.createElement('div');
+    row1.className = 'cm-color-popup-row';
+
+    const swatch = document.createElement('input');
+    swatch.type = 'color';
+    swatch.className = 'cm-color-popup-swatch';
+    const hex2 = (n) => Math.round(n).toString(16).padStart(2, '0');
+    swatch.value = `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+    swatch.addEventListener('input', () => {
+      const v = swatch.value;
+      r = parseInt(v.slice(1,3),16);
+      g = parseInt(v.slice(3,5),16);
+      b = parseInt(v.slice(5,7),16);
+      emit();
+    });
+    row1.appendChild(swatch);
+
+    const alphaWrap = document.createElement('div');
+    alphaWrap.className = 'cm-color-popup-alpha-wrap';
+
+    const alphaSlider = document.createElement('input');
+    alphaSlider.type = 'range';
+    alphaSlider.className = 'cm-color-popup-alpha';
+    alphaSlider.min = '0';
+    alphaSlider.max = '100';
+    alphaSlider.value = String(Math.round(a * 100));
+    alphaSlider.addEventListener('input', () => {
+      a = alphaSlider.value / 100;
+      alphaLabel.textContent = `${alphaSlider.value}%`;
+      emit();
+    });
+
+    const alphaLabel = document.createElement('span');
+    alphaLabel.className = 'cm-color-popup-alpha-label';
+    alphaLabel.textContent = `${Math.round(a * 100)}%`;
+
+    alphaWrap.appendChild(alphaSlider);
+    alphaWrap.appendChild(alphaLabel);
+    row1.appendChild(alphaWrap);
+    popup.appendChild(row1);
+
+    // ── Row 2: format toggle + text value ──
+
+    const row2 = document.createElement('div');
+    row2.className = 'cm-color-popup-row';
+
+    const formatBtn = document.createElement('button');
+    formatBtn.className = 'cm-color-popup-format';
+    formatBtn.textContent = activeFormat.toUpperCase();
+    formatBtn.title = 'Cycle output format';
+    formatBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = FORMAT_CYCLE.indexOf(activeFormat);
+      activeFormat = FORMAT_CYCLE[(idx + 1) % FORMAT_CYCLE.length];
+      formatBtn.textContent = activeFormat.toUpperCase();
+      emit();
+    });
+    row2.appendChild(formatBtn);
+
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'cm-color-popup-text';
+    textInput.value = color;
+    textInput.addEventListener('change', () => {
+      const newParsed = parseColor(textInput.value.trim());
+      r = newParsed.r; g = newParsed.g; b = newParsed.b; a = newParsed.a;
+      if (newParsed.format !== 'named') {
+        activeFormat = newParsed.format;
+        if (activeFormat === 'rgba') activeFormat = 'rgb';
+        if (activeFormat === 'hsla') activeFormat = 'hsl';
+        formatBtn.textContent = activeFormat.toUpperCase();
+      }
+      swatch.value = `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+      alphaSlider.value = String(Math.round(a * 100));
+      alphaLabel.textContent = `${Math.round(a * 100)}%`;
+      emit();
+    });
+    row2.appendChild(textInput);
+    popup.appendChild(row2);
+
+    // ── Position and show ──
+
+    container.appendChild(popup);
+    const chipRect = chip.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    popup.style.left = `${chipRect.left - containerRect.left}px`;
+    popup.style.top = `${chipRect.bottom - containerRect.top + 4}px`;
+
+    // Keep in viewport
+    requestAnimationFrame(() => {
+      const popupRect = popup.getBoundingClientRect();
+      if (popupRect.right > window.innerWidth - 8) {
+        popup.style.left = `${Math.max(0, parseInt(popup.style.left) - (popupRect.right - window.innerWidth + 16))}px`;
+      }
+    });
+
+    // ── Dismiss on click-outside or Escape ──
+
+    const onClickOutside = (e) => {
+      const path = e.composedPath();
+      if (!path.includes(popup) && !path.includes(chip)) {
+        dismiss();
+      }
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); dismiss(); }
+    };
+    const dismiss = () => {
+      document.removeEventListener('mousedown', onClickOutside, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+      if (popup.parentNode) popup.remove();
+      if (activeColorPopup === popup) activeColorPopup = null;
+    };
+
+    setTimeout(() => {
+      document.addEventListener('mousedown', onClickOutside, true);
+    }, 50);
+    document.addEventListener('keydown', onKeyDown, true);
+  });
+
+  chip.updateColor = (c) => {
+    color = c;
+    parsed = parseColor(c);
+    setChipVisual();
+  };
+
+  return chip;
+}
+
+// ─── Color Chip Popup Styles ─────────────────────────────────────────────────
+
+// Injected lazily into whatever root node (ShadowRoot or Document) the popup
+// lives in, so it works correctly inside Shadow DOM.
+const POPUP_STYLE_ID = 'cm-color-popup-styles';
+const POPUP_CSS = `
+  .cm-color-popup {
+    position: absolute;
+    z-index: 1000;
+    background: var(--bg-elevated, #fff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08);
+    padding: 8px;
+    width: 230px;
+    font-family: var(--font-sans, -apple-system, sans-serif);
+    font-size: 12px;
+    color: var(--text-primary, #1a1a2e);
+  }
+  .cm-color-popup-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cm-color-popup-row + .cm-color-popup-row {
+    margin-top: 6px;
+  }
+  .cm-color-popup-swatch {
+    width: 32px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 4px;
+    cursor: pointer;
+    background: none;
+    flex-shrink: 0;
+  }
+  .cm-color-popup-swatch::-webkit-color-swatch-wrapper { padding: 2px; }
+  .cm-color-popup-swatch::-webkit-color-swatch { border: none; border-radius: 2px; }
+  .cm-color-popup-swatch::-moz-color-swatch { border: none; border-radius: 2px; }
+  .cm-color-popup-alpha-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .cm-color-popup-alpha {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: linear-gradient(to right,
+      transparent,
+      var(--text-primary, #1a1a2e));
+    border-radius: 2px;
+    outline: none;
+  }
+  .cm-color-popup-alpha::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--bg-elevated, #fff);
+    border: 2px solid var(--border-strong, #cbd5e1);
+    cursor: pointer;
+  }
+  .cm-color-popup-alpha::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--bg-elevated, #fff);
+    border: 2px solid var(--border-strong, #cbd5e1);
+    cursor: pointer;
+  }
+  .cm-color-popup-alpha-label {
+    font-size: 11px;
+    color: var(--text-secondary, #64748b);
+    min-width: 32px;
+    text-align: right;
+  }
+  .cm-color-popup-format {
+    padding: 2px 6px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 3px;
+    background: var(--bg-tertiary, #f0f1f2);
+    color: var(--text-secondary, #64748b);
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono, monospace);
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+  .cm-color-popup-format:hover {
+    background: var(--hover-bg, rgba(0,0,0,0.04));
+  }
+  .cm-color-popup-text {
+    flex: 1;
+    padding: 3px 6px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 3px;
+    background: var(--bg-secondary, #fff);
+    color: inherit;
+    font-size: 11px;
+    font-family: var(--font-mono, monospace);
+    outline: none;
+    min-width: 0;
+  }
+  .cm-color-popup-text:focus {
+    border-color: var(--accent-color, #10b981);
+    box-shadow: 0 0 0 2px var(--focus-ring, rgba(16,185,129,0.4));
+  }
+`;
+
+function ensurePopupStyles(container) {
+  const root = container.getRootNode();
+  if (root.getElementById?.(POPUP_STYLE_ID) || root.querySelector?.(`#${POPUP_STYLE_ID}`)) return;
+  const style = document.createElement('style');
+  style.id = POPUP_STYLE_ID;
+  style.textContent = POPUP_CSS;
+  if (root === document) {
+    document.head.appendChild(style);
+  } else {
+    // ShadowRoot — prepend so it doesn't interfere with component styles
+    root.prepend(style);
+  }
+}
+
+// ─── Document Scanning ──────────────────────────────────────────────────────
+
+// Find all define ... { } blocks in the document and extract color declarations
+function findColorRanges(docText) {
+  const results = [];
+  const defineRegex = /\bdefine\b/g;
+  let defineMatch;
+
+  while ((defineMatch = defineRegex.exec(docText)) !== null) {
+    let openBrace = -1;
+    for (let i = defineMatch.index + 6; i < docText.length; i++) {
+      if (docText[i] === '{') { openBrace = i; break; }
+    }
+    if (openBrace === -1) continue;
+
+    let depth = 1;
+    let closeBrace = -1;
+    for (let i = openBrace + 1; i < docText.length; i++) {
+      if (docText[i] === '{') depth++;
+      else if (docText[i] === '}') { depth--; if (depth === 0) { closeBrace = i; break; } }
+    }
+    if (closeBrace === -1) continue;
+
+    const blockContent = docText.slice(openBrace + 1, closeBrace);
+    const blockStart = openBrace + 1;
+
+    const declRegex = /([\w-]+)\s*:\s*([^;}\n]+)/g;
+    let declMatch;
+
+    while ((declMatch = declRegex.exec(blockContent)) !== null) {
+      const prop = declMatch[1].trim();
+      const value = declMatch[2].trim();
+
+      if (!COLOR_PROPERTIES.has(prop)) continue;
+      if (value === 'none' || value === 'inherit' || value === 'currentColor') continue;
+
+      const isColor = (
+        /^#[0-9a-fA-F]{3,8}$/.test(value) ||
+        /^rgba?\(/.test(value) ||
+        /^hsla?\(/.test(value) ||
+        CSS_NAMED_COLORS.has(value.toLowerCase())
+      );
+
+      if (!isColor) continue;
+
+      const valueStart = blockStart + declMatch.index + declMatch[0].indexOf(value, prop.length + 1);
+      const valueEnd = valueStart + value.length;
+
+      results.push({ from: valueStart, to: valueEnd, color: value });
+    }
+  }
+
+  return results;
+}
+
+// ─── CodeMirror Extension ───────────────────────────────────────────────────
+
+export function colorPickerExtension(cmViewModule) {
+  const { EditorView, ViewPlugin, Decoration, WidgetType } = cmViewModule;
+
+  class ColorChipWidget extends WidgetType {
+    constructor(color, from, to) {
+      super();
+      this.color = color;
+      this.from = from;
+      this.to = to;
+    }
+
+    eq(other) {
+      return this.color === other.color;
+    }
+
+    toDOM(view) {
+      let currentFrom = this.from;
+      let currentTo = this.to;
+      const editorRoot = view.dom.closest('.cm-editor') || view.dom;
+
+      const chip = createColorChip({
+        color: this.color,
+        container: editorRoot,
+        onChange: (newColor) => {
+          view.dispatch({
+            changes: { from: currentFrom, to: currentTo, insert: newColor },
+          });
+          currentTo = currentFrom + newColor.length;
+        },
+      });
+      chip.setAttribute('aria-label', `Color: ${this.color}`);
+
+      return chip;
+    }
+
+    ignoreEvent() {
+      return false;
+    }
+  }
+
+  function buildDecorations(view) {
+    const docText = view.state.doc.toString();
+    const colorRanges = findColorRanges(docText);
+    const widgets = [];
+
+    for (const { from, to, color } of colorRanges) {
+      const deco = Decoration.widget({
+        widget: new ColorChipWidget(color, from, to),
+        side: -1,
+      });
+      widgets.push(deco.range(from));
+    }
+
+    return Decoration.set(widgets, true);
+  }
+
+  const colorPlugin = ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.decorations = buildDecorations(view);
+      }
+
+      update(update) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = buildDecorations(update.view);
+        }
+      }
+    },
+    {
+      decorations: (v) => v.decorations,
+    }
+  );
+
+  const baseTheme = EditorView.baseTheme({
+    '.cm-color-chip': {
+      display: 'inline-block',
+      width: '12px',
+      height: '12px',
+      borderRadius: '2px',
+      border: '1px solid rgba(128,128,128,0.4)',
+      verticalAlign: 'middle',
+      marginRight: '4px',
+      cursor: 'pointer',
+      transition: 'transform 0.1s ease',
+    },
+    '.cm-color-chip:hover': {
+      transform: 'scale(1.3)',
+    },
+    '&dark .cm-color-chip': {
+      borderColor: 'rgba(200,200,200,0.3)',
+    },
+  });
+
+  return [colorPlugin, baseTheme];
+}

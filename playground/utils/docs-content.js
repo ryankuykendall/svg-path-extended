@@ -1026,9 +1026,82 @@ Z
     <span class="hljs-title function_">circle</span>(x, y, <span class="hljs-number">3</span>)
   }
 }
-</code></pre><h2>Limitations</h2>
+</code></pre><h2>TextLayer</h2>
+<p>TextLayers produce SVG <code>&lt;text&gt;</code> elements instead of <code>&lt;path&gt;</code> elements.</p>
+<h3>Defining a TextLayer</h3>
+<pre><code class="hljs">define TextLayer(<span class="hljs-string">&#x27;labels&#x27;</span>) {
+  font-size: 14;
+  font-family: monospace;
+  fill: <span class="hljs-comment">#333;</span>
+}
+</code></pre><h3>text() — Two Forms</h3>
+<p><strong>Inline form</strong> — simple text content:</p>
+<pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;labels&#x27;</span>).<span class="hljs-property">apply</span> {
+  <span class="hljs-title function_">text</span>(<span class="hljs-number">50</span>, <span class="hljs-number">45</span>)<span class="hljs-string">\`Start\`</span>
+  <span class="hljs-title function_">text</span>(<span class="hljs-number">150</span>, <span class="hljs-number">75</span>, 30deg)<span class="hljs-string">\`End\`</span>    <span class="hljs-comment">// rotation uses angle units (deg/rad/pi)</span>
+}
+</code></pre><p><strong>Block form</strong> — mixed text runs and tspan children:</p>
+<pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;labels&#x27;</span>).<span class="hljs-property">apply</span> {
+  <span class="hljs-title function_">text</span>(<span class="hljs-params"><span class="hljs-number">10</span>, <span class="hljs-number">180</span></span>) {
+    <span class="hljs-string">\`Hello \`</span>
+    <span class="hljs-title function_">tspan</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, 30deg)<span class="hljs-string">\`world\`</span>
+    <span class="hljs-string">\` and more\`</span>
+  }
+}
+</code></pre><p>The block form maps to SVG&#39;s mixed content model:
+<code>&lt;text x=&quot;10&quot; y=&quot;180&quot;&gt;Hello &lt;tspan rotate=&quot;30&quot;&gt;world&lt;/tspan&gt; and more&lt;/text&gt;</code></p>
+<p>Note: <code>30deg</code> in the source becomes <code>rotate=&quot;30&quot;</code> (degrees) in SVG output.</p>
+<h3>tspan() — Only Inside text() Blocks</h3>
+<pre><code class="hljs"><span class="hljs-title function_">tspan</span>()<span class="hljs-string">\`content\`</span>                   <span class="hljs-comment">// no offset</span>
+<span class="hljs-title function_">tspan</span>(dx, dy)<span class="hljs-string">\`content\`</span>             <span class="hljs-comment">// with offsets</span>
+<span class="hljs-title function_">tspan</span>(dx, dy, 45deg)<span class="hljs-string">\`content\`</span>      <span class="hljs-comment">// with offsets and rotation</span>
+</code></pre><p>Position arguments (x, y, dx, dy) are plain numbers. Rotation follows the standard angle unit convention — bare numbers are radians, use <code>deg</code>/<code>rad</code>/<code>pi</code> suffixes for explicit units. Content is always a template literal.</p>
+<h3>Template Literals</h3>
+<p>Template literals use backtick syntax with <code>\${expression}</code> interpolation. They work everywhere — text content, log messages, variable values:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> name = <span class="hljs-string">&quot;World&quot;</span>
+<span class="hljs-keyword">let</span> x = <span class="hljs-string">\`Hello <span class="hljs-subst">\${name}</span>!\`</span>              <span class="hljs-comment">// &quot;Hello World!&quot;</span>
+<span class="hljs-keyword">let</span> msg = <span class="hljs-string">\`Score: <span class="hljs-subst">\${<span class="hljs-number">2</span> + <span class="hljs-number">3</span>}</span>\`</span>           <span class="hljs-comment">// &quot;Score: 5&quot;</span>
+<span class="hljs-title function_">log</span>(<span class="hljs-string">\`Position: <span class="hljs-subst">\${ctx.position.x}</span>\`</span>)    <span class="hljs-comment">// in log messages</span>
+</code></pre><p>Template literals are the sole string construction mechanism — <code>+</code> stays strictly numeric. String equality (<code>==</code>/<code>!=</code>) works for conditionals:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> mode = <span class="hljs-string">&quot;dark&quot;</span>
+<span class="hljs-keyword">if</span> (mode == <span class="hljs-string">&quot;dark&quot;</span>) { <span class="hljs-comment">/* ... */</span> }
+<span class="hljs-keyword">if</span> (mode != <span class="hljs-string">&quot;light&quot;</span>) { <span class="hljs-comment">/* ... */</span> }
+</code></pre><h3>TextLayer Output Format</h3>
+<pre><code class="hljs language-js"><span class="hljs-keyword">const</span> result = <span class="hljs-title function_">compile</span>(<span class="hljs-string">\`
+  define TextLayer(&#x27;labels&#x27;) { font-size: 14; fill: #333; }
+  layer(&#x27;labels&#x27;).apply {
+    text(50, 45)\\\`Start\\\`
+    text(10, 180) {
+      tspan()\\\`Multi-\\\`
+      tspan(0, 16)\\\`line\\\`
+    }
+  }
+\`</span>);
+
+<span class="hljs-comment">// result.layers[0]:</span>
+<span class="hljs-comment">// {</span>
+<span class="hljs-comment">//   name: &#x27;labels&#x27;,</span>
+<span class="hljs-comment">//   type: &#x27;text&#x27;,</span>
+<span class="hljs-comment">//   data: &#x27;Start Multi-line&#x27;,</span>
+<span class="hljs-comment">//   textElements: [</span>
+<span class="hljs-comment">//     { x: 50, y: 45, children: [{ type: &#x27;run&#x27;, text: &#x27;Start&#x27; }] },</span>
+<span class="hljs-comment">//     { x: 10, y: 180, children: [</span>
+<span class="hljs-comment">//       { type: &#x27;tspan&#x27;, text: &#x27;Multi-&#x27; },</span>
+<span class="hljs-comment">//       { type: &#x27;tspan&#x27;, text: &#x27;line&#x27;, dx: 0, dy: 16 },</span>
+<span class="hljs-comment">//     ]},</span>
+<span class="hljs-comment">//   ],</span>
+<span class="hljs-comment">//   styles: { &#x27;font-size&#x27;: &#x27;14&#x27;, fill: &#x27;#333&#x27; },</span>
+<span class="hljs-comment">//   isDefault: false,</span>
+<span class="hljs-comment">// }</span>
+</code></pre><h3>Restrictions</h3>
 <ul>
-<li><strong>PathLayer only</strong> — <code>TextLayer</code> for <code>&lt;text&gt;</code> elements is not yet supported</li>
+<li><code>text()</code> can only be used inside a <code>layer().apply</code> block targeting a TextLayer</li>
+<li><code>tspan()</code> can only appear inside a <code>text() { }</code> block</li>
+<li>Path commands (<code>M</code>, <code>L</code>, etc.) cannot be used inside a TextLayer apply block</li>
+<li>If a TextLayer is the default layer, bare path commands will throw an error</li>
+</ul>
+<h2>Limitations</h2>
+<ul>
 <li><strong>Static style values</strong> — style properties are literal strings, not expressions (you cannot use <code>calc()</code> or variables inside style blocks)</li>
 <li><strong>No nesting</strong> — <code>layer().apply</code> blocks cannot be nested inside each other</li>
 <li><strong>Layer order</strong> — layers render in definition order (first defined = bottom)</li>

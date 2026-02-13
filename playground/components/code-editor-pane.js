@@ -3,6 +3,8 @@
 import { store } from '../state/store.js';
 import { svgPathCompletions } from '../utils/codemirror-setup.js';
 import { themeManager } from '../utils/theme.js';
+import { colorPickerExtension } from '../utils/cm-color-picker.js';
+import { textLayerEditorExtension } from '../utils/cm-textlayer-editor.js';
 
 export class CodeEditorPane extends HTMLElement {
   constructor() {
@@ -141,6 +143,8 @@ export class CodeEditorPane extends HTMLElement {
         }),
         updateExtension,
         view.EditorView.lineWrapping,
+        ...colorPickerExtension(view),
+        ...textLayerEditorExtension(view),
       ],
     });
 

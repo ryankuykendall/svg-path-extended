@@ -184,6 +184,53 @@ Option 2 (cache last successful layer list) is the most pragmatic short-term fix
 
 ---
 
+## ISSUE-004: Google Fonts picker limited to curated list without API key
+
+**Discovered:** 2026-02-13 (during TextLayer style editor implementation)
+
+**Severity:** Low
+
+**Description:**
+
+The TextLayer style editor's font picker uses a hardcoded curated list of ~100 popular Google Fonts. The `fetchGoogleFonts()` helper in `playground/utils/google-fonts.js` supports fetching the full catalog (~1500+ fonts) via the Google Fonts API, but this requires an API key. Since the playground runs entirely client-side, embedding an API key in the source would expose it publicly.
+
+Currently `fetchGoogleFonts()` is called without a key, so the API path is never exercised and the curated fallback list is always used.
+
+**Impact:**
+
+1. **Limited font selection:** Users only see ~100 fonts instead of the full Google Fonts catalog
+2. **Niche fonts unavailable:** Users looking for specific or less popular fonts won't find them in the picker
+3. **Dead code:** The API fetch path in `google-fonts.js` exists but is never used
+
+**Current Workarounds:**
+
+1. The curated list covers the most popular Google Fonts (Roboto, Inter, Poppins, Montserrat, etc.) which satisfies the majority of use cases
+2. Users can manually type any font family name into the font input field — if it's a valid Google Font, `loadGoogleFont()` will still load it from the CDN (the API key is only needed for *discovering* fonts, not *serving* them)
+
+**Potential Solutions:**
+
+1. **User-provided API key in preferences:** Add a field in the playground preferences UI where users can paste their own Google Fonts API key. Store it in `localStorage` via the store, pass it to `fetchGoogleFonts()`
+   - Pro: No key exposure, users who want the full catalog can opt in
+   - Con: Extra UI, requires users to create their own GCP project and key
+
+2. **Proxy through backend:** Route API requests through a server-side proxy that holds the key
+   - Pro: Key stays private, transparent to users
+   - Con: Requires backend infrastructure, adds a dependency for a purely client-side playground
+
+3. **Expand the curated list:** Increase from ~100 to ~300-500 fonts to cover more use cases without an API
+   - Pro: Zero infrastructure, no key needed
+   - Con: Larger bundle size, still not the full catalog, requires manual curation updates
+
+4. **Scrape font list at build time:** Fetch the full catalog during `npm run build` and embed it as a static JSON asset
+   - Pro: Full catalog without runtime API key, no backend needed
+   - Con: Requires API key at build time, list becomes stale between builds
+
+**Recommended Long-term Solution:**
+
+Option 1 (user-provided API key in preferences) is the cleanest approach. It respects the client-side architecture, avoids key exposure, and lets power users who want the full catalog bring their own key. The preferences view already exists as a natural place for this setting. For most users, the curated list plus manual font name entry is sufficient.
+
+---
+
 ## Template for New Issues
 
 ```markdown
