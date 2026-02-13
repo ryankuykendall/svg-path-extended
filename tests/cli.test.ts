@@ -377,7 +377,7 @@ describe('CLI', () => {
     it('generates <text> with rotation', () => {
       const inputFile = join(TMP_DIR, 'text-rot.svgx');
       const outputFile = join(TMP_DIR, 'text-rot.svg');
-      writeFileSync(inputFile, `define TextLayer('t') {}\nlayer('t').apply {\n  text(10, 20, 45)\`Rotated\`\n}`);
+      writeFileSync(inputFile, `define TextLayer('t') {}\nlayer('t').apply {\n  text(10, 20, 45deg)\`Rotated\`\n}`);
       runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
 
       const content = readFileSync(outputFile, 'utf-8');

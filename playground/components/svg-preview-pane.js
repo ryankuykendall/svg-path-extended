@@ -108,7 +108,8 @@ export class SvgPreviewPane extends HTMLElement {
             textEl.setAttribute('x', String(te.x));
             textEl.setAttribute('y', String(te.y));
             if (te.rotation != null) {
-              textEl.setAttribute('transform', `rotate(${te.rotation}, ${te.x}, ${te.y})`);
+              const deg = te.rotation * 180 / Math.PI;
+              textEl.setAttribute('transform', `rotate(${deg}, ${te.x}, ${te.y})`);
             }
             for (const [key, value] of Object.entries(layer.styles)) {
               textEl.setAttribute(key, value);
@@ -121,7 +122,7 @@ export class SvgPreviewPane extends HTMLElement {
                 tspan.textContent = child.text;
                 if (child.dx != null) tspan.setAttribute('dx', String(child.dx));
                 if (child.dy != null) tspan.setAttribute('dy', String(child.dy));
-                if (child.rotation != null) tspan.setAttribute('rotate', String(child.rotation));
+                if (child.rotation != null) tspan.setAttribute('rotate', String(child.rotation * 180 / Math.PI));
                 textEl.appendChild(tspan);
               }
             }

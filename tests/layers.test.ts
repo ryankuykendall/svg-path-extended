@@ -385,17 +385,28 @@ describe('Multi-Layer Support', () => {
       });
     });
 
-    it('creates text with rotation', () => {
+    it('creates text with rotation in degrees', () => {
       const result = compile(`
         define TextLayer('labels') {}
         layer('labels').apply {
-          text(50, 45, 30)\`Rotated\`
+          text(50, 45, 30deg)\`Rotated\`
         }
       `);
       const te = result.layers[0].textElements![0];
       expect(te.x).toBe(50);
       expect(te.y).toBe(45);
-      expect(te.rotation).toBe(30);
+      expect(te.rotation).toBeCloseTo(30 * Math.PI / 180);
+    });
+
+    it('creates text with rotation in radians (default)', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(50, 45, 0.5pi)\`Rotated\`
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.rotation).toBeCloseTo(Math.PI / 2);
     });
 
     it('creates text with template literal interpolation', () => {
@@ -416,17 +427,17 @@ describe('Multi-Layer Support', () => {
         layer('labels').apply {
           text(10, 20) {
             \`Hello \`
-            tspan(0, 0, 30)\`world\`
+            tspan(0, 0, 30deg)\`world\`
             \` end\`
           }
         }
       `);
       const te = result.layers[0].textElements![0];
-      expect(te.children).toEqual([
-        { type: 'run', text: 'Hello ' },
-        { type: 'tspan', text: 'world', dx: 0, dy: 0, rotation: 30 },
-        { type: 'run', text: ' end' },
-      ]);
+      expect(te.children).toHaveLength(3);
+      expect(te.children[0]).toEqual({ type: 'run', text: 'Hello ' });
+      expect(te.children[1]).toMatchObject({ type: 'tspan', text: 'world', dx: 0, dy: 0 });
+      expect((te.children[1] as any).rotation).toBeCloseTo(30 * Math.PI / 180);
+      expect(te.children[2]).toEqual({ type: 'run', text: ' end' });
     });
 
     it('creates tspan with only dx/dy', () => {

@@ -52,6 +52,10 @@ function escapeXml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function radToDeg(rad: number): number {
+  return rad * 180 / Math.PI;
+}
+
 function generateSvg(result: CompileResult, options: CliOptions): string {
   const viewBox = options.viewBox || '0 0 200 200';
   const width = options.width || '200';
@@ -66,13 +70,13 @@ function generateSvg(result: CompileResult, options: CliOptions): string {
         const attrs = Object.entries(layer.styles)
           .map(([k, v]) => `${k}="${v}"`).join(' ');
         const transform = te.rotation != null
-          ? ` transform="rotate(${te.rotation}, ${te.x}, ${te.y})"` : '';
+          ? ` transform="rotate(${radToDeg(te.rotation)}, ${te.x}, ${te.y})"` : '';
         const content = te.children.map(child => {
           if (child.type === 'run') return escapeXml(child.text);
           const spAttrs = [
             child.dx != null ? `dx="${child.dx}"` : '',
             child.dy != null ? `dy="${child.dy}"` : '',
-            child.rotation != null ? `rotate="${child.rotation}"` : '',
+            child.rotation != null ? `rotate="${radToDeg(child.rotation)}"` : '',
           ].filter(Boolean).join(' ');
           return `<tspan${spAttrs ? ' ' + spAttrs : ''}>${escapeXml(child.text)}</tspan>`;
         }).join('');

@@ -286,7 +286,7 @@ define TextLayer('labels') {
 ```
 layer('labels').apply {
   text(50, 45)`Start`
-  text(150, 75, 30)`End`       // with rotation (degrees)
+  text(150, 75, 30deg)`End`    // rotation uses angle units (deg/rad/pi)
 }
 ```
 
@@ -296,7 +296,7 @@ layer('labels').apply {
 layer('labels').apply {
   text(10, 180) {
     `Hello `
-    tspan(0, 0, 30)`world`
+    tspan(0, 0, 30deg)`world`
     ` and more`
   }
 }
@@ -305,15 +305,17 @@ layer('labels').apply {
 The block form maps to SVG's mixed content model:
 `<text x="10" y="180">Hello <tspan rotate="30">world</tspan> and more</text>`
 
+Note: `30deg` in the source becomes `rotate="30"` (degrees) in SVG output.
+
 ### tspan() — Only Inside text() Blocks
 
 ```
 tspan()`content`                   // no offset
 tspan(dx, dy)`content`             // with offsets
-tspan(dx, dy, rotation)`content`   // with offsets and rotation
+tspan(dx, dy, 45deg)`content`      // with offsets and rotation
 ```
 
-All arguments are numeric. Content is always a template literal.
+Position arguments (x, y, dx, dy) are plain numbers. Rotation follows the standard angle unit convention — bare numbers are radians, use `deg`/`rad`/`pi` suffixes for explicit units. Content is always a template literal.
 
 ### Template Literals
 

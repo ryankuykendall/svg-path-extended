@@ -77,12 +77,12 @@ export interface LayerStyle {
 
 export type TextChild =
   | { type: 'run'; text: string }
-  | { type: 'tspan'; text: string; dx?: number; dy?: number; rotation?: number };
+  | { type: 'tspan'; text: string; dx?: number; dy?: number; rotation?: number };  // rotation in radians
 
 export interface TextElement {
   x: number;
   y: number;
-  rotation?: number;  // Degrees — renders as transform="rotate(angle, x, y)"
+  rotation?: number;  // Radians — converted to degrees at render time
   children: TextChild[];
 }
 
