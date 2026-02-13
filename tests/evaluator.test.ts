@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { compile } from '../src';
 import { compilePath } from './helpers';
 
 describe('Evaluator', () => {
@@ -916,6 +917,64 @@ describe('Evaluator', () => {
 
     it('reassigns with modulus operator', () => {
       expect(compilePath('let x = 5; if (1) { x = calc(x % 3); } M x 0')).toBe('M 2 0');
+    });
+  });
+
+  describe('template literals', () => {
+    it('evaluates simple template literal', () => {
+      const result = compile('let x = `hello`; log(x);');
+      expect(result.logs[0].parts[0].value).toBe('hello');
+    });
+
+    it('evaluates template literal with expression', () => {
+      const result = compile('let name = "World"; let x = `Hello ${name}!`; log(x);');
+      expect(result.logs[0].parts[0].value).toBe('Hello World!');
+    });
+
+    it('evaluates template literal with numeric expression', () => {
+      const result = compile('let x = `Score: ${2 + 3}`; log(x);');
+      expect(result.logs[0].parts[0].value).toBe('Score: 5');
+    });
+
+    it('evaluates template literal with multiple expressions', () => {
+      const result = compile('let a = 1; let b = 2; let x = `${a} + ${b} = ${a + b}`; log(x);');
+      expect(result.logs[0].parts[0].value).toBe('1 + 2 = 3');
+    });
+
+    it('evaluates empty template literal', () => {
+      const result = compile('let x = ``; log(x);');
+      expect(result.logs[0].parts[0].value).toBe('');
+    });
+
+    it('template literal in log()', () => {
+      const result = compile('let n = 42; log(`The answer is ${n}`);');
+      expect(result.logs[0].parts[0].value).toBe('The answer is 42');
+    });
+  });
+
+  describe('string equality', () => {
+    it('compares equal strings', () => {
+      expect(compilePath('let mode = "dark"; if (mode == "dark") { M 1 0 } else { M 2 0 }')).toBe('M 1 0');
+    });
+
+    it('compares unequal strings', () => {
+      expect(compilePath('let mode = "dark"; if (mode == "light") { M 1 0 } else { M 2 0 }')).toBe('M 2 0');
+    });
+
+    it('!= for unequal strings returns truthy', () => {
+      expect(compilePath('let mode = "dark"; if (mode != "light") { M 1 0 } else { M 2 0 }')).toBe('M 1 0');
+    });
+
+    it('!= for equal strings returns falsy', () => {
+      expect(compilePath('let mode = "dark"; if (mode != "dark") { M 1 0 } else { M 2 0 }')).toBe('M 2 0');
+    });
+
+    it('string equality with template literals', () => {
+      expect(compilePath('let a = `hello`; if (a == "hello") { M 1 0 } else { M 2 0 }')).toBe('M 1 0');
+    });
+
+    it('string + still throws error', () => {
+      expect(() => compile('let x = "a" + "b";')).toThrow('requires numeric operands');
     });
   });
 });

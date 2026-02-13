@@ -24,6 +24,10 @@ import type {
   StyleProperty,
   LayerDefinition,
   LayerApplyBlock,
+  TemplateLiteral,
+  TextStatement,
+  TspanStatement,
+  TextBodyItem,
 } from './ast';
 
 const P = Parsimmon;
@@ -95,7 +99,7 @@ const identifier: Parsimmon.Parser<Identifier> = token(
 }));
 
 // Reserved words that cannot be identifiers
-const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log', 'return', 'define', 'default', 'layer', 'apply'];
+const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log', 'return', 'define', 'default', 'layer', 'apply', 'text', 'tspan'];
 
 // Context-aware functions that should be parsed as statements, not path arguments
 // These functions require path context and produce path output
@@ -324,11 +328,28 @@ const functionCall: Parsimmon.Parser<FunctionCall> = P.seqMap(
   })
 );
 
-// Primary expression: number, string, calc, identifier (with optional property access), function call (with optional member access), or parenthesized expression
+// Template literal: `hello ${name}!`
+// Whitespace inside template literals is significant, so NO token() wrapper
+const templateLiteral: Parsimmon.Parser<TemplateLiteral> = P.seq(
+  P.string('`'),
+  P.alt(
+    P.string('${').then(P.lazy(() => expression)).skip(P.string('}')),
+    P.regexp(/(?:[^`\\$]|\\.|(?:\$(?!\{)))+/)
+      .map(raw => raw.replace(/\\`/g, '`').replace(/\\\$/g, '$')
+                      .replace(/\\\\/g, '\\').replace(/\\n/g, '\n').replace(/\\t/g, '\t'))
+  ).many(),
+  P.string('`')
+).skip(optWhitespace).map(([, parts]) => ({
+  type: 'TemplateLiteral' as const,
+  parts,
+}));
+
+// Primary expression: number, string, template literal, calc, identifier (with optional property access), function call (with optional member access), or parenthesized expression
 const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
   P.alt(
     numberLiteral,
     stringLiteral,
+    templateLiteral,
     calcExpression,
     withMemberAccess(functionCall),
     withMemberAccess(nonReservedIdentifier),
@@ -579,12 +600,66 @@ const layerApplyBlock: Parsimmon.Parser<LayerApplyBlock> = P.seqMap(
   })
 );
 
+// tspan statement: tspan()`content` or tspan(dx, dy)`content` or tspan(dx, dy, rotation)`content`
+// Only valid inside text() block bodies
+const tspanStatement: Parsimmon.Parser<TspanStatement> = P.seqMap(
+  P.index,
+  keyword('tspan'),
+  word('('),
+  P.alt(
+    P.seqMap(expression, word(','), expression, word(','), expression,
+      (dx: Expression, _c1: string, dy: Expression, _c2: string, rot: Expression) => ({ dx, dy, rotation: rot })),
+    P.seqMap(expression, word(','), expression,
+      (dx: Expression, _c: string, dy: Expression) => ({ dx, dy })),
+    P.succeed({} as { dx?: Expression; dy?: Expression; rotation?: Expression })
+  ),
+  word(')'),
+  templateLiteral,
+  (idx, _t, _lp, args, _rp, content) => ({
+    type: 'TspanStatement' as const,
+    ...args,
+    content,
+    loc: indexToLoc(idx),
+  })
+);
+
+// text() block body: mixed bare template literals and tspan statements
+const textBlockBody: Parsimmon.Parser<TextBodyItem[]> = P.alt(
+  tspanStatement as Parsimmon.Parser<TextBodyItem>,
+  templateLiteral as Parsimmon.Parser<TextBodyItem>,
+).many();
+
+// text statement: text(x, y)`content` or text(x, y) { `text` tspan()... }
+const textStatement: Parsimmon.Parser<TextStatement> = P.seqMap(
+  P.index,
+  keyword('text'),
+  word('('),
+  P.seqMap(expression, word(','), expression,
+    P.seq(word(','), expression).map(([, r]: [string, Expression]) => r).fallback(undefined as Expression | undefined),
+    (x: Expression, _c: string, y: Expression, rotation: Expression | undefined) => ({ x, y, rotation })),
+  word(')'),
+  P.alt(
+    // Block form: text(x, y) { `text` tspan()... }
+    P.seq(word('{'), textBlockBody, word('}'))
+      .map(([, body]: [string, TextBodyItem[], string]) => ({ body })),
+    // Inline form: text(x, y)`content`
+    templateLiteral.map((content: TemplateLiteral) => ({ content })),
+  ),
+  (idx, _t, _lp, pos, _rp, form) => ({
+    type: 'TextStatement' as const,
+    ...pos,
+    ...form,
+    loc: indexToLoc(idx),
+  })
+);
+
 // Statement
 // Important: functionCallStatement must come BEFORE pathCommand to avoid
 // 'circle(...)' being parsed as path command 'c' + 'ircle(...)'
 const statement: Parsimmon.Parser<Statement> = P.alt(
   layerDefinition,
   layerApplyBlock,
+  textStatement,
   letDeclaration,
   forLoop,
   ifStatement,

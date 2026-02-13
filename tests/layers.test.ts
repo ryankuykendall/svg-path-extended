@@ -328,10 +328,191 @@ describe('Multi-Layer Support', () => {
       `)).toThrow('Layer name must be a string');
     });
 
-    it('throws on TextLayer (not yet supported)', () => {
+    it('allows TextLayer definitions', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+      `);
+      expect(result.layers).toHaveLength(1);
+      expect(result.layers[0].type).toBe('text');
+      expect(result.layers[0].name).toBe('labels');
+    });
+
+    it('throws when path commands target a TextLayer apply block', () => {
       expect(() => compile(`
-        define TextLayer('text') {}
-      `)).toThrow('TextLayer is not yet supported');
+        define TextLayer('labels') {}
+        layer('labels').apply { M 10 20 }
+      `)).toThrow('Path commands cannot be used inside a TextLayer apply block');
+    });
+
+    it('throws when bare path commands route to default TextLayer', () => {
+      expect(() => compile(`
+        define default TextLayer('labels') {}
+        M 10 20
+      `)).toThrow('Path commands cannot be routed to a TextLayer');
+    });
+
+    it('throws when text() is used outside a TextLayer apply block', () => {
+      expect(() => compile(`
+        text(10, 20)\`hello\`
+      `)).toThrow('text() can only be used inside a TextLayer apply block');
+    });
+
+    it('throws when text() is used inside a PathLayer apply block', () => {
+      expect(() => compile(`
+        define PathLayer('main') {}
+        layer('main').apply { text(10, 20)\`hello\` }
+      `)).toThrow('text() can only be used inside a TextLayer apply block');
+    });
+  });
+
+  describe('TextLayer', () => {
+    it('creates a TextLayer with inline text', () => {
+      const result = compile(`
+        define TextLayer('labels') { font-size: 14; }
+        layer('labels').apply {
+          text(10, 20)\`Hello\`
+        }
+      `);
+      expect(result.layers).toHaveLength(1);
+      const layer = result.layers[0];
+      expect(layer.type).toBe('text');
+      expect(layer.name).toBe('labels');
+      expect(layer.styles['font-size']).toBe('14');
+      expect(layer.textElements).toHaveLength(1);
+      expect(layer.textElements![0]).toEqual({
+        x: 10, y: 20, rotation: undefined,
+        children: [{ type: 'run', text: 'Hello' }],
+      });
+    });
+
+    it('creates text with rotation', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(50, 45, 30)\`Rotated\`
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.x).toBe(50);
+      expect(te.y).toBe(45);
+      expect(te.rotation).toBe(30);
+    });
+
+    it('creates text with template literal interpolation', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        let name = "World";
+        layer('labels').apply {
+          text(10, 20)\`Hello \${name}!\`
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.children[0]).toEqual({ type: 'run', text: 'Hello World!' });
+    });
+
+    it('creates text with block form and tspans', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(10, 20) {
+            \`Hello \`
+            tspan(0, 0, 30)\`world\`
+            \` end\`
+          }
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.children).toEqual([
+        { type: 'run', text: 'Hello ' },
+        { type: 'tspan', text: 'world', dx: 0, dy: 0, rotation: 30 },
+        { type: 'run', text: ' end' },
+      ]);
+    });
+
+    it('creates tspan with only dx/dy', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(10, 20) {
+            tspan()\`first\`
+            tspan(0, 16)\`second\`
+          }
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.children).toEqual([
+        { type: 'tspan', text: 'first' },
+        { type: 'tspan', text: 'second', dx: 0, dy: 16 },
+      ]);
+    });
+
+    it('data field contains concatenated plain text', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(10, 20)\`Hello\`
+          text(50, 60)\`World\`
+        }
+      `);
+      expect(result.layers[0].data).toBe('Hello World');
+    });
+
+    it('mixes PathLayer and TextLayer', () => {
+      const result = compile(`
+        define default PathLayer('shape') { stroke: #333; fill: none; }
+        define TextLayer('labels') { font-size: 14; fill: #333; }
+        M 50 50 L 150 80
+        layer('labels').apply {
+          text(50, 45)\`Start\`
+          text(150, 75)\`End\`
+        }
+      `);
+      expect(result.layers).toHaveLength(2);
+      expect(result.layers[0].type).toBe('path');
+      expect(result.layers[0].data).toBe('M 50 50 L 150 80');
+      expect(result.layers[1].type).toBe('text');
+      expect(result.layers[1].textElements).toHaveLength(2);
+    });
+
+    it('TextLayer can be the default layer', () => {
+      const result = compile(`
+        define default TextLayer('labels') {}
+        define PathLayer('lines') {}
+        layer('lines').apply { M 10 20 }
+        layer('labels').apply { text(10, 20)\`hello\` }
+      `);
+      expect(result.layers[0].type).toBe('text');
+      expect(result.layers[0].isDefault).toBe(true);
+      expect(result.layers[1].type).toBe('path');
+    });
+
+    it('uses variables and expressions in text position', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        let x = 10;
+        let y = 20;
+        layer('labels').apply {
+          text(calc(x + 5), calc(y * 2))\`pos\`
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.x).toBe(15);
+      expect(te.y).toBe(40);
+    });
+
+    it('uses for loop inside TextLayer apply block', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          for (i in 0..2) {
+            text(calc(i * 50), 20)\`item \${i}\`
+          }
+        }
+      `);
+      expect(result.layers[0].textElements).toHaveLength(3);
+      expect(result.layers[0].textElements![0].x).toBe(0);
+      expect(result.layers[0].textElements![1].x).toBe(50);
+      expect(result.layers[0].textElements![2].x).toBe(100);
     });
   });
 });

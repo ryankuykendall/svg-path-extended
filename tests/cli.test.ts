@@ -356,4 +356,62 @@ describe('CLI', () => {
       unlinkSync(outputFile);
     });
   });
+
+  describe('text layer SVG output', () => {
+    it('generates <text> elements in SVG output', () => {
+      const inputFile = join(TMP_DIR, 'text-test.svgx');
+      const outputFile = join(TMP_DIR, 'text-test.svg');
+      writeFileSync(inputFile, `define TextLayer('labels') { font-size: 14; fill: #333; }\nlayer('labels').apply {\n  text(50, 45)\`Hello\`\n}`);
+      runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
+
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toContain('<text x="50" y="45"');
+      expect(content).toContain('font-size="14"');
+      expect(content).toContain('fill="#333"');
+      expect(content).toContain('>Hello</text>');
+
+      unlinkSync(inputFile);
+      unlinkSync(outputFile);
+    });
+
+    it('generates <text> with rotation', () => {
+      const inputFile = join(TMP_DIR, 'text-rot.svgx');
+      const outputFile = join(TMP_DIR, 'text-rot.svg');
+      writeFileSync(inputFile, `define TextLayer('t') {}\nlayer('t').apply {\n  text(10, 20, 45)\`Rotated\`\n}`);
+      runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
+
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toContain('transform="rotate(45, 10, 20)"');
+
+      unlinkSync(inputFile);
+      unlinkSync(outputFile);
+    });
+
+    it('generates <tspan> elements', () => {
+      const inputFile = join(TMP_DIR, 'text-tspan.svgx');
+      const outputFile = join(TMP_DIR, 'text-tspan.svg');
+      writeFileSync(inputFile, `define TextLayer('t') {}\nlayer('t').apply {\n  text(10, 20) {\n    tspan()\`first\`\n    tspan(0, 16)\`second\`\n  }\n}`);
+      runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
+
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toContain('<tspan>first</tspan>');
+      expect(content).toContain('<tspan dx="0" dy="16">second</tspan>');
+
+      unlinkSync(inputFile);
+      unlinkSync(outputFile);
+    });
+
+    it('escapes XML special characters in text', () => {
+      const inputFile = join(TMP_DIR, 'text-escape.svgx');
+      const outputFile = join(TMP_DIR, 'text-escape.svg');
+      writeFileSync(inputFile, `define TextLayer('t') {}\nlayer('t').apply {\n  text(10, 20)\`a < b & c > d\`\n}`);
+      runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
+
+      const content = readFileSync(outputFile, 'utf-8');
+      expect(content).toContain('a &lt; b &amp; c &gt; d');
+
+      unlinkSync(inputFile);
+      unlinkSync(outputFile);
+    });
+  });
 });

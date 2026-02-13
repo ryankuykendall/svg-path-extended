@@ -679,4 +679,123 @@ L 10 20 // end point`;
       });
     });
   });
+
+  describe('template literals', () => {
+    it('parses a simple template literal', () => {
+      const ast = parse('let x = `hello`;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: {
+          type: 'TemplateLiteral',
+          parts: ['hello'],
+        },
+      });
+    });
+
+    it('parses template literal with expression', () => {
+      const ast = parse('let x = `hello ${name}!`;');
+      const tl = (ast.body[0] as any).value;
+      expect(tl.type).toBe('TemplateLiteral');
+      expect(tl.parts).toHaveLength(3);
+      expect(tl.parts[0]).toBe('hello ');
+      expect(tl.parts[1]).toMatchObject({ type: 'Identifier', name: 'name' });
+      expect(tl.parts[2]).toBe('!');
+    });
+
+    it('parses template literal with multiple expressions', () => {
+      const ast = parse('let x = `${a} and ${b}`;');
+      const tl = (ast.body[0] as any).value;
+      expect(tl.parts).toHaveLength(3);
+      expect(tl.parts[0]).toMatchObject({ type: 'Identifier', name: 'a' });
+      expect(tl.parts[1]).toBe(' and ');
+      expect(tl.parts[2]).toMatchObject({ type: 'Identifier', name: 'b' });
+    });
+
+    it('parses template literal with calc expression', () => {
+      const ast = parse('let x = `value: ${2 + 3}`;');
+      const tl = (ast.body[0] as any).value;
+      expect(tl.parts[0]).toBe('value: ');
+      expect(tl.parts[1]).toMatchObject({
+        type: 'BinaryExpression',
+        operator: '+',
+      });
+    });
+
+    it('parses empty template literal', () => {
+      const ast = parse('let x = ``;');
+      const tl = (ast.body[0] as any).value;
+      expect(tl.type).toBe('TemplateLiteral');
+      expect(tl.parts).toHaveLength(0);
+    });
+
+    it('parses template literal with escaped backtick', () => {
+      const ast = parse('let x = `hello \\`world\\``;');
+      const tl = (ast.body[0] as any).value;
+      expect(tl.parts[0]).toBe('hello `world`');
+    });
+
+    it('parses template literal with dollar sign not followed by brace', () => {
+      const ast = parse('let x = `price: $5`;');
+      const tl = (ast.body[0] as any).value;
+      expect(tl.parts[0]).toBe('price: $5');
+    });
+  });
+
+  describe('text and tspan statements', () => {
+    it('parses inline text statement', () => {
+      const ast = parse('text(10, 20)`hello`');
+      expect(ast.body[0]).toMatchObject({
+        type: 'TextStatement',
+        x: { type: 'NumberLiteral', value: 10 },
+        y: { type: 'NumberLiteral', value: 20 },
+        content: { type: 'TemplateLiteral', parts: ['hello'] },
+      });
+    });
+
+    it('parses text statement with rotation', () => {
+      const ast = parse('text(10, 20, 30)`hello`');
+      expect(ast.body[0]).toMatchObject({
+        type: 'TextStatement',
+        x: { type: 'NumberLiteral', value: 10 },
+        y: { type: 'NumberLiteral', value: 20 },
+        rotation: { type: 'NumberLiteral', value: 30 },
+      });
+    });
+
+    it('parses block text statement with tspan', () => {
+      const ast = parse('text(10, 20) { `hello ` tspan(0, 16)`world` }');
+      const stmt = ast.body[0] as any;
+      expect(stmt.type).toBe('TextStatement');
+      expect(stmt.body).toHaveLength(2);
+      expect(stmt.body[0]).toMatchObject({ type: 'TemplateLiteral', parts: ['hello '] });
+      expect(stmt.body[1]).toMatchObject({
+        type: 'TspanStatement',
+        dx: { type: 'NumberLiteral', value: 0 },
+        dy: { type: 'NumberLiteral', value: 16 },
+        content: { type: 'TemplateLiteral', parts: ['world'] },
+      });
+    });
+
+    it('parses tspan with no arguments', () => {
+      const ast = parse('text(10, 20) { tspan()`content` }');
+      const stmt = ast.body[0] as any;
+      expect(stmt.body[0]).toMatchObject({
+        type: 'TspanStatement',
+        content: { type: 'TemplateLiteral', parts: ['content'] },
+      });
+      expect(stmt.body[0].dx).toBeUndefined();
+      expect(stmt.body[0].dy).toBeUndefined();
+    });
+
+    it('parses tspan with rotation', () => {
+      const ast = parse('text(10, 20) { tspan(0, 16, 45)`rotated` }');
+      const stmt = ast.body[0] as any;
+      expect(stmt.body[0]).toMatchObject({
+        type: 'TspanStatement',
+        dx: { type: 'NumberLiteral', value: 0 },
+        dy: { type: 'NumberLiteral', value: 16 },
+        rotation: { type: 'NumberLiteral', value: 45 },
+      });
+    });
+  });
 });

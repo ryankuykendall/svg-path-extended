@@ -25,6 +25,7 @@ export type Node =
   | PathCommand
   | LayerDefinition
   | LayerApplyBlock
+  | TextStatement
   | CalcExpression
   | FunctionCall
   | BinaryExpression
@@ -32,7 +33,8 @@ export type Node =
   | MemberExpression
   | Identifier
   | NumberLiteral
-  | StringLiteral;
+  | StringLiteral
+  | TemplateLiteral;
 
 export interface Program {
   type: 'Program';
@@ -49,7 +51,8 @@ export type Statement =
   | ReturnStatement
   | PathCommand
   | LayerDefinition
-  | LayerApplyBlock;
+  | LayerApplyBlock
+  | TextStatement;
 
 // let x = 10;
 export interface LetDeclaration {
@@ -162,6 +165,35 @@ export interface StringLiteral {
   value: string;
 }
 
+// Template literal: `hello ${name}!`
+export interface TemplateLiteral {
+  type: 'TemplateLiteral';
+  parts: (string | Expression)[];  // Alternating strings and expressions
+}
+
+// text(x, y)`content` or text(x, y) { `text` tspan()... }
+export type TextBodyItem = TspanStatement | TemplateLiteral;
+
+export interface TextStatement {
+  type: 'TextStatement';
+  x: Expression;
+  y: Expression;
+  rotation?: Expression;
+  content?: TemplateLiteral;   // Inline form: text(x, y)`content`
+  body?: TextBodyItem[];       // Block form: text(x, y) { `text` tspan()... }
+  loc?: SourceLocation;
+}
+
+// tspan()`content` — only valid inside text() block
+export interface TspanStatement {
+  type: 'TspanStatement';
+  dx?: Expression;
+  dy?: Expression;
+  rotation?: Expression;
+  content: TemplateLiteral;
+  loc?: SourceLocation;
+}
+
 // Style property in a layer definition: stroke: #cc0000;
 export interface StyleProperty {
   type: 'StyleProperty';
@@ -195,4 +227,5 @@ export type Expression =
   | MemberExpression
   | Identifier
   | NumberLiteral
-  | StringLiteral;
+  | StringLiteral
+  | TemplateLiteral;

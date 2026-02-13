@@ -14,6 +14,9 @@ import type {
   MemberExpression,
   LayerDefinition,
   LayerApplyBlock,
+  TemplateLiteral,
+  TextStatement,
+  TspanStatement,
 } from '../parser/ast';
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import {
@@ -70,7 +73,22 @@ export interface LayerStyle {
   [key: string]: string;  // CSS property name (kebab-case stored as-is) → value
 }
 
-export interface LayerState {
+// --- Text element types ---
+
+export type TextChild =
+  | { type: 'run'; text: string }
+  | { type: 'tspan'; text: string; dx?: number; dy?: number; rotation?: number };
+
+export interface TextElement {
+  x: number;
+  y: number;
+  rotation?: number;  // Degrees — renders as transform="rotate(angle, x, y)"
+  children: TextChild[];
+}
+
+// --- Layer state (discriminated union) ---
+
+export interface PathLayerState {
   name: string;
   layerType: 'PathLayer';
   isDefault: boolean;
@@ -78,6 +96,16 @@ export interface LayerState {
   pathContext: PathContext;
   accum: string[];
 }
+
+export interface TextLayerState {
+  name: string;
+  layerType: 'TextLayer';
+  isDefault: boolean;
+  styles: LayerStyle;
+  textElements: TextElement[];
+}
+
+export type LayerState = PathLayerState | TextLayerState;
 
 export interface LayerReference {
   type: 'LayerReference';
@@ -88,8 +116,9 @@ export interface LayerReference {
 
 export interface LayerOutput {
   name: string;
-  type: 'path';
-  data: string;               // SVG path data
+  type: 'path' | 'text';
+  data: string;                    // Path: d-attribute. Text: concatenated plain text.
+  textElements?: TextElement[];    // Only present when type === 'text'
   styles: Record<string, string>;  // SVG attribute name → value
   isDefault: boolean;
 }
@@ -121,6 +150,10 @@ function expressionToSource(expr: Expression): string {
       return `(${expressionToSource(expr.left)} ${expr.operator} ${expressionToSource(expr.right)})`;
     case 'UnaryExpression':
       return `${expr.operator}${expressionToSource(expr.argument)}`;
+    case 'TemplateLiteral':
+      return '`' + expr.parts.map(p =>
+        typeof p === 'string' ? p : '${' + expressionToSource(p) + '}'
+      ).join('') + '`';
     default:
       return '?';
   }
@@ -276,6 +309,13 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
       const left = evaluateExpression(expr.left, scope);
       const right = evaluateExpression(expr.right, scope);
 
+      // String equality: == and != work for strings
+      if ((expr.operator === '==' || expr.operator === '!=') &&
+          typeof left === 'string' && typeof right === 'string') {
+        if (expr.operator === '==') return left === right ? 1 : 0;
+        return left !== right ? 1 : 0;
+      }
+
       if (typeof left !== 'number' || typeof right !== 'number') {
         throw new Error(`Binary operator ${expr.operator} requires numeric operands`);
       }
@@ -317,9 +357,22 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'MemberExpression':
       return evaluateMemberExpression(expr, scope);
 
+    case 'TemplateLiteral':
+      return evaluateTemplateLiteral(expr, scope);
+
     default:
       throw new Error(`Unknown expression type: ${(expr as Expression).type}`);
   }
+}
+
+function evaluateTemplateLiteral(tl: TemplateLiteral, scope: Scope): string {
+  return tl.parts.map(part => {
+    if (typeof part === 'string') return part;
+    const val = evaluateExpression(part, scope);
+    if (typeof val === 'number') return formatNum(val);
+    if (typeof val === 'string') return val;
+    return String(val);
+  }).join('');
 }
 
 function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
@@ -356,7 +409,10 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
   if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'LayerReference') {
     const layerRef = obj as LayerReference;
     if (expr.property === 'ctx') {
-      return { type: 'ContextObject' as const, value: contextToObject(layerRef.layer.pathContext) };
+      if (layerRef.layer.layerType !== 'PathLayer') {
+        throw new Error(`Property 'ctx' is only available on PathLayer references`);
+      }
+      return { type: 'ContextObject' as const, value: contextToObject((layerRef.layer as PathLayerState).pathContext) };
     }
     if (expr.property === 'name') {
       return layerRef.layer.name;
@@ -634,6 +690,20 @@ function updateCtxVariable(scope: Scope): void {
   }
 }
 
+function getActiveTextLayer(scope: Scope): TextLayerState | null {
+  if (!scope.evalState?.activeLayerName) return null;
+  const layer = scope.evalState.layers.get(scope.evalState.activeLayerName);
+  if (!layer || layer.layerType !== 'TextLayer') return null;
+  return layer as TextLayerState;
+}
+
+function requireNumber(value: Value, label: string): number {
+  if (typeof value !== 'number') {
+    throw new Error(`${label} must be a number`);
+  }
+  return value;
+}
+
 /**
  * Evaluate a context-aware function that needs access to path context
  */
@@ -906,7 +976,7 @@ function evaluatePathCommand(cmd: PathCommand, scope: Scope): string {
     const numericArgs = getNumericArgs(cmd.args, scope);
     // If bare command (not in apply block) with a default layer, update that layer's context
     if (scope.evalState.defaultLayerName && !scope.evalState.activeLayerName) {
-      const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName)!;
+      const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName)! as PathLayerState;
       updateContextForCommand(defaultLayer.pathContext, cmd.command, numericArgs);
     } else {
       updateContextForCommand(scope.evalState.pathContext, cmd.command, numericArgs);
@@ -1041,11 +1111,25 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
     }
 
     case 'PathCommand': {
+      // Validate path commands aren't targeting a TextLayer
+      if (scope.evalState) {
+        if (scope.evalState.activeLayerName) {
+          const activeLayer = scope.evalState.layers.get(scope.evalState.activeLayerName);
+          if (activeLayer?.layerType === 'TextLayer') {
+            throw new Error('Path commands cannot be used inside a TextLayer apply block');
+          }
+        } else if (scope.evalState.defaultLayerName) {
+          const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName);
+          if (defaultLayer?.layerType === 'TextLayer') {
+            throw new Error('Path commands cannot be routed to a TextLayer. Use a PathLayer as default or wrap in a layer().apply block');
+          }
+        }
+      }
       const result = evaluatePathCommand(stmt, scope);
       if (result) {
         // Route path commands to default layer if one is defined and we're not in an apply block
         if (scope.evalState && scope.evalState.defaultLayerName && !scope.evalState.activeLayerName) {
-          const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName)!;
+          const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName)! as PathLayerState;
           defaultLayer.accum.push(result);
         } else {
           accum.push(result);
@@ -1062,9 +1146,6 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       if (typeof nameValue !== 'string') {
         throw new Error('Layer name must be a string');
       }
-      if (stmt.layerType === 'TextLayer') {
-        throw new Error('TextLayer is not yet supported');
-      }
       if (scope.evalState.layers.has(nameValue)) {
         throw new Error(`Duplicate layer name: '${nameValue}'`);
       }
@@ -1075,7 +1156,22 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       for (const prop of stmt.styles) {
         styles[prop.name] = prop.value;
       }
-      const layerState: LayerState = {
+      if (stmt.layerType === 'TextLayer') {
+        const layerState: TextLayerState = {
+          name: nameValue,
+          layerType: 'TextLayer',
+          isDefault: stmt.isDefault,
+          styles,
+          textElements: [],
+        };
+        scope.evalState.layers.set(nameValue, layerState);
+        scope.evalState.layerOrder.push(nameValue);
+        if (stmt.isDefault) {
+          scope.evalState.defaultLayerName = nameValue;
+        }
+        return;
+      }
+      const layerState: PathLayerState = {
         name: nameValue,
         layerType: 'PathLayer',
         isDefault: stmt.isDefault,
@@ -1106,19 +1202,64 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       if (scope.evalState.activeLayerName !== null) {
         throw new Error(`Cannot nest layer apply blocks. Already inside layer '${scope.evalState.activeLayerName}'`);
       }
-      // Save current state
+      if (layer.layerType === 'TextLayer') {
+        // TextLayer apply: set activeLayerName so TextStatements write here
+        const prevActiveLayerName = scope.evalState.activeLayerName;
+        scope.evalState.activeLayerName = nameValue;
+        for (const bodyStmt of stmt.body) {
+          evaluateStatementToAccum(bodyStmt, createScope(scope), []);
+        }
+        scope.evalState.activeLayerName = prevActiveLayerName;
+        return;
+      }
+      // PathLayer apply: save current state, switch to layer's context
       const prevPathContext = scope.evalState.pathContext;
       const prevActiveLayerName = scope.evalState.activeLayerName;
-      // Switch to layer's context
-      scope.evalState.pathContext = layer.pathContext;
+      scope.evalState.pathContext = (layer as PathLayerState).pathContext;
       scope.evalState.activeLayerName = nameValue;
       updateCtxVariable(scope);
-      // Evaluate body into layer's accum
-      evaluateStatementsToAccum(stmt.body, createScope(scope), layer.accum);
-      // Restore previous state
+      evaluateStatementsToAccum(stmt.body, createScope(scope), (layer as PathLayerState).accum);
       scope.evalState.pathContext = prevPathContext;
       scope.evalState.activeLayerName = prevActiveLayerName;
       updateCtxVariable(scope);
+      return;
+    }
+
+    case 'TextStatement': {
+      if (!scope.evalState) throw new Error('text() requires evaluation context');
+      const activeTextLayer = getActiveTextLayer(scope);
+      if (!activeTextLayer) {
+        throw new Error('text() can only be used inside a TextLayer apply block');
+      }
+
+      const x = requireNumber(evaluateExpression(stmt.x, scope), 'text() x');
+      const y = requireNumber(evaluateExpression(stmt.y, scope), 'text() y');
+      const rotation = stmt.rotation
+        ? requireNumber(evaluateExpression(stmt.rotation, scope), 'text() rotation')
+        : undefined;
+
+      if (stmt.content) {
+        // Inline form: text(x, y)`content`
+        const text = evaluateTemplateLiteral(stmt.content, scope);
+        activeTextLayer.textElements.push({ x, y, rotation, children: [{ type: 'run', text }] });
+      } else if (stmt.body) {
+        // Block form: text(x, y) { `text` tspan()... }
+        const children: TextChild[] = [];
+        for (const item of stmt.body) {
+          if (item.type === 'TemplateLiteral') {
+            const text = evaluateTemplateLiteral(item, scope);
+            children.push({ type: 'run', text });
+          } else {
+            // TspanStatement
+            const text = evaluateTemplateLiteral(item.content, scope);
+            const dx = item.dx ? requireNumber(evaluateExpression(item.dx, scope), 'tspan() dx') : undefined;
+            const dy = item.dy ? requireNumber(evaluateExpression(item.dy, scope), 'tspan() dy') : undefined;
+            const rot = item.rotation ? requireNumber(evaluateExpression(item.rotation, scope), 'tspan() rotation') : undefined;
+            children.push({ type: 'tspan', text, dx, dy, rotation: rot });
+          }
+        }
+        activeTextLayer.textElements.push({ x, y, rotation, children });
+      }
       return;
     }
 
@@ -1182,13 +1323,28 @@ function buildCompileResult(mainAccum: string[], evalState: EvaluationState): Co
     // Add defined layers in definition order
     for (const name of evalState.layerOrder) {
       const layer = evalState.layers.get(name)!;
-      layers.push({
-        name: layer.name,
-        type: 'path',
-        data: layer.accum.join(' '),
-        styles: { ...layer.styles },
-        isDefault: layer.isDefault,
-      });
+      if (layer.layerType === 'TextLayer') {
+        const textLayer = layer as TextLayerState;
+        const allText = textLayer.textElements
+          .map(te => te.children.map(c => c.text).join(''))
+          .join(' ');
+        layers.push({
+          name: layer.name,
+          type: 'text',
+          data: allText,
+          textElements: textLayer.textElements,
+          styles: { ...layer.styles },
+          isDefault: layer.isDefault,
+        });
+      } else {
+        layers.push({
+          name: layer.name,
+          type: 'path',
+          data: (layer as PathLayerState).accum.join(' '),
+          styles: { ...layer.styles },
+          isDefault: layer.isDefault,
+        });
+      }
     }
   }
 

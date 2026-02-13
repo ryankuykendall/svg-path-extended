@@ -48,6 +48,10 @@ Examples:
 `);
 }
 
+function escapeXml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function generateSvg(result: CompileResult, options: CliOptions): string {
   const viewBox = options.viewBox || '0 0 200 200';
   const width = options.width || '200';
@@ -56,11 +60,28 @@ function generateSvg(result: CompileResult, options: CliOptions): string {
   const defaultFill = options.fill || 'none';
   const defaultStrokeWidth = options.strokeWidth || '2';
 
-  const paths = result.layers.map((layer) => {
+  const elements = result.layers.map((layer) => {
+    if (layer.type === 'text' && layer.textElements) {
+      return layer.textElements.map(te => {
+        const attrs = Object.entries(layer.styles)
+          .map(([k, v]) => `${k}="${v}"`).join(' ');
+        const transform = te.rotation != null
+          ? ` transform="rotate(${te.rotation}, ${te.x}, ${te.y})"` : '';
+        const content = te.children.map(child => {
+          if (child.type === 'run') return escapeXml(child.text);
+          const spAttrs = [
+            child.dx != null ? `dx="${child.dx}"` : '',
+            child.dy != null ? `dy="${child.dy}"` : '',
+            child.rotation != null ? `rotate="${child.rotation}"` : '',
+          ].filter(Boolean).join(' ');
+          return `<tspan${spAttrs ? ' ' + spAttrs : ''}>${escapeXml(child.text)}</tspan>`;
+        }).join('');
+        return `  <text x="${te.x}" y="${te.y}"${transform}${attrs ? ' ' + attrs : ''}>${content}</text>`;
+      }).join('\n');
+    }
     const stroke = layer.styles['stroke'] || defaultStroke;
     const fill = layer.styles['fill'] || defaultFill;
     const strokeWidth = layer.styles['stroke-width'] || defaultStrokeWidth;
-    // Build additional style attributes from layer styles (excluding the ones we handle explicitly)
     const handled = new Set(['stroke', 'fill', 'stroke-width']);
     const extraAttrs = Object.entries(layer.styles)
       .filter(([key]) => !handled.has(key))
@@ -72,7 +93,7 @@ function generateSvg(result: CompileResult, options: CliOptions): string {
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">
   <rect width="100%" height="100%" fill="#f5f5f5"/>
-${paths}
+${elements}
 </svg>`;
 }
 

@@ -265,9 +265,115 @@ layer('points').apply {
 }
 ```
 
+## TextLayer
+
+TextLayers produce SVG `<text>` elements instead of `<path>` elements.
+
+### Defining a TextLayer
+
+```
+define TextLayer('labels') {
+  font-size: 14;
+  font-family: monospace;
+  fill: #333;
+}
+```
+
+### text() — Two Forms
+
+**Inline form** — simple text content:
+
+```
+layer('labels').apply {
+  text(50, 45)`Start`
+  text(150, 75, 30)`End`       // with rotation (degrees)
+}
+```
+
+**Block form** — mixed text runs and tspan children:
+
+```
+layer('labels').apply {
+  text(10, 180) {
+    `Hello `
+    tspan(0, 0, 30)`world`
+    ` and more`
+  }
+}
+```
+
+The block form maps to SVG's mixed content model:
+`<text x="10" y="180">Hello <tspan rotate="30">world</tspan> and more</text>`
+
+### tspan() — Only Inside text() Blocks
+
+```
+tspan()`content`                   // no offset
+tspan(dx, dy)`content`             // with offsets
+tspan(dx, dy, rotation)`content`   // with offsets and rotation
+```
+
+All arguments are numeric. Content is always a template literal.
+
+### Template Literals
+
+Template literals use backtick syntax with `${expression}` interpolation. They work everywhere — text content, log messages, variable values:
+
+```
+let name = "World"
+let x = `Hello ${name}!`              // "Hello World!"
+let msg = `Score: ${2 + 3}`           // "Score: 5"
+log(`Position: ${ctx.position.x}`)    // in log messages
+```
+
+Template literals are the sole string construction mechanism — `+` stays strictly numeric. String equality (`==`/`!=`) works for conditionals:
+
+```
+let mode = "dark"
+if (mode == "dark") { /* ... */ }
+if (mode != "light") { /* ... */ }
+```
+
+### TextLayer Output Format
+
+```js
+const result = compile(`
+  define TextLayer('labels') { font-size: 14; fill: #333; }
+  layer('labels').apply {
+    text(50, 45)\`Start\`
+    text(10, 180) {
+      tspan()\`Multi-\`
+      tspan(0, 16)\`line\`
+    }
+  }
+`);
+
+// result.layers[0]:
+// {
+//   name: 'labels',
+//   type: 'text',
+//   data: 'Start Multi-line',
+//   textElements: [
+//     { x: 50, y: 45, children: [{ type: 'run', text: 'Start' }] },
+//     { x: 10, y: 180, children: [
+//       { type: 'tspan', text: 'Multi-' },
+//       { type: 'tspan', text: 'line', dx: 0, dy: 16 },
+//     ]},
+//   ],
+//   styles: { 'font-size': '14', fill: '#333' },
+//   isDefault: false,
+// }
+```
+
+### Restrictions
+
+- `text()` can only be used inside a `layer().apply` block targeting a TextLayer
+- `tspan()` can only appear inside a `text() { }` block
+- Path commands (`M`, `L`, etc.) cannot be used inside a TextLayer apply block
+- If a TextLayer is the default layer, bare path commands will throw an error
+
 ## Limitations
 
-- **PathLayer only** — `TextLayer` for `<text>` elements is not yet supported
 - **Static style values** — style properties are literal strings, not expressions (you cannot use `calc()` or variables inside style blocks)
 - **No nesting** — `layer().apply` blocks cannot be nested inside each other
 - **Layer order** — layers render in definition order (first defined = bottom)

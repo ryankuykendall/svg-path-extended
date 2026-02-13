@@ -15,6 +15,9 @@ import type {
   Comment,
   LayerDefinition,
   LayerApplyBlock,
+  TemplateLiteral,
+  TextStatement,
+  TspanStatement,
 } from '../parser/ast';
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import { createPathContext, contextToObject, updateContextForCommand, setLastTangent, type PathContext } from './context';
@@ -504,6 +507,13 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
       const left = evaluateExpression(expr.left, scope);
       const right = evaluateExpression(expr.right, scope);
 
+      // String equality: == and != work for strings
+      if ((expr.operator === '==' || expr.operator === '!=') &&
+          typeof left === 'string' && typeof right === 'string') {
+        if (expr.operator === '==') return left === right ? 1 : 0;
+        return left !== right ? 1 : 0;
+      }
+
       if (typeof left !== 'number' || typeof right !== 'number') {
         throw new Error(formatError(`Binary operator ${expr.operator} requires numeric operands`, line));
       }
@@ -547,6 +557,15 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
 
     case 'MemberExpression':
       return evaluateMemberExpression(expr, scope);
+
+    case 'TemplateLiteral':
+      return expr.parts.map(part => {
+        if (typeof part === 'string') return part;
+        const val = evaluateExpression(part, scope);
+        if (typeof val === 'number') return String(val);
+        if (typeof val === 'string') return val;
+        return String(val);
+      }).join('');
 
     default:
       throw new Error(formatError(`Unknown expression type: ${(expr as Expression).type}`, line));
@@ -866,6 +885,10 @@ function evaluateStatementPlain(stmt: Statement, scope: Scope): string {
       return results.join(' ');
     }
 
+    case 'TextStatement':
+      // In annotated plain mode, text statements are no-ops (no path output)
+      return '';
+
     case 'ReturnStatement': {
       const value = evaluateExpression(stmt.value, scope);
       throw new ReturnSignal(value);
@@ -1114,6 +1137,10 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
       }
       break;
     }
+
+    case 'TextStatement':
+      // In annotated mode, text statements are no-ops (no path output)
+      break;
 
     case 'ReturnStatement': {
       const value = evaluateExpression(stmt.value, scope);

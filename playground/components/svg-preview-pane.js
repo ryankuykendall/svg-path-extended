@@ -100,8 +100,36 @@ export class SvgPreviewPane extends HTMLElement {
       // Clear existing layer paths
       layersGroup.innerHTML = '';
 
+      const SVG_NS = 'http://www.w3.org/2000/svg';
       for (const layer of layers) {
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        if (layer.type === 'text' && layer.textElements) {
+          for (const te of layer.textElements) {
+            const textEl = document.createElementNS(SVG_NS, 'text');
+            textEl.setAttribute('x', String(te.x));
+            textEl.setAttribute('y', String(te.y));
+            if (te.rotation != null) {
+              textEl.setAttribute('transform', `rotate(${te.rotation}, ${te.x}, ${te.y})`);
+            }
+            for (const [key, value] of Object.entries(layer.styles)) {
+              textEl.setAttribute(key, value);
+            }
+            for (const child of te.children) {
+              if (child.type === 'run') {
+                textEl.appendChild(document.createTextNode(child.text));
+              } else {
+                const tspan = document.createElementNS(SVG_NS, 'tspan');
+                tspan.textContent = child.text;
+                if (child.dx != null) tspan.setAttribute('dx', String(child.dx));
+                if (child.dy != null) tspan.setAttribute('dy', String(child.dy));
+                if (child.rotation != null) tspan.setAttribute('rotate', String(child.rotation));
+                textEl.appendChild(tspan);
+              }
+            }
+            layersGroup.appendChild(textEl);
+          }
+          continue;
+        }
+        const path = document.createElementNS(SVG_NS, 'path');
         path.setAttribute('d', layer.data || '');
         path.setAttribute('fill', 'none');
 
@@ -301,11 +329,10 @@ export class SvgPreviewPane extends HTMLElement {
     const navBg = this.shadowRoot.querySelector('#navigator-bg');
     const navSvg = this.shadowRoot.querySelector('#navigator-svg');
 
-    // Combine all layer paths for navigator display
+    // Combine all layer paths for navigator display (skip text elements)
     const layersGroup = this.shadowRoot.querySelector('#preview-layers');
     const layerPaths = layersGroup ? Array.from(layersGroup.querySelectorAll('path')) : [];
     if (layerPaths.length > 0) {
-      // Combine all layer path data for the navigator
       const combined = layerPaths.map(p => p.getAttribute('d') || '').filter(Boolean).join(' ');
       navPath.setAttribute('d', combined);
     } else {
