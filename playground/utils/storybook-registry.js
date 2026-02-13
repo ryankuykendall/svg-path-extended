@@ -96,6 +96,46 @@ export const componentRegistry = [
     }
   },
   {
+    id: 'layers-panel',
+    name: 'Layers Panel',
+    category: 'Editor',
+    description: 'Floating panel showing layer list with visibility toggles',
+    stories: [
+      {
+        name: 'Multiple Layers',
+        props: {
+          layers: [
+            { name: 'grid', type: 'path', data: '', styles: { stroke: '#dddddd', 'stroke-width': '0.5' } },
+            { name: 'shape', type: 'path', data: '', styles: { stroke: '#333333', 'stroke-width': '2' } },
+            { name: 'labels', type: 'text', data: '', styles: { fill: '#666666' }, textElements: [] }
+          ]
+        }
+      },
+      {
+        name: 'Single Layer (Hidden)',
+        props: {
+          layers: [
+            { name: 'default', type: 'path', data: '', styles: { stroke: '#000000' } }
+          ]
+        }
+      }
+    ],
+    controls: [],
+    notes: 'Reads layers and layerVisibility from store. Auto-hides when <= 1 layer.',
+    render: (container, props) => {
+      import('../state/store.js').then(({ store }) => {
+        store.set('layers', props.layers || []);
+        store.set('layerVisibility', {});
+
+        const panel = document.createElement('layers-panel');
+        // Override auto-hide for storybook display
+        panel.style.display = 'block';
+        panel.style.position = 'relative';
+        container.appendChild(panel);
+      });
+    }
+  },
+  {
     id: 'console-pane',
     name: 'Console',
     category: 'Editor',

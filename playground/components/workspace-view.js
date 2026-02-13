@@ -564,6 +564,22 @@ export class WorkspaceView extends HTMLElement {
       this.previewPane.hideLoading();
       this.consolePane.logs = result.logs || [];
       this.hideError();
+
+      // Store layers for layers panel
+      const resultLayers = result.layers || [];
+      store.set('layers', resultLayers);
+
+      // Clean up stale visibility entries
+      const currentVisibility = store.get('layerVisibility');
+      const currentLayerNames = new Set(resultLayers.map(l => l.name));
+      const cleaned = {};
+      for (const [name, visible] of Object.entries(currentVisibility)) {
+        if (currentLayerNames.has(name)) {
+          cleaned[name] = visible;
+        }
+      }
+      store.set('layerVisibility', cleaned);
+
       store.update({
         compilationStatus: 'completed',
         compilationError: null,
@@ -584,6 +600,7 @@ export class WorkspaceView extends HTMLElement {
       this.previewPane.hideLoading();
       this.showError(e.message);
       this.consolePane.logs = [];
+      store.set('layers', []);
       store.update({
         compilationStatus: 'error',
         compilationError: e.message,

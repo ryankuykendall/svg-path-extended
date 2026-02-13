@@ -112,6 +112,8 @@ export const store = createStore({
   annotatedOutput: '',
   logs: [],
   error: null,
+  layers: [],              // Array of LayerOutput from last compilation
+  layerVisibility: {},     // { [layerName]: boolean } — true = visible (default)
 
   // Compilation status (for async worker)
   compilationStatus: 'idle',    // 'idle', 'compiling', 'rendering', 'completed', 'error'

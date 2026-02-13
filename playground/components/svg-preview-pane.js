@@ -1,6 +1,7 @@
 // SVG Preview pane with zoom/pan controls and navigator
 
 import { store } from '../state/store.js';
+import './layers-panel.js';
 
 export class SvgPreviewPane extends HTMLElement {
   constructor() {
@@ -35,6 +36,10 @@ export class SvgPreviewPane extends HTMLElement {
   subscribeToStore() {
     store.subscribe(['width', 'height', 'stroke', 'strokeWidth', 'fillEnabled', 'fill', 'background', 'gridEnabled', 'gridColor', 'gridSize', 'zoomLevel', 'panX', 'panY', 'pathData'], () => {
       this.updateSvgStyles();
+    });
+    store.subscribe('layerVisibility', () => {
+      this.applyLayerVisibility();
+      this.updateNavigatorContent();
     });
   }
 
@@ -105,6 +110,7 @@ export class SvgPreviewPane extends HTMLElement {
         if (layer.type === 'text' && layer.textElements) {
           for (const te of layer.textElements) {
             const textEl = document.createElementNS(SVG_NS, 'text');
+            textEl.dataset.layerName = layer.name;
             textEl.setAttribute('x', String(te.x));
             textEl.setAttribute('y', String(te.y));
             if (te.rotation != null) {
@@ -131,6 +137,7 @@ export class SvgPreviewPane extends HTMLElement {
           continue;
         }
         const path = document.createElementNS(SVG_NS, 'path');
+        path.dataset.layerName = layer.name;
         path.setAttribute('d', layer.data || '');
         path.setAttribute('fill', 'none');
 
@@ -171,9 +178,25 @@ export class SvgPreviewPane extends HTMLElement {
 
     const renderTime = performance.now() - start;
 
+    this.applyLayerVisibility();
     this.updateNavigatorContent();
 
     return renderTime;
+  }
+
+  applyLayerVisibility() {
+    const layersGroup = this.shadowRoot.querySelector('#preview-layers');
+    if (!layersGroup) return;
+    const visibility = store.get('layerVisibility');
+
+    for (const el of layersGroup.children) {
+      const name = el.dataset.layerName;
+      if (name && visibility[name] === false) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = '';
+      }
+    }
   }
 
   clear() {
@@ -330,9 +353,11 @@ export class SvgPreviewPane extends HTMLElement {
     const navBg = this.shadowRoot.querySelector('#navigator-bg');
     const navSvg = this.shadowRoot.querySelector('#navigator-svg');
 
-    // Combine all layer paths for navigator display (skip text elements)
+    // Combine all visible layer paths for navigator display (skip text elements and hidden layers)
     const layersGroup = this.shadowRoot.querySelector('#preview-layers');
-    const layerPaths = layersGroup ? Array.from(layersGroup.querySelectorAll('path')) : [];
+    const layerPaths = layersGroup
+      ? Array.from(layersGroup.querySelectorAll('path')).filter(p => p.style.display !== 'none')
+      : [];
     if (layerPaths.length > 0) {
       const combined = layerPaths.map(p => p.getAttribute('d') || '').filter(Boolean).join(' ');
       navPath.setAttribute('d', combined);
@@ -571,6 +596,13 @@ export class SvgPreviewPane extends HTMLElement {
           }
         }
 
+        layers-panel {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          z-index: 10;
+        }
+
         #preview-container {
           position: relative;
           display: flex;
@@ -715,6 +747,8 @@ export class SvgPreviewPane extends HTMLElement {
           to { transform: rotate(360deg); }
         }
       </style>
+
+      <layers-panel></layers-panel>
 
       <div id="zoom-navigator">
         <svg id="navigator-svg">
