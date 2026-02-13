@@ -526,4 +526,120 @@ describe('Multi-Layer Support', () => {
       expect(result.layers[0].textElements![2].x).toBe(100);
     });
   });
+
+  describe('for/if/let inside text blocks', () => {
+    it('supports for loop inside text block to generate tspans', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(100, 100) {
+            for (i in 0..2) {
+              tspan(20, 0)\`item \${i}\`
+            }
+          }
+        }
+      `);
+      expect(result.layers[0].textElements).toHaveLength(1);
+      const te = result.layers[0].textElements![0];
+      expect(te.children).toHaveLength(3);
+      expect(te.children[0]).toEqual({ type: 'tspan', text: 'item 0', dx: 20, dy: 0, rotation: undefined });
+      expect(te.children[1]).toEqual({ type: 'tspan', text: 'item 1', dx: 20, dy: 0, rotation: undefined });
+      expect(te.children[2]).toEqual({ type: 'tspan', text: 'item 2', dx: 20, dy: 0, rotation: undefined });
+    });
+
+    it('supports if statement inside text block', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(10, 20) {
+            if (1) {
+              tspan(0, 16)\`visible\`
+            } else {
+              tspan(0, 16)\`hidden\`
+            }
+          }
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.children).toHaveLength(1);
+      expect(te.children[0]).toEqual({ type: 'tspan', text: 'visible', dx: 0, dy: 16, rotation: undefined });
+    });
+
+    it('supports if-else inside text block (false branch)', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(10, 20) {
+            if (0) {
+              tspan(0, 16)\`visible\`
+            } else {
+              tspan(0, 16)\`fallback\`
+            }
+          }
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.children).toHaveLength(1);
+      expect(te.children[0]).toMatchObject({ type: 'tspan', text: 'fallback' });
+    });
+
+    it('supports let declaration inside text block', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(10, 20) {
+            let prefix = "item";
+            tspan(0, 16)\`\${prefix} A\`
+            tspan(0, 16)\`\${prefix} B\`
+          }
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.children).toHaveLength(2);
+      expect(te.children[0]).toMatchObject({ type: 'tspan', text: 'item A' });
+      expect(te.children[1]).toMatchObject({ type: 'tspan', text: 'item B' });
+    });
+
+    it('supports nested for loop inside text block', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(10, 20) {
+            for (row in 0..1) {
+              for (col in 0..1) {
+                tspan(0, 16)\`r\${row}c\${col}\`
+              }
+            }
+          }
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.children).toHaveLength(4);
+      expect(te.children[0]).toMatchObject({ type: 'tspan', text: 'r0c0' });
+      expect(te.children[1]).toMatchObject({ type: 'tspan', text: 'r0c1' });
+      expect(te.children[2]).toMatchObject({ type: 'tspan', text: 'r1c0' });
+      expect(te.children[3]).toMatchObject({ type: 'tspan', text: 'r1c1' });
+    });
+
+    it('supports mixed content with for loops in text block', () => {
+      const result = compile(`
+        define TextLayer('labels') {}
+        layer('labels').apply {
+          text(10, 20) {
+            \`Header\`
+            for (i in 0..1) {
+              tspan(0, 16)\`line \${i}\`
+            }
+            \`Footer\`
+          }
+        }
+      `);
+      const te = result.layers[0].textElements![0];
+      expect(te.children).toHaveLength(4);
+      expect(te.children[0]).toEqual({ type: 'run', text: 'Header' });
+      expect(te.children[1]).toMatchObject({ type: 'tspan', text: 'line 0' });
+      expect(te.children[2]).toMatchObject({ type: 'tspan', text: 'line 1' });
+      expect(te.children[3]).toEqual({ type: 'run', text: 'Footer' });
+    });
+  });
 });

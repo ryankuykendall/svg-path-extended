@@ -134,6 +134,56 @@ Option 1 — investigate and fix the evaluation order. The current behavior is u
 
 ---
 
+## ISSUE-003: Layers menu disappears when code references an undefined layer
+
+**Discovered:** 2026-02-13 (during layer system testing)
+
+**Severity:** Low
+
+**Description:**
+
+When a user writes `layer('some-layer').apply { ... }` but `'some-layer'` has not been defined with a `define` statement, the compiler throws an `Undefined layer` error. Because the entire compilation fails, no `CompileResult` is produced, and the Layers menu in the playground disappears entirely — not just the invalid layer, but all previously visible layers.
+
+**Example:**
+
+```
+define PathLayer('outline') { stroke: black; }
+layer('outline').apply { M 0 0 L 100 100 }
+layer('details').apply { M 50 50 L 75 75 }   // 'details' not defined → error
+```
+
+The `outline` layer was valid and visible in the Layers menu before the third line was added, but the compilation error causes the entire menu to vanish.
+
+**Impact:**
+
+1. **Discoverability loss:** Users lose visibility of layers they've already defined while in the middle of writing new layer references
+2. **Confusing UX:** The Layers menu appearing and disappearing based on parse/eval success feels unstable
+
+**Current Workarounds:**
+
+1. Always `define` a layer before writing `layer(...).apply` blocks
+2. Check the error panel — the error message clearly states which layer is undefined
+
+**Potential Solutions:**
+
+1. **Partial compilation:** Run compilation in two passes — first collect layer definitions, then evaluate apply blocks. If an apply block fails, still report the defined layers
+   - Pro: Best UX, layers stay visible during editing
+   - Con: Significant compiler architecture change
+
+2. **Cache last successful layer list:** Keep the previous Layers menu state when compilation fails
+   - Pro: Simple to implement in the playground
+   - Con: Stale data could be confusing (showing layers that no longer exist in the code)
+
+3. **Extract layer definitions without full compilation:** A lightweight regex/parse pass that finds `define ... Layer(...)` statements for the menu, independent of full compilation
+   - Pro: Fast, decoupled from compilation success
+   - Con: Duplicates parsing logic, could drift out of sync
+
+**Recommended Long-term Solution:**
+
+Option 2 (cache last successful layer list) is the most pragmatic short-term fix. Option 1 (partial compilation) would be ideal long-term but requires rethinking the single-pass evaluator architecture.
+
+---
+
 ## Template for New Issues
 
 ```markdown

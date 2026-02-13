@@ -623,11 +623,62 @@ const tspanStatement: Parsimmon.Parser<TspanStatement> = P.seqMap(
   })
 );
 
-// text() block body: mixed bare template literals and tspan statements
-const textBlockBody: Parsimmon.Parser<TextBodyItem[]> = P.alt(
-  tspanStatement as Parsimmon.Parser<TextBodyItem>,
-  templateLiteral as Parsimmon.Parser<TextBodyItem>,
-).many();
+// text() block body: mixed bare template literals, tspan statements, for loops, if statements, let declarations
+// Uses P.lazy() because textForLoop/textIfStatement reference textBlock which references textBlockBody
+const textBlockBody: Parsimmon.Parser<TextBodyItem[]> = P.lazy(() =>
+  P.alt(
+    tspanStatement as Parsimmon.Parser<TextBodyItem>,
+    templateLiteral as Parsimmon.Parser<TextBodyItem>,
+    textForLoop as Parsimmon.Parser<TextBodyItem>,
+    textIfStatement as Parsimmon.Parser<TextBodyItem>,
+    letDeclaration as Parsimmon.Parser<TextBodyItem>,
+  ).many()
+);
+
+// Text-specific block: { textBlockBody } — used by textForLoop and textIfStatement
+const textBlock: Parsimmon.Parser<TextBodyItem[]> =
+  P.seq(word('{'), textBlockBody, word('}')).map(([, items]) => items);
+
+// For loop inside text blocks — body contains text items instead of statements
+const textForLoop: Parsimmon.Parser<ForLoop> = P.seqMap(
+  P.index,
+  keyword('for'),
+  word('('),
+  nonReservedIdentifier,
+  keyword('in'),
+  rangeValue,
+  token(P.string('..')),
+  rangeValue,
+  word(')'),
+  textBlock,
+  (startIndex, _for, _lp, id, _in, start, _dots, end, _rp, body) => ({
+    type: 'ForLoop' as const,
+    variable: id.name,
+    start,
+    end,
+    body: body as unknown as Statement[],
+    loc: indexToLoc(startIndex),
+  })
+);
+
+// If statement inside text blocks — branches contain text items instead of statements
+const textIfStatement: Parsimmon.Parser<IfStatement> = P.seqMap(
+  keyword('if'),
+  word('('),
+  expression,
+  word(')'),
+  textBlock,
+  P.seq(keyword('else'), P.alt(
+    P.lazy(() => textIfStatement).map(stmt => [stmt]),
+    textBlock
+  )).map(([, b]) => b).fallback(null),
+  (_if, _lp, condition, _rp, consequent, alternate) => ({
+    type: 'IfStatement' as const,
+    condition,
+    consequent: consequent as unknown as Statement[],
+    alternate: alternate as unknown as Statement[] | null,
+  })
+);
 
 // text statement: text(x, y)`content` or text(x, y) { `text` tspan()... }
 const textStatement: Parsimmon.Parser<TextStatement> = P.seqMap(

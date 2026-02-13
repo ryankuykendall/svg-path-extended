@@ -17,6 +17,7 @@ import type {
   TemplateLiteral,
   TextStatement,
   TspanStatement,
+  TextBodyItem,
 } from '../parser/ast';
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import {
@@ -1020,6 +1021,64 @@ function parseAndTrackPathString(pathStr: string, scope: Scope): void {
 }
 
 /**
+ * Evaluate text body items (TemplateLiteral, TspanStatement, ForLoop, IfStatement, LetDeclaration)
+ * into TextChild array. Used by TextStatement block form evaluation.
+ */
+function evaluateTextBody(items: TextBodyItem[], scope: Scope, children: TextChild[]): void {
+  for (const item of items) {
+    if (item.type === 'TemplateLiteral') {
+      const text = evaluateTemplateLiteral(item, scope);
+      children.push({ type: 'run', text });
+    } else if (item.type === 'TspanStatement') {
+      const text = evaluateTemplateLiteral(item.content, scope);
+      const dx = item.dx ? requireNumber(evaluateExpression(item.dx, scope), 'tspan() dx') : undefined;
+      const dy = item.dy ? requireNumber(evaluateExpression(item.dy, scope), 'tspan() dy') : undefined;
+      const rot = item.rotation ? requireNumber(evaluateExpression(item.rotation, scope), 'tspan() rotation') : undefined;
+      children.push({ type: 'tspan', text, dx, dy, rotation: rot });
+    } else if (item.type === 'ForLoop') {
+      const start = requireNumber(evaluateExpression(item.start, scope), 'for loop start');
+      const end = requireNumber(evaluateExpression(item.end, scope), 'for loop end');
+
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        throw new Error('for loop range must be finite (got Infinity or NaN)');
+      }
+
+      const MAX_ITERATIONS = 10000;
+      const ascending = start <= end;
+      const iterations = ascending ? (end - start + 1) : (start - end + 1);
+      if (iterations > MAX_ITERATIONS) {
+        throw new Error(`for loop would run ${iterations} iterations (max ${MAX_ITERATIONS})`);
+      }
+
+      if (ascending) {
+        for (let i = start; i <= end; i++) {
+          const loopScope = createScope(scope);
+          setVariable(loopScope, item.variable, i);
+          evaluateTextBody(item.body as TextBodyItem[], loopScope, children);
+        }
+      } else {
+        for (let i = start; i >= end; i--) {
+          const loopScope = createScope(scope);
+          setVariable(loopScope, item.variable, i);
+          evaluateTextBody(item.body as TextBodyItem[], loopScope, children);
+        }
+      }
+    } else if (item.type === 'IfStatement') {
+      const condition = evaluateExpression(item.condition, scope);
+      const isTruthy = typeof condition === 'number' ? condition !== 0 : Boolean(condition);
+      if (isTruthy) {
+        evaluateTextBody(item.consequent as TextBodyItem[], scope, children);
+      } else if (item.alternate) {
+        evaluateTextBody(item.alternate as TextBodyItem[], scope, children);
+      }
+    } else if (item.type === 'LetDeclaration') {
+      const value = evaluateExpression(item.value, scope);
+      setVariable(scope, item.name, value);
+    }
+  }
+}
+
+/**
  * Evaluate a statement, appending output to the accumulator array.
  * Using an accumulator avoids O(n^2) string concatenation from nested joins.
  */
@@ -1243,21 +1302,9 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
         const text = evaluateTemplateLiteral(stmt.content, scope);
         activeTextLayer.textElements.push({ x, y, rotation, children: [{ type: 'run', text }] });
       } else if (stmt.body) {
-        // Block form: text(x, y) { `text` tspan()... }
+        // Block form: text(x, y) { `text` tspan() for/if/let... }
         const children: TextChild[] = [];
-        for (const item of stmt.body) {
-          if (item.type === 'TemplateLiteral') {
-            const text = evaluateTemplateLiteral(item, scope);
-            children.push({ type: 'run', text });
-          } else {
-            // TspanStatement
-            const text = evaluateTemplateLiteral(item.content, scope);
-            const dx = item.dx ? requireNumber(evaluateExpression(item.dx, scope), 'tspan() dx') : undefined;
-            const dy = item.dy ? requireNumber(evaluateExpression(item.dy, scope), 'tspan() dy') : undefined;
-            const rot = item.rotation ? requireNumber(evaluateExpression(item.rotation, scope), 'tspan() rotation') : undefined;
-            children.push({ type: 'tspan', text, dx, dy, rotation: rot });
-          }
-        }
+        evaluateTextBody(stmt.body, scope, children);
         activeTextLayer.textElements.push({ x, y, rotation, children });
       }
       return;

@@ -1,9 +1,35 @@
 // CodeMirror 6 configuration and completions for svg-path-extended
 
+// SVG style property completions (offered inside define ... { } blocks)
+const stylePropertyCompletions = [
+  { label: 'stroke', info: 'stroke color' },
+  { label: 'stroke-width', info: 'stroke width' },
+  { label: 'stroke-dasharray', info: 'dash pattern' },
+  { label: 'stroke-linecap', info: 'line cap style (butt, round, square)' },
+  { label: 'stroke-linejoin', info: 'line join style (miter, round, bevel)' },
+  { label: 'stroke-opacity', info: 'stroke opacity' },
+  { label: 'fill', info: 'fill color' },
+  { label: 'fill-opacity', info: 'fill opacity' },
+  { label: 'fill-rule', info: 'fill rule (nonzero, evenodd)' },
+  { label: 'opacity', info: 'overall opacity' },
+  { label: 'font-family', info: 'font family' },
+  { label: 'font-size', info: 'font size' },
+  { label: 'font-weight', info: 'font weight' },
+  { label: 'font-style', info: 'font style' },
+  { label: 'text-anchor', info: 'text anchor (start, middle, end)' },
+  { label: 'text-decoration', info: 'text decoration' },
+  { label: 'dominant-baseline', info: 'vertical alignment' },
+  { label: 'letter-spacing', info: 'letter spacing' },
+];
+
 // Stdlib completions for autocomplete (ordered by priority)
 export const stdlibCompletions = [
   // ctx object (used with polar/tangent functions)
   { label: 'ctx', type: 'variable', info: 'ctx - Path context object' },
+
+  // Layer types
+  { label: 'PathLayer', type: 'keyword', info: "PathLayer('name') - Path layer type for define" },
+  { label: 'TextLayer', type: 'keyword', info: "TextLayer('name') - Text layer type for define" },
 
   // 1. Polar Coordinate functions
   { label: 'polarPoint', type: 'function', info: 'polarPoint(angle, distance) - Point at polar offset' },
@@ -134,6 +160,34 @@ export const snippetTemplates = [
     template: 'for (row in 0..rows) {\n  for (col in 0..cols) {\n    \n  }\n}',
     cursorOffset: 13,
   },
+  {
+    label: 'define',
+    type: 'keyword',
+    info: 'define a layer with styles',
+    template: "define PathLayer('name') { stroke: #000; stroke-width: 2; }",
+    cursorOffset: 18,
+  },
+  {
+    label: 'layer',
+    type: 'keyword',
+    info: 'layer apply block - send output to a named layer',
+    template: "layer('name').apply {\n  \n}",
+    cursorOffset: 7,
+  },
+  {
+    label: 'text',
+    type: 'keyword',
+    info: 'text element (inline or block form)',
+    template: "text(100, 100)`content`",
+    cursorOffset: 15,
+  },
+  {
+    label: 'tspan',
+    type: 'keyword',
+    info: 'text span inside text() block',
+    template: "tspan(0, 20)`content`",
+    cursorOffset: 13,
+  },
 ];
 
 // Completion source for svg-path-extended
@@ -235,6 +289,39 @@ export function svgPathCompletions(context) {
             { label: 'angle', type: 'property', info: `${obj}.angle - Tangent angle (radians)`, boost: 2 },
           ],
           validFor: /^\w*$/,
+        };
+      }
+    }
+  }
+
+  // Check if we're inside a define ... { } block for style property completions
+  const styleWord = context.matchBefore(/[\w-]*/);
+  if (styleWord && (styleWord.from < styleWord.to || context.explicit)) {
+    const textBefore = context.state.doc.sliceString(0, styleWord.from);
+    // Check if we're inside an unclosed define block: find last 'define' and check brace balance
+    const lastDefine = textBefore.lastIndexOf('define');
+    if (lastDefine !== -1) {
+      const afterDefine = textBefore.slice(lastDefine);
+      const openBraces = (afterDefine.match(/\{/g) || []).length;
+      const closeBraces = (afterDefine.match(/\}/g) || []).length;
+      if (openBraces > closeBraces) {
+        // We're inside a define block — offer style property completions
+        let boost = 100;
+        return {
+          from: styleWord.from,
+          options: stylePropertyCompletions.map(prop => ({
+            label: prop.label,
+            type: 'property',
+            info: prop.info,
+            boost: boost--,
+            apply: (view, completion, from, to) => {
+              view.dispatch({
+                changes: { from, to, insert: prop.label + ': ' },
+                selection: { anchor: from + prop.label.length + 2 },
+              });
+            },
+          })),
+          validFor: /^[\w-]*$/,
         };
       }
     }

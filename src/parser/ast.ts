@@ -172,7 +172,7 @@ export interface TemplateLiteral {
 }
 
 // text(x, y)`content` or text(x, y) { `text` tspan()... }
-export type TextBodyItem = TspanStatement | TemplateLiteral;
+export type TextBodyItem = TspanStatement | TemplateLiteral | ForLoop | IfStatement | LetDeclaration;
 
 export interface TextStatement {
   type: 'TextStatement';
