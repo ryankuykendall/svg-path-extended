@@ -209,7 +209,8 @@ export class SvgPreviewPane extends HTMLElement {
     const layersGroup = this.shadowRoot.querySelector('#preview-layers');
     if (layersGroup) layersGroup.innerHTML = '';
     store.set('pathData', '');
-    this.shadowRoot.querySelector('#navigator-path').setAttribute('d', '');
+    const navPaths = this.shadowRoot.querySelector('#navigator-paths');
+    if (navPaths) navPaths.innerHTML = '';
     store.update({ zoomLevel: 1, panX: 0, panY: 0 });
     this.updateViewBox();
   }
@@ -233,11 +234,17 @@ export class SvgPreviewPane extends HTMLElement {
     const viewWidth = width / zoomLevel;
     const viewHeight = height / zoomLevel;
 
-    // Clamp pan values
-    const maxPanX = Math.max(0, width - viewWidth);
-    const maxPanY = Math.max(0, height - viewHeight);
-    panX = Math.max(0, Math.min(panX, maxPanX));
-    panY = Math.max(0, Math.min(panY, maxPanY));
+    // Clamp pan values; center canvas when zoomed out
+    if (viewWidth >= width) {
+      panX = -(viewWidth - width) / 2;
+    } else {
+      panX = Math.max(0, Math.min(panX, width - viewWidth));
+    }
+    if (viewHeight >= height) {
+      panY = -(viewHeight - height) / 2;
+    } else {
+      panY = Math.max(0, Math.min(panY, height - viewHeight));
+    }
 
     // Update store with clamped values
     store.update({ panX, panY });
@@ -308,16 +315,11 @@ export class SvgPreviewPane extends HTMLElement {
   doPan(e) {
     if (!this.isPanning) return;
 
-    const width = store.get('width');
-    const height = store.get('height');
-    const zoomLevel = store.get('zoomLevel');
-    const rect = this.preview.getBoundingClientRect();
+    const ctm = this.preview.getScreenCTM();
+    if (!ctm) return;
 
-    const scaleX = (width / zoomLevel) / rect.width;
-    const scaleY = (height / zoomLevel) / rect.height;
-
-    const dx = (this.panStartX - e.clientX) * scaleX;
-    const dy = (this.panStartY - e.clientY) * scaleY;
+    const dx = (this.panStartX - e.clientX) / ctm.a;
+    const dy = (this.panStartY - e.clientY) / ctm.d;
 
     store.update({
       panX: store.get('panX') + dx,
@@ -354,23 +356,58 @@ export class SvgPreviewPane extends HTMLElement {
   }
 
   updateNavigatorContent() {
-    const navPath = this.shadowRoot.querySelector('#navigator-path');
+    const navGroup = this.shadowRoot.querySelector('#navigator-paths');
     const navBg = this.shadowRoot.querySelector('#navigator-bg');
     const navSvg = this.shadowRoot.querySelector('#navigator-svg');
+    const SVG_NS = 'http://www.w3.org/2000/svg';
 
-    // Combine all visible layer paths for navigator display (skip text elements and hidden layers)
+    // Clear existing navigator content
+    navGroup.innerHTML = '';
+
+    // Build per-layer paths in the navigator, preserving individual styles
     const layersGroup = this.shadowRoot.querySelector('#preview-layers');
-    const layerPaths = layersGroup
-      ? Array.from(layersGroup.querySelectorAll('path')).filter(p => p.style.display !== 'none')
+    const visibleElements = layersGroup
+      ? Array.from(layersGroup.children).filter(el => el.style.display !== 'none')
       : [];
-    if (layerPaths.length > 0) {
-      const combined = layerPaths.map(p => p.getAttribute('d') || '').filter(Boolean).join(' ');
-      navPath.setAttribute('d', combined);
+
+    if (visibleElements.length > 0) {
+      for (const el of visibleElements) {
+        if (el.tagName === 'path') {
+          const navPath = document.createElementNS(SVG_NS, 'path');
+          navPath.setAttribute('d', el.getAttribute('d') || '');
+          navPath.setAttribute('stroke', el.getAttribute('stroke') || store.get('stroke'));
+          navPath.setAttribute('stroke-width', Math.max(parseFloat(el.getAttribute('stroke-width')) || store.get('strokeWidth'), 1));
+          navPath.setAttribute('fill', el.getAttribute('fill') || 'none');
+          // Copy additional style attributes (dasharray scaled to screen pixels)
+          for (const attr of ['stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'opacity', 'fill-rule']) {
+            const val = el.getAttribute(attr);
+            if (val) navPath.setAttribute(attr, val);
+          }
+          navGroup.appendChild(navPath);
+        } else if (el.tagName === 'text') {
+          // Text is illegible at navigator scale; render a small circle indicator
+          const x = parseFloat(el.getAttribute('x')) || 0;
+          const y = parseFloat(el.getAttribute('y')) || 0;
+          const indicator = document.createElementNS(SVG_NS, 'circle');
+          indicator.setAttribute('cx', String(x));
+          indicator.setAttribute('cy', String(y));
+          indicator.setAttribute('r', '3');
+          indicator.setAttribute('fill', el.getAttribute('fill') || el.getAttribute('stroke') || store.get('stroke'));
+          navGroup.appendChild(indicator);
+        }
+      }
     } else {
-      navPath.setAttribute('d', this.previewPath.getAttribute('d') || '');
+      // Fallback: single preview-path (no layers)
+      const d = this.previewPath.getAttribute('d') || '';
+      if (d) {
+        const navPath = document.createElementNS(SVG_NS, 'path');
+        navPath.setAttribute('d', d);
+        navPath.setAttribute('stroke', store.get('stroke'));
+        navPath.setAttribute('stroke-width', Math.max(store.get('strokeWidth'), 1));
+        navPath.setAttribute('fill', 'none');
+        navGroup.appendChild(navPath);
+      }
     }
-    navPath.setAttribute('stroke', store.get('stroke'));
-    navPath.setAttribute('stroke-width', 1);
 
     const width = store.get('width');
     const height = store.get('height');
@@ -610,9 +647,9 @@ export class SvgPreviewPane extends HTMLElement {
 
         #preview-container {
           position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          width: 100%;
+          flex: 1;
+          min-height: 0;
           border-radius: var(--radius-lg, 12px);
           overflow: hidden;
           box-shadow: var(--shadow-lg);
@@ -620,8 +657,12 @@ export class SvgPreviewPane extends HTMLElement {
 
         #preview {
           display: block;
-          max-width: 100%;
-          max-height: 100%;
+          width: 100%;
+          height: 100%;
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          translate: -50% -50%;
         }
 
         #preview-container.can-pan {
@@ -758,7 +799,7 @@ export class SvgPreviewPane extends HTMLElement {
       <div id="zoom-navigator">
         <svg id="navigator-svg">
           <rect id="navigator-bg" width="100%" height="100%"></rect>
-          <path id="navigator-path" fill="none"></path>
+          <g id="navigator-paths"></g>
           <rect id="navigator-viewport" fill="none" stroke="var(--accent-color, #10b981)" stroke-width="1" vector-effect="non-scaling-stroke"></rect>
         </svg>
       </div>
