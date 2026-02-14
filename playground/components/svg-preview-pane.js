@@ -143,8 +143,13 @@ export class SvgPreviewPane extends HTMLElement {
 
         // Apply per-layer styles, fall back to store defaults
         const state = store.getAll();
+        const hasCustomStroke = !!layer.styles['stroke'];
+        const hasCustomStrokeWidth = !!layer.styles['stroke-width'];
         path.setAttribute('stroke', layer.styles['stroke'] || state.stroke);
         path.setAttribute('stroke-width', layer.styles['stroke-width'] || state.strokeWidth);
+        // Mark per-layer styles so updateSvgStyles() won't overwrite them
+        if (hasCustomStroke) path.dataset.hasLayerStroke = 'true';
+        if (hasCustomStrokeWidth) path.dataset.hasLayerStrokeWidth = 'true';
         if (layer.styles['fill']) {
           path.setAttribute('fill', layer.styles['fill']);
         } else {

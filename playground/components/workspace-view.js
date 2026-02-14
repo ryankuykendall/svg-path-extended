@@ -81,7 +81,7 @@ export class WorkspaceView extends HTMLElement {
         // Generate thumbnail if content changed since last thumbnail
         thumbnailService.generateIfDirty(
           this._currentWorkspaceId,
-          () => this.previewPane?.shadowRoot?.querySelector('svg'),
+          () => this.previewPane?.shadowRoot?.querySelector('#preview'),
           store.getAll()
         );
         thumbnailService.stopAutoGeneration();
@@ -434,7 +434,7 @@ export class WorkspaceView extends HTMLElement {
     // Export with legend
     this._handleExportLegend = () => {
       if (store.get('currentView') === 'workspace') {
-        const svgElement = this.previewPane.shadowRoot?.querySelector('svg');
+        const svgElement = this.previewPane.shadowRoot?.querySelector('#preview');
         if (svgElement) {
           this.exportLegendModal.open(svgElement, store.getAll());
         }
@@ -454,7 +454,7 @@ export class WorkspaceView extends HTMLElement {
     // Set thumbnail (crop modal)
     this._handleSetThumbnail = () => {
       if (store.get('currentView') === 'workspace') {
-        const svgElement = this.previewPane.shadowRoot?.querySelector('svg');
+        const svgElement = this.previewPane.shadowRoot?.querySelector('#preview');
         if (svgElement) {
           this.thumbnailCropModal.open(svgElement, store.getAll());
         }
@@ -468,7 +468,7 @@ export class WorkspaceView extends HTMLElement {
       const { workspaceId } = e.detail;
       if (workspaceId !== this._currentWorkspaceId) return;
 
-      const svgElement = this.previewPane?.shadowRoot?.querySelector('svg');
+      const svgElement = this.previewPane?.shadowRoot?.querySelector('#preview');
       if (svgElement) {
         thumbnailService.generateIfDirty(workspaceId, () => svgElement, store.getAll());
       }
@@ -480,7 +480,7 @@ export class WorkspaceView extends HTMLElement {
       if (store.get('currentView') === 'workspace' && this._currentWorkspaceId) {
         thumbnailService.generateIfDirty(
           this._currentWorkspaceId,
-          () => this.previewPane?.shadowRoot?.querySelector('svg'),
+          () => this.previewPane?.shadowRoot?.querySelector('#preview'),
           store.getAll()
         );
       }
@@ -510,7 +510,7 @@ export class WorkspaceView extends HTMLElement {
   }
 
   copySvg() {
-    const svgElement = this.previewPane.shadowRoot?.querySelector('svg');
+    const svgElement = this.previewPane.shadowRoot?.querySelector('#preview');
     if (svgElement) {
       const svgString = svgElement.outerHTML;
       navigator.clipboard.writeText(svgString).catch(err => {

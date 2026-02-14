@@ -3,6 +3,7 @@
 
 import { store } from '../state/store.js';
 import thumbnailService from '../services/thumbnail-service.js';
+import { createSvgSnapshot } from '../utils/svg-snapshot.js';
 
 const ACCENT = '#10b981';
 const ACCENT_LIGHT = 'rgba(16, 185, 129, 0.35)';
@@ -406,60 +407,20 @@ class ThumbnailCropModal extends HTMLElement {
 
   // --- SVG building ---
 
-  _cloneSvgWithoutGrid(svgElement) {
-    const clone = svgElement.cloneNode(true);
-    const defs = clone.querySelector('defs');
-    if (defs) {
-      const gridPattern = defs.querySelector('pattern[id*="grid"]');
-      if (gridPattern) gridPattern.remove();
-      if (defs.children.length === 0) defs.remove();
-    }
-    clone.querySelectorAll('rect[fill^="url(#"]').forEach(rect => {
-      const fill = rect.getAttribute('fill');
-      if (fill && fill.includes('grid')) rect.remove();
-    });
-    return clone;
-  }
-
   _buildPreviewSvg() {
     const previewArea = this.shadowRoot.querySelector('.preview-area');
     const oldSvg = previewArea.querySelector('svg');
     if (oldSvg) oldSvg.remove();
 
     const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('xmlns', ns);
-    svg.setAttribute('width', this._canvasWidth);
-    svg.setAttribute('height', this._canvasHeight);
-    svg.setAttribute('viewBox', `0 0 ${this._canvasWidth} ${this._canvasHeight}`);
+    const svg = createSvgSnapshot(this._svgElement, {
+      background: this._storeState.background || '#f5f5f5',
+    });
 
-    // Clone the source SVG content (without grid)
-    const clone = this._cloneSvgWithoutGrid(this._svgElement);
-
-    // Copy all child elements from clone into our SVG
-    // First: background rect
-    const bg = document.createElementNS(ns, 'rect');
-    bg.setAttribute('width', this._canvasWidth);
-    bg.setAttribute('height', this._canvasHeight);
-    bg.setAttribute('fill', this._storeState.background || '#f5f5f5');
-    svg.appendChild(bg);
-
-    // Copy path elements
-    const pathEl = clone.querySelector('path');
-    if (pathEl) {
-      const newPath = document.createElementNS(ns, 'path');
-      newPath.setAttribute('d', pathEl.getAttribute('d') || '');
-      newPath.setAttribute('stroke', this._storeState.stroke || '#000000');
-      newPath.setAttribute('stroke-width', this._storeState.strokeWidth || 2);
-      newPath.setAttribute('fill', this._storeState.fillEnabled ? (this._storeState.fill || 'none') : 'none');
-      svg.appendChild(newPath);
-    }
-
-    // Crop overlay group
+    // Add crop overlay on top
     const cropGroup = document.createElementNS(ns, 'g');
     cropGroup.setAttribute('id', 'crop-overlay');
     svg.appendChild(cropGroup);
-
     this._buildCropOverlay(cropGroup);
 
     previewArea.appendChild(svg);
@@ -636,31 +597,12 @@ class ThumbnailCropModal extends HTMLElement {
       { size: 256, canvasId: 'preview-256' },
     ];
 
-    // Create a temporary SVG just for the crop region (without overlay)
-    const ns = 'http://www.w3.org/2000/svg';
-    const tempSvg = document.createElementNS(ns, 'svg');
-    tempSvg.setAttribute('xmlns', ns);
-    tempSvg.setAttribute('width', '1024');
-    tempSvg.setAttribute('height', '1024');
-    tempSvg.setAttribute('viewBox', `${this._cropX} ${this._cropY} ${this._cropSize} ${this._cropSize}`);
-
-    // Background
-    const bg = document.createElementNS(ns, 'rect');
-    bg.setAttribute('x', this._cropX); bg.setAttribute('y', this._cropY);
-    bg.setAttribute('width', this._cropSize); bg.setAttribute('height', this._cropSize);
-    bg.setAttribute('fill', this._storeState.background || '#f5f5f5');
-    tempSvg.appendChild(bg);
-
-    // Path from current state
-    const pathData = this._storeState.pathData || '';
-    if (pathData) {
-      const path = document.createElementNS(ns, 'path');
-      path.setAttribute('d', pathData);
-      path.setAttribute('stroke', this._storeState.stroke || '#000000');
-      path.setAttribute('stroke-width', this._storeState.strokeWidth || 2);
-      path.setAttribute('fill', this._storeState.fillEnabled ? (this._storeState.fill || 'none') : 'none');
-      tempSvg.appendChild(path);
-    }
+    const tempSvg = createSvgSnapshot(this._svgElement, {
+      width: 1024,
+      height: 1024,
+      viewBox: `${this._cropX} ${this._cropY} ${this._cropSize} ${this._cropSize}`,
+      background: this._storeState.background || '#f5f5f5',
+    });
 
     // Serialize to image
     const serializer = new XMLSerializer();

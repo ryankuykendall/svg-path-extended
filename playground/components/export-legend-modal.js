@@ -2,6 +2,7 @@
 // Opens via custom event, not routed. Component-local state (not persisted in store).
 
 import { store } from '../state/store.js';
+import { createSvgSnapshot } from '../utils/svg-snapshot.js';
 
 // Accent color used for legend border and resize handle (matches app theme)
 const ACCENT = '#10b981';
@@ -555,6 +556,9 @@ class ExportLegendModal extends HTMLElement {
   // --- Public API ---
 
   open(svgElement, storeState) {
+    // Store SVG reference for rebuilds
+    this._svgElement = svgElement;
+
     // Snapshot workspace state for override merging
     this._workspaceState = { ...storeState };
     this._exportOverrides = { gridEnabled: null, gridColor: null, background: null, stroke: null };
@@ -629,7 +633,7 @@ class ExportLegendModal extends HTMLElement {
     // Rebuild with effective state
     this._legendWidth = savedWidth;
     this._scaleFactor = savedScale;
-    this._buildPreviewSvg(null, this._getEffectiveState());
+    this._buildPreviewSvg(this._svgElement, this._getEffectiveState());
 
     // Restore legend position and zoom/pan
     this._legendX = savedX;
@@ -649,51 +653,11 @@ class ExportLegendModal extends HTMLElement {
     const oldSvg = previewArea.querySelector('svg');
     if (oldSvg) oldSvg.remove();
 
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('xmlns', ns);
-    svg.setAttribute('width', this._canvasWidth);
-    svg.setAttribute('height', this._canvasHeight);
-    svg.setAttribute('viewBox', `0 0 ${this._canvasWidth} ${this._canvasHeight}`);
-
-    // Background
-    const bg = document.createElementNS(ns, 'rect');
-    bg.setAttribute('width', this._canvasWidth);
-    bg.setAttribute('height', this._canvasHeight);
-    bg.setAttribute('fill', state.background);
-    svg.appendChild(bg);
-
-    // Grid (if enabled)
-    if (state.gridEnabled) {
-      const defs = document.createElementNS(ns, 'defs');
-      const pattern = document.createElementNS(ns, 'pattern');
-      pattern.setAttribute('id', 'export-grid');
-      pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-      pattern.setAttribute('width', state.gridSize);
-      pattern.setAttribute('height', state.gridSize);
-      const gridPath = document.createElementNS(ns, 'path');
-      gridPath.setAttribute('d', `M ${state.gridSize} 0 L 0 0 0 ${state.gridSize}`);
-      gridPath.setAttribute('fill', 'none');
-      gridPath.setAttribute('stroke', state.gridColor);
-      gridPath.setAttribute('stroke-width', '0.5');
-      pattern.appendChild(gridPath);
-      defs.appendChild(pattern);
-      svg.appendChild(defs);
-
-      const gridRect = document.createElementNS(ns, 'rect');
-      gridRect.setAttribute('width', this._canvasWidth);
-      gridRect.setAttribute('height', this._canvasHeight);
-      gridRect.setAttribute('fill', 'url(#export-grid)');
-      svg.appendChild(gridRect);
-    }
-
-    // Path artwork
-    const path = document.createElementNS(ns, 'path');
-    path.setAttribute('d', state.pathData || '');
-    path.setAttribute('stroke', state.stroke);
-    path.setAttribute('stroke-width', state.strokeWidth);
-    path.setAttribute('fill', state.fillEnabled ? state.fill : 'none');
-    svg.appendChild(path);
+    const svg = createSvgSnapshot(sourceSvg || this._svgElement, {
+      includeGrid: state.gridEnabled,
+      gridColor: state.gridColor,
+      background: state.background,
+    });
 
     // Build legend first to measure height, then set initial position
     const margin = this._s(10);

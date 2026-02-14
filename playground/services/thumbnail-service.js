@@ -2,6 +2,7 @@
 // Rasterizes SVG → Web Worker (OffscreenCanvas) → PNG blobs → API upload
 
 import { thumbnailApi } from './api.js';
+import { createSvgSnapshot } from '../utils/svg-snapshot.js';
 
 const SIZES = [1024, 512, 256];
 const MAX_RASTER_SIZE = 4096; // Supersample ceiling (pixels) — balances quality vs memory
@@ -139,32 +140,6 @@ async function processOnMainThread(bitmap) {
 }
 
 /**
- * Clone an SVG element and remove grid elements (thumbnails always exclude grid).
- */
-function cloneSvgWithoutGrid(svgElement) {
-  const clone = svgElement.cloneNode(true);
-
-  // Remove grid pattern defs and grid rect
-  const defs = clone.querySelector('defs');
-  if (defs) {
-    const gridPattern = defs.querySelector('pattern[id*="grid"]');
-    if (gridPattern) gridPattern.remove();
-    // Remove defs if empty
-    if (defs.children.length === 0) defs.remove();
-  }
-
-  // Remove grid rect (filled with url(#...-grid))
-  clone.querySelectorAll('rect[fill^="url(#"]').forEach(rect => {
-    const fill = rect.getAttribute('fill');
-    if (fill && fill.includes('grid')) {
-      rect.remove();
-    }
-  });
-
-  return clone;
-}
-
-/**
  * Generate a thumbnail for a workspace.
  *
  * @param {string} workspaceId - Workspace ID
@@ -198,39 +173,33 @@ async function generateThumbnail(workspaceId, svgElement, storeState, cropRegion
       // bypassing DOM clone/serialize which can produce namespace issues.
       svgString = options.svgString;
     } else {
-      // 1. Clone SVG and remove grid
-      const clone = cloneSvgWithoutGrid(svgElement);
-
-      // 2. Determine crop viewBox
+      // 1. Determine crop viewBox
       const canvasWidth = storeState.width || 200;
       const canvasHeight = storeState.height || 200;
 
-      let cropSize;
+      let cropX, cropY, cropSize;
       if (cropRegion) {
-        // User-defined crop
-        clone.setAttribute('viewBox', `${cropRegion.x} ${cropRegion.y} ${cropRegion.size} ${cropRegion.size}`);
+        cropX = cropRegion.x;
+        cropY = cropRegion.y;
         cropSize = cropRegion.size;
       } else {
         // Auto center-crop: square crop = min(width, height), centered
         cropSize = Math.min(canvasWidth, canvasHeight);
-        const cropX = (canvasWidth - cropSize) / 2;
-        const cropY = (canvasHeight - cropSize) / 2;
-        clone.setAttribute('viewBox', `${cropX} ${cropY} ${cropSize} ${cropSize}`);
+        cropX = (canvasWidth - cropSize) / 2;
+        cropY = (canvasHeight - cropSize) / 2;
       }
 
-      // 3. Supersample: rasterize at up to 1:1 SVG-unit-to-pixel, capped at MAX_RASTER_SIZE.
-      //    For a crop of 800 units → rasterize at 800px (1:1).
-      //    For a crop of 8192 units → rasterize at 4096px (cap), then downscale.
-      //    Minimum is 1024 so small crops don't produce tiny rasters.
+      // 2. Supersample: rasterize at up to 1:1 SVG-unit-to-pixel, capped at MAX_RASTER_SIZE.
       const rasterSize = Math.max(1024, Math.min(Math.ceil(cropSize), MAX_RASTER_SIZE));
-      clone.setAttribute('width', String(rasterSize));
-      clone.setAttribute('height', String(rasterSize));
 
-      // 4. Strip inline styles (e.g. positioning from off-screen elements) that
-      //    could interfere with SVG-as-image rendering
-      clone.removeAttribute('style');
+      // 3. Clone SVG via shared snapshot utility
+      const clone = createSvgSnapshot(svgElement, {
+        width: rasterSize,
+        height: rasterSize,
+        viewBox: `${cropX} ${cropY} ${cropSize} ${cropSize}`,
+      });
 
-      // 5. Serialize SVG → Blob → object URL
+      // 4. Serialize SVG → Blob → object URL
       const serializer = new XMLSerializer();
       svgString = serializer.serializeToString(clone);
     }
