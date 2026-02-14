@@ -112,7 +112,6 @@ const styles = `
     cursor: pointer;
     transition: all var(--transition-base, 0.15s ease);
     box-shadow: var(--shadow-sm);
-    overflow: hidden;
   }
 
   .workspace-list.grid .workspace-item:hover {
@@ -126,6 +125,7 @@ const styles = `
     overflow: hidden;
     background: var(--bg-primary, #f1f5f9);
     border-bottom: 1px solid var(--border-color, #e2e8f0);
+    border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
   }
 
   .workspace-thumb img {
@@ -165,7 +165,6 @@ const styles = `
     box-shadow: var(--shadow-sm);
     display: flex;
     align-items: stretch;
-    overflow: hidden;
   }
 
   .workspace-list.list .workspace-item:hover {
@@ -179,6 +178,7 @@ const styles = `
     overflow: hidden;
     background: var(--bg-primary, #f1f5f9);
     flex-shrink: 0;
+    border-radius: var(--radius-lg, 12px) 0 0 var(--radius-lg, 12px);
   }
 
   .workspace-thumb-sm img {
