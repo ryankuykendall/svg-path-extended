@@ -92,10 +92,6 @@ export const store = createStore({
   preferences: {
     width: 200,
     height: 200,
-    stroke: '#000000',
-    strokeWidth: 2,
-    fillEnabled: false,
-    fill: '#3498db',
     background: '#f5f5f5',
     gridEnabled: true,
     gridColor: '#cccccc',
@@ -124,10 +120,6 @@ export const store = createStore({
   // SVG styles
   width: 200,
   height: 200,
-  stroke: '#000000',
-  strokeWidth: 2,
-  fillEnabled: false,
-  fill: '#3498db',
   background: '#f5f5f5',
   gridEnabled: true,
   gridColor: '#cccccc',

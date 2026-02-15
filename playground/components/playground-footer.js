@@ -16,7 +16,7 @@ export class PlaygroundFooter extends HTMLElement {
 
   subscribeToStore() {
     // Subscribe to relevant state changes
-    store.subscribe(['width', 'height', 'stroke', 'strokeWidth', 'fillEnabled', 'fill', 'background', 'gridEnabled', 'gridColor', 'gridSize', 'toFixed'], () => {
+    store.subscribe(['width', 'height', 'background', 'gridEnabled', 'gridColor', 'gridSize', 'toFixed'], () => {
       this.syncFromStore();
     });
   }
@@ -27,11 +27,6 @@ export class PlaygroundFooter extends HTMLElement {
 
     root.querySelector('#width').value = state.width;
     root.querySelector('#height').value = state.height;
-    root.querySelector('#stroke').value = state.stroke;
-    root.querySelector('#stroke-width').value = state.strokeWidth;
-    root.querySelector('#fill-enabled').checked = state.fillEnabled;
-    root.querySelector('#fill').value = state.fill;
-    root.querySelector('#fill').disabled = !state.fillEnabled;
     root.querySelector('#bg').value = state.background;
     root.querySelector('#grid-enabled').checked = state.gridEnabled;
     root.querySelector('#grid-color').value = state.gridColor;
@@ -50,29 +45,6 @@ export class PlaygroundFooter extends HTMLElement {
 
     root.querySelector('#height').addEventListener('input', (e) => {
       store.set('height', parseInt(e.target.value) || 200);
-      this.dispatchStyleChange();
-    });
-
-    // Stroke
-    root.querySelector('#stroke').addEventListener('input', (e) => {
-      store.set('stroke', e.target.value);
-      this.dispatchStyleChange();
-    });
-
-    root.querySelector('#stroke-width').addEventListener('change', (e) => {
-      store.set('strokeWidth', e.target.value);
-      this.dispatchStyleChange();
-    });
-
-    // Fill
-    root.querySelector('#fill-enabled').addEventListener('change', (e) => {
-      store.set('fillEnabled', e.target.checked);
-      root.querySelector('#fill').disabled = !e.target.checked;
-      this.dispatchStyleChange();
-    });
-
-    root.querySelector('#fill').addEventListener('input', (e) => {
-      store.set('fill', e.target.value);
       this.dispatchStyleChange();
     });
 
@@ -306,31 +278,6 @@ export class PlaygroundFooter extends HTMLElement {
         <div class="control-group">
           <label for="height">H</label>
           <input type="number" id="height" value="${state.height}" min="50" max="20000">
-        </div>
-
-        <div class="separator"></div>
-
-        <div class="control-group">
-          <label for="stroke">Stroke</label>
-          <input type="color" id="stroke" value="${state.stroke}">
-          <select id="stroke-width">
-            <option value="1" ${state.strokeWidth == 1 ? 'selected' : ''}>1px</option>
-            <option value="2" ${state.strokeWidth == 2 ? 'selected' : ''}>2px</option>
-            <option value="3" ${state.strokeWidth == 3 ? 'selected' : ''}>3px</option>
-            <option value="4" ${state.strokeWidth == 4 ? 'selected' : ''}>4px</option>
-            <option value="5" ${state.strokeWidth == 5 ? 'selected' : ''}>5px</option>
-            <option value="6" ${state.strokeWidth == 6 ? 'selected' : ''}>6px</option>
-            <option value="8" ${state.strokeWidth == 8 ? 'selected' : ''}>8px</option>
-            <option value="10" ${state.strokeWidth == 10 ? 'selected' : ''}>10px</option>
-          </select>
-        </div>
-
-        <div class="separator"></div>
-
-        <div class="control-group">
-          <label for="fill-enabled">Fill</label>
-          <input type="checkbox" id="fill-enabled" ${state.fillEnabled ? 'checked' : ''}>
-          <input type="color" id="fill" value="${state.fill}" ${state.fillEnabled ? '' : 'disabled'}>
         </div>
 
         <div class="separator"></div>

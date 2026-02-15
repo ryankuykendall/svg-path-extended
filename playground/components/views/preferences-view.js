@@ -220,10 +220,6 @@ const styles = `
 const DEFAULTS = {
   width: 200,
   height: 200,
-  stroke: '#000000',
-  strokeWidth: 2,
-  fillEnabled: false,
-  fill: '#3498db',
   background: '#f5f5f5',
   gridEnabled: true,
   gridColor: '#cccccc',
@@ -412,36 +408,6 @@ class PreferencesView extends HTMLElement {
             <div class="form-group">
               <label for="height">Height (px)</label>
               <input type="number" id="height" name="height" value="${prefs.height}" min="50" max="20000">
-            </div>
-          </div>
-
-          <div class="section">
-            <h2>Stroke</h2>
-            <div class="form-group">
-              <label for="stroke">Stroke Color</label>
-              <div class="color-input-group">
-                <input type="color" id="stroke" name="stroke" value="${prefs.stroke}">
-                <span class="color-value">${prefs.stroke}</span>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="strokeWidth">Stroke Width</label>
-              <input type="number" id="strokeWidth" name="strokeWidth" value="${prefs.strokeWidth}" min="0.5" max="20" step="0.5">
-            </div>
-          </div>
-
-          <div class="section">
-            <h2>Fill</h2>
-            <div class="form-group">
-              <label for="fillEnabled">Enable Fill</label>
-              <input type="checkbox" id="fillEnabled" name="fillEnabled" ${prefs.fillEnabled ? 'checked' : ''}>
-            </div>
-            <div class="form-group">
-              <label for="fill">Fill Color</label>
-              <div class="color-input-group">
-                <input type="color" id="fill" name="fill" value="${prefs.fill}">
-                <span class="color-value">${prefs.fill}</span>
-              </div>
             </div>
           </div>
 

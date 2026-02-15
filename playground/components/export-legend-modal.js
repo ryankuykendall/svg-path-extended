@@ -497,7 +497,7 @@ class ExportLegendModal extends HTMLElement {
     this._workspaceState = null;
 
     // Export overrides (non-null values override workspace state in preview)
-    this._exportOverrides = { gridEnabled: null, gridColor: null, background: null, stroke: null };
+    this._exportOverrides = { gridEnabled: null, gridColor: null };
 
     // Debounce handle for preview rebuilds
     this._rebuildRafId = null;
@@ -561,7 +561,7 @@ class ExportLegendModal extends HTMLElement {
 
     // Snapshot workspace state for override merging
     this._workspaceState = { ...storeState };
-    this._exportOverrides = { gridEnabled: null, gridColor: null, background: null, stroke: null };
+    this._exportOverrides = { gridEnabled: null, gridColor: null };
 
     this._canvasWidth = storeState.width;
     this._canvasHeight = storeState.height;
@@ -1004,8 +1004,6 @@ class ExportLegendModal extends HTMLElement {
     if (this._workspaceState) {
       root.querySelector('#export-grid-enabled').checked = this._workspaceState.gridEnabled;
       root.querySelector('#export-grid-color').value = this._workspaceState.gridColor || '#cccccc';
-      root.querySelector('#export-background').value = this._workspaceState.background || '#ffffff';
-      root.querySelector('#export-stroke').value = this._workspaceState.stroke || '#000000';
     }
   }
 
@@ -1283,14 +1281,6 @@ class ExportLegendModal extends HTMLElement {
       this._exportOverrides.gridColor = e.target.value;
       this._scheduleRebuild();
     });
-    root.querySelector('#export-background').addEventListener('input', (e) => {
-      this._exportOverrides.background = e.target.value;
-      this._scheduleRebuild();
-    });
-    root.querySelector('#export-stroke').addEventListener('input', (e) => {
-      this._exportOverrides.stroke = e.target.value;
-      this._scheduleRebuild();
-    });
 
     // Preview area mouse events (pan + legend drag + resize)
     const previewArea = root.querySelector('.preview-area');
@@ -1482,14 +1472,6 @@ class ExportLegendModal extends HTMLElement {
               <div class="advanced-row">
                 <label for="export-grid-color">Grid Color</label>
                 <input type="color" id="export-grid-color">
-              </div>
-              <div class="advanced-row">
-                <label for="export-background">Background</label>
-                <input type="color" id="export-background">
-              </div>
-              <div class="advanced-row">
-                <label for="export-stroke">Stroke Color</label>
-                <input type="color" id="export-stroke">
               </div>
             </div>
           </details>

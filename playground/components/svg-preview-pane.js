@@ -3,6 +3,9 @@
 import { store } from '../state/store.js';
 import './layers-panel.js';
 
+const DEFAULT_STROKE = '#000000';
+const DEFAULT_STROKE_WIDTH = 2;
+
 export class SvgPreviewPane extends HTMLElement {
   constructor() {
     super();
@@ -34,7 +37,7 @@ export class SvgPreviewPane extends HTMLElement {
   }
 
   subscribeToStore() {
-    store.subscribe(['width', 'height', 'stroke', 'strokeWidth', 'fillEnabled', 'fill', 'background', 'gridEnabled', 'gridColor', 'gridSize', 'zoomLevel', 'panX', 'panY', 'pathData'], () => {
+    store.subscribe(['width', 'height', 'background', 'gridEnabled', 'gridColor', 'gridSize', 'zoomLevel', 'panX', 'panY', 'pathData'], () => {
       this.updateSvgStyles();
     });
     store.subscribe('layerVisibility', () => {
@@ -141,20 +144,15 @@ export class SvgPreviewPane extends HTMLElement {
         path.setAttribute('d', layer.data || '');
         path.setAttribute('fill', 'none');
 
-        // Apply per-layer styles, fall back to store defaults
-        const state = store.getAll();
+        // Apply per-layer styles, fall back to hardcoded defaults
         const hasCustomStroke = !!layer.styles['stroke'];
         const hasCustomStrokeWidth = !!layer.styles['stroke-width'];
-        path.setAttribute('stroke', layer.styles['stroke'] || state.stroke);
-        path.setAttribute('stroke-width', layer.styles['stroke-width'] || state.strokeWidth);
+        path.setAttribute('stroke', layer.styles['stroke'] || DEFAULT_STROKE);
+        path.setAttribute('stroke-width', layer.styles['stroke-width'] || DEFAULT_STROKE_WIDTH);
         // Mark per-layer styles so updateSvgStyles() won't overwrite them
         if (hasCustomStroke) path.dataset.hasLayerStroke = 'true';
         if (hasCustomStrokeWidth) path.dataset.hasLayerStrokeWidth = 'true';
-        if (layer.styles['fill']) {
-          path.setAttribute('fill', layer.styles['fill']);
-        } else {
-          path.setAttribute('fill', state.fillEnabled ? state.fill : 'none');
-        }
+        path.setAttribute('fill', layer.styles['fill'] || 'none');
         // Apply any additional style attributes
         for (const [key, value] of Object.entries(layer.styles)) {
           if (key !== 'stroke' && key !== 'stroke-width' && key !== 'fill') {
@@ -375,8 +373,8 @@ export class SvgPreviewPane extends HTMLElement {
         if (el.tagName === 'path') {
           const navPath = document.createElementNS(SVG_NS, 'path');
           navPath.setAttribute('d', el.getAttribute('d') || '');
-          navPath.setAttribute('stroke', el.getAttribute('stroke') || store.get('stroke'));
-          navPath.setAttribute('stroke-width', Math.max(parseFloat(el.getAttribute('stroke-width')) || store.get('strokeWidth'), 1));
+          navPath.setAttribute('stroke', el.getAttribute('stroke') || DEFAULT_STROKE);
+          navPath.setAttribute('stroke-width', Math.max(parseFloat(el.getAttribute('stroke-width')) || DEFAULT_STROKE_WIDTH, 1));
           navPath.setAttribute('fill', el.getAttribute('fill') || 'none');
           // Copy additional style attributes (dasharray scaled to screen pixels)
           for (const attr of ['stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'opacity', 'fill-rule']) {
@@ -392,7 +390,7 @@ export class SvgPreviewPane extends HTMLElement {
           indicator.setAttribute('cx', String(x));
           indicator.setAttribute('cy', String(y));
           indicator.setAttribute('r', '3');
-          indicator.setAttribute('fill', el.getAttribute('fill') || el.getAttribute('stroke') || store.get('stroke'));
+          indicator.setAttribute('fill', el.getAttribute('fill') || el.getAttribute('stroke') || DEFAULT_STROKE);
           navGroup.appendChild(indicator);
         }
       }
@@ -402,8 +400,8 @@ export class SvgPreviewPane extends HTMLElement {
       if (d) {
         const navPath = document.createElementNS(SVG_NS, 'path');
         navPath.setAttribute('d', d);
-        navPath.setAttribute('stroke', store.get('stroke'));
-        navPath.setAttribute('stroke-width', Math.max(store.get('strokeWidth'), 1));
+        navPath.setAttribute('stroke', DEFAULT_STROKE);
+        navPath.setAttribute('stroke-width', Math.max(DEFAULT_STROKE_WIDTH, 1));
         navPath.setAttribute('fill', 'none');
         navGroup.appendChild(navPath);
       }
@@ -509,20 +507,19 @@ export class SvgPreviewPane extends HTMLElement {
 
     this.updateViewBox();
 
-    this.previewPath.setAttribute('stroke', state.stroke);
-    this.previewPath.setAttribute('stroke-width', state.strokeWidth);
-    this.previewPath.setAttribute('fill', state.fillEnabled ? state.fill : 'none');
+    this.previewPath.setAttribute('stroke', DEFAULT_STROKE);
+    this.previewPath.setAttribute('stroke-width', DEFAULT_STROKE_WIDTH);
+    this.previewPath.setAttribute('fill', 'none');
 
     // Update layer paths that don't have per-layer styles
     const layersGroup = this.shadowRoot.querySelector('#preview-layers');
     if (layersGroup) {
       for (const path of layersGroup.querySelectorAll('path')) {
-        // Only update defaults — per-layer styles are set in setLayersWithTiming
         if (!path.dataset.hasLayerStroke) {
-          path.setAttribute('stroke', state.stroke);
+          path.setAttribute('stroke', DEFAULT_STROKE);
         }
         if (!path.dataset.hasLayerStrokeWidth) {
-          path.setAttribute('stroke-width', state.strokeWidth);
+          path.setAttribute('stroke-width', DEFAULT_STROKE_WIDTH);
         }
       }
     }
