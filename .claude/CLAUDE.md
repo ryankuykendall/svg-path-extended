@@ -1,85 +1,60 @@
 # svg-path-extended
 
-A TypeScript module that extends SVG path syntax with variables, expressions, control flow, and functions.
+A TypeScript compiler that extends SVG path syntax with variables, expressions, control flow, functions, multi-layer output, and text elements.
 
 ## Quick Reference
 
 ```bash
-npm run build      # Build production bundles (ESM, CJS, browser)
-npm run dev        # Build with watch mode
-npm test           # Run tests in watch mode
-npm run test:run   # Run tests once
-npm run cli        # Run CLI in development (via tsx)
+npm run build           # Build production bundles (ESM, CJS, browser)
+npm run dev             # Build with watch mode
+npm test                # Run tests in watch mode
+npm run test:run        # Run tests once
+npm run cli             # Run CLI in development (via tsx)
+npm run dev:website     # Build website + serve at localhost:3000 via Wrangler
+npm run build:website   # Full website build (lib + docs + blog + static)
+npm run build:docs      # Build docs pages
+npm run build:blog      # Build blog pages
 ```
 
-## Project Structure
+## Project Layout
 
 ```
-src/
-├── parser/
-│   ├── ast.ts         # AST node type definitions
-│   └── index.ts       # Parsimmon-based parser
-├── evaluator/
-│   └── index.ts       # AST evaluator → SVG path strings
-├── stdlib/
-│   ├── math.ts        # Math functions (sin, cos, lerp, etc.)
-│   ├── path.ts        # Path helpers (circle, rect, polygon, star)
-│   └── index.ts       # Stdlib exports
-├── cli.ts             # CLI entry point
-└── index.ts           # Library entry point (exports compile, parse, evaluate)
-
-tests/
-├── parser.test.ts     # Parser unit tests
-├── evaluator.test.ts  # Evaluator/integration tests
-├── errors.test.ts     # Error handling tests
-└── cli.test.ts        # CLI integration tests
-
-playground/
-└── index.html         # Self-contained browser playground (CodeMirror 6)
-
-docs/
-├── syntax.md          # Language syntax reference
-├── stdlib.md          # Standard library functions
-├── cli.md             # CLI usage and options
-└── examples.md        # Practical examples and recipes
+src/           Compiler, evaluator, CLI, stdlib       → see src/CLAUDE.md
+playground/    Vanilla Web Components SPA              → see playground/CLAUDE.md
+docs/          Language and CLI documentation
+tests/         Vitest test suites
+scripts/       Build scripts (docs, blog, website, git hooks)
+website/       Cloudflare Pages worker
+dist/          Build output (do not edit)
+public/        Generated website build (do not edit)
 ```
 
-## Build Artifacts (Do Not Edit Directly)
+## Feature / Bug Lifecycle
 
-- `public/` - Generated build output; changes here will be overwritten
+### Compiler & CLI (`src/`)
 
-## Architecture
+Docs first → failing tests → implement → visual verify → full test suite. See `src/CLAUDE.md` for detailed steps and test file mapping.
 
-- **Parser**: Parsimmon parser combinators. Operator precedence via chained expression parsers (or → and → equality → comparison → additive → multiplicative → unary → primary).
+### Playground (`playground/`)
 
-- **Evaluator**: Walks AST, maintains scope chain, evaluates expressions, produces SVG path strings. Has safeguards: max 10,000 loop iterations, rejects Infinity/NaN in loop bounds.
+Build library → scope components → identify reuse → storybook-driven design → integrate → visual verify. See `playground/CLAUDE.md` for detailed steps.
 
-- **Path commands vs identifiers**: Single letters that are SVG path commands (M, L, H, V, C, S, Q, T, A, Z) cannot be used as variable names in path argument positions.
+### Cross-Cutting (both `src/` and `playground/`)
 
-- **calc()**: Required for math expressions in path arguments. Plain identifiers work for simple variable references.
+1. Make compiler changes first following the compiler lifecycle above
+2. Run `npm run build` — playground loads `dist/index.global.js`
+3. Make playground changes following the playground lifecycle above
 
-- **User functions**: Return PathSegment objects that stringify when used in path context.
+### Agent Workflow Hints
 
-## Key Files for Common Tasks
-
-| Task | Files |
-|------|-------|
-| Add new syntax | `src/parser/index.ts`, `src/parser/ast.ts` |
-| Add runtime behavior | `src/evaluator/index.ts` |
-| Add stdlib function | `src/stdlib/math.ts` or `src/stdlib/path.ts` |
-| Add CLI option | `src/cli.ts` |
-| Update playground | `playground/index.html` |
-
-## Development Workflow
-
-1. **Documentation first** - Update `docs/` before coding (except bug fixes)
-2. **Write failing tests** - Parser tests for syntax, evaluator tests for behavior
-3. **Implement** - Make tests pass
-4. **Visual verify** - Generate SVGs with `--output-svg-file` if applicable
+- **Parallel exploration**: For cross-cutting work, launch explore agents for `src/` and `playground/` simultaneously — they're fully independent codebases connected only by `dist/index.global.js`
+- **Targeted tests**: Run specific test files during development (e.g., `npx vitest run tests/layers.test.ts`); full suite before commit
+- **Build gate**: `npm run build` is required after any `src/` change before playground testing
+- **Doc-first exploration**: When planning compiler features, explore `docs/` in parallel with `src/` since doc-first is the workflow
 
 ## Live Playground
 
-- Local: `open playground/index.html` (after `npm run build`)
+- Local: `npm run dev:website` → http://localhost:3000
 - Deployed: https://pedestal.design/svg-path-extended/
 
 ## Summary Instructions

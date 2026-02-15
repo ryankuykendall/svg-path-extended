@@ -86,16 +86,16 @@ All three steps required — missing any one will silently fail:
 
 ## Key Files for Common Tasks
 
-| Task | Files |
-|------|-------|
-| Add view/route | `utils/router.js`, `components/views/`, `components/app-shell.js` |
-| Add shared component | `components/shared/`, `utils/storybook-registry.js` |
-| Add workspace control | `components/playground-footer.js`, `components/workspace-view.js` |
-| Modify SVG preview | `components/svg-preview-pane.js` |
-| Add editor autocomplete | `utils/codemirror-setup.js` |
-| Add API endpoint | `services/api.js` |
-| Change theme/colors | `styles/theme.css` |
-| Add store state | `state/store.js`, relevant subscribers |
+| Task                    | Files                                                             |
+| ----------------------- | ----------------------------------------------------------------- |
+| Add view/route          | `utils/router.js`, `components/views/`, `components/app-shell.js` |
+| Add shared component    | `components/shared/`, `utils/storybook-registry.js`               |
+| Add workspace control   | `components/playground-footer.js`, `components/workspace-view.js` |
+| Modify SVG preview      | `components/svg-preview-pane.js`                                  |
+| Add editor autocomplete | `utils/codemirror-setup.js`                                       |
+| Add API endpoint        | `services/api.js`                                                 |
+| Change theme/colors     | `styles/theme.css`                                                |
+| Add store state         | `state/store.js`, relevant subscribers                            |
 
 ## Dev & Verification
 
@@ -103,3 +103,12 @@ All three steps required — missing any one will silently fail:
 - Library must build first (`npm run build`) — playground loads `../dist/index.global.js`
 - Browser console shows compile/render timing logs
 - Test in both light and dark themes
+
+## Development Lifecycle
+
+1. **Build the library first** — `npm run build` (playground loads `dist/index.global.js`, not source). If the change depends on a compiler update in `src/`, the library must be rebuilt before any playground work.
+2. **Identify component scope** — Determine which existing custom elements are affected and what new elements need to be created. Map out the component tree for the experience.
+3. **Identify reuse opportunities** — Before building, determine whether to create new shared primitives in `components/shared/`, extend existing ones, or refactor to extract reusable patterns. Discuss non-obvious trade-offs with the user to balance end-user needs against long-term code health.
+4. **Storybook-driven design** — Define the storybook entry first (tag, props, slots, controls in `utils/storybook-registry.js`) — this is the component's spec. Then build the component to satisfy it. Review each component for interaction, visual design, animation quality, polish, and delight. Verify in `/storybook/:component`.
+5. **Integrate** — Wire components together following conventions above (Shadow DOM, lifecycle, events). Connect store subscriptions, cross-component events, and route/view registration. The goal is a cohesive, predictable experience — components should coordinate, not just coexist.
+6. **Visual verify** — Test the integrated experience in both light and dark themes via `npm run dev:website`. Storybook verified components in isolation; this step verifies they work together — layout, event flow, theme consistency, and interaction feel across the full workflow.
