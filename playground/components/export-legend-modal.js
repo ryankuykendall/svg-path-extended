@@ -583,7 +583,7 @@ class ExportLegendModal extends HTMLElement {
     // We want the legend to be ~25-30% of the shorter canvas side.
     const shortSide = Math.min(this._canvasWidth, this._canvasHeight);
     this._scaleFactor = Math.max(0.2, Math.min(8, shortSide / 2000));
-    this._legendWidth = this.BASE_WIDTH * this._scaleFactor;
+    this._legendWidth = this._computeBaseWidth() * this._scaleFactor;
 
     // Reset zoom/pan
     this._zoom = 1;
@@ -709,6 +709,30 @@ class ExportLegendModal extends HTMLElement {
       y += titleFontSize + this._s(6);
     }
 
+    // Creator (left) + Date (right) on single line below title
+    if (this._formData.creator || this._formData.date) {
+      if (this._formData.creator) {
+        const creatorEl = this._createText(this._formData.creator, pad, y, {
+          fontSize: smallFontSize,
+          cls: 'legend-creator',
+          color: '#64748b',
+        });
+        elements.push(creatorEl);
+      }
+      if (this._formData.date) {
+        const dateX = this._formData.creator ? this._legendWidth - pad : pad;
+        const dateAnchor = this._formData.creator ? 'end' : undefined;
+        const dateEl = this._createText(this._formData.date, dateX, y, {
+          fontSize: smallFontSize,
+          cls: 'legend-date',
+          color: '#64748b',
+          anchor: dateAnchor,
+        });
+        elements.push(dateEl);
+      }
+      y += lineHeight;
+    }
+
     // Description (word-wrapped)
     if (this._formData.description) {
       const descEl = this._createWrappedText(this._formData.description, pad, y, innerWidth, {
@@ -721,7 +745,7 @@ class ExportLegendModal extends HTMLElement {
     }
 
     // Separator line
-    if (this._formData.name || this._formData.description) {
+    if (this._formData.name || this._formData.description || this._formData.creator || this._formData.date) {
       const sep = document.createElementNS(ns, 'line');
       sep.setAttribute('x1', pad);
       sep.setAttribute('y1', y);
@@ -732,28 +756,6 @@ class ExportLegendModal extends HTMLElement {
       sep.classList.add('legend-separator');
       elements.push(sep);
       y += separatorGap;
-    }
-
-    // Date
-    if (this._formData.date) {
-      const dateEl = this._createText(`Exported: ${this._formData.date}`, pad, y, {
-        fontSize: smallFontSize,
-        cls: 'legend-date',
-        color: '#64748b',
-      });
-      elements.push(dateEl);
-      y += lineHeight;
-    }
-
-    // Creator
-    if (this._formData.creator) {
-      const creatorEl = this._createText(`Creator: ${this._formData.creator}`, pad, y, {
-        fontSize: smallFontSize,
-        cls: 'legend-creator',
-        color: '#64748b',
-      });
-      elements.push(creatorEl);
-      y += lineHeight;
     }
 
     // Code block — each source line gets its own <tspan>
@@ -896,14 +898,14 @@ class ExportLegendModal extends HTMLElement {
   /**
    * Render code as a block of <tspan> elements — one per source line.
    * Lines wider than the inner width are truncated with "...".
-   * Total lines capped at 20 to keep the legend compact.
+   * Total lines capped at 128; ellipsis shown only if truncated.
    */
   _createCodeBlock(code, x, y, maxWidth, opts = {}) {
     const ns = 'http://www.w3.org/2000/svg';
     const fSize = opts.fontSize || this._s(this.BASE_SMALL_FONT_SIZE);
     const monoCharWidth = fSize * this.CHAR_WIDTH_FACTOR;
     const charsPerLine = Math.max(10, Math.floor(maxWidth / monoCharWidth));
-    const maxLines = 20;
+    const maxLines = 128;
     const lineGap = fSize + this._s(2);
 
     let sourceLines = code.split('\n');
@@ -968,11 +970,29 @@ class ExportLegendModal extends HTMLElement {
     return lines;
   }
 
+  // --- Content-driven width ---
+
+  _computeBaseWidth() {
+    const titleChars = Math.min((this._formData.name || '').length, 60);
+    const titleWidth = titleChars * this.BASE_TITLE_FONT_SIZE * this.CHAR_WIDTH_FACTOR + 2 * this.BASE_PADDING;
+
+    let maxCodeLineLen = 0;
+    if (this._formData.code) {
+      for (const line of this._formData.code.split('\n')) {
+        if (line.length > maxCodeLineLen) maxCodeLineLen = line.length;
+      }
+    }
+    const codeChars = Math.min(maxCodeLineLen, 80);
+    const codeWidth = codeChars * this.BASE_SMALL_FONT_SIZE * this.CHAR_WIDTH_FACTOR + 2 * this.BASE_PADDING;
+
+    const MIN_BASE_WIDTH = 200;
+    return Math.max(MIN_BASE_WIDTH, titleWidth, codeWidth);
+  }
+
   // --- Legend updates from form ---
 
   _updateLegendFromForm() {
-    // Recompute scale from current width
-    this._scaleFactor = this._legendWidth / this.BASE_WIDTH;
+    this._legendWidth = this._computeBaseWidth() * this._scaleFactor;
 
     const oldLegend = this._svg.querySelector('#pathogen-legend');
     if (oldLegend) oldLegend.remove();
@@ -1337,15 +1357,17 @@ class ExportLegendModal extends HTMLElement {
 
   _addDocumentListeners() {
     this._handleMouseMove = (e) => {
-      // Legend resize — changes width, which re-derives scale factor
+      // Legend resize — derive scale factor from target width
       if (this._isResizing) {
         const dx = e.clientX - this._resizeStartX;
         const rect = this._svg.getBoundingClientRect();
         const vw = this._canvasWidth / this._zoom;
         const scale = vw / rect.width;
         const svgDx = dx * scale;
-        const minWidth = this.BASE_WIDTH * 0.15; // minimum ~15% of base
-        this._legendWidth = Math.max(minWidth, this._resizeStartWidth + svgDx);
+        const baseWidth = this._computeBaseWidth();
+        const minWidth = baseWidth * 0.15;
+        const newWidth = Math.max(minWidth, this._resizeStartWidth + svgDx);
+        this._scaleFactor = newWidth / baseWidth;
         this._updateLegendFromForm();
         return;
       }
