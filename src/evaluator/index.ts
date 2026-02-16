@@ -18,7 +18,9 @@ import type {
   TextStatement,
   TspanStatement,
   TextBodyItem,
+  StyleBlockLiteral,
 } from '../parser/ast';
+import { expression as expressionParser } from '../parser';
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import {
   type PathContext,
@@ -31,7 +33,7 @@ import {
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 
-export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference;
+export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue;
 
 /**
  * Represents an object value that supports property access (like ctx)
@@ -49,6 +51,14 @@ export interface PathWithResult {
   type: 'PathWithResult';
   path: string;      // The path string to emit
   result: ContextObject;  // The result value (for assignments)
+}
+
+/**
+ * Represents a style block value (CSS-like key-value map)
+ */
+export interface StyleBlockValue {
+  type: 'StyleBlockValue';
+  properties: Record<string, string>;
 }
 
 /**
@@ -78,12 +88,13 @@ export interface LayerStyle {
 
 export type TextChild =
   | { type: 'run'; text: string }
-  | { type: 'tspan'; text: string; dx?: number; dy?: number; rotation?: number };  // rotation in radians
+  | { type: 'tspan'; text: string; dx?: number; dy?: number; rotation?: number; styles?: Record<string, string> };  // rotation in radians
 
 export interface TextElement {
   x: number;
   y: number;
   rotation?: number;  // Radians — converted to degrees at render time
+  styles?: Record<string, string>;
   children: TextChild[];
 }
 
@@ -155,6 +166,8 @@ function expressionToSource(expr: Expression): string {
       return '`' + expr.parts.map(p =>
         typeof p === 'string' ? p : '${' + expressionToSource(p) + '}'
       ).join('') + '`';
+    case 'StyleBlockLiteral':
+      return '${ ' + expr.properties.map(p => `${p.name}: ${p.value};`).join(' ') + ' }';
     default:
       return '?';
   }
@@ -290,6 +303,38 @@ function checkAngleUnitMismatch(left: Expression, right: Expression, operator: s
   }
 }
 
+function isStyleBlock(value: Value): value is StyleBlockValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'StyleBlockValue';
+}
+
+function camelToKebab(name: string): string {
+  return name.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+}
+
+function evaluateStyleBlockLiteral(expr: StyleBlockLiteral, scope: Scope): StyleBlockValue {
+  const properties: Record<string, string> = {};
+  for (const prop of expr.properties) {
+    // Try to evaluate the raw value string as an expression
+    let resolvedValue = prop.value;
+    try {
+      const parseResult = expressionParser.parse(prop.value);
+      if (parseResult.status) {
+        const evaluated = evaluateExpression(parseResult.value, scope);
+        if (typeof evaluated === 'number') {
+          resolvedValue = formatNum(evaluated);
+        } else if (typeof evaluated === 'string') {
+          resolvedValue = evaluated;
+        }
+        // For other types, keep raw string
+      }
+    } catch {
+      // Parse or eval failed — keep raw string (handles rgb(...), #hex, multi-value strings, etc.)
+    }
+    properties[prop.name] = resolvedValue;
+  }
+  return { type: 'StyleBlockValue', properties };
+}
+
 function evaluateExpression(expr: Expression, scope: Scope): Value {
   switch (expr.type) {
     case 'NumberLiteral':
@@ -309,6 +354,14 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
 
       const left = evaluateExpression(expr.left, scope);
       const right = evaluateExpression(expr.right, scope);
+
+      // Style block merge: <<
+      if (expr.operator === '<<') {
+        if (!isStyleBlock(left) || !isStyleBlock(right)) {
+          throw new Error('Operator << requires style block operands');
+        }
+        return { type: 'StyleBlockValue', properties: { ...left.properties, ...right.properties } };
+      }
 
       // String equality: == and != work for strings
       if ((expr.operator === '==' || expr.operator === '!=') &&
@@ -361,6 +414,9 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'TemplateLiteral':
       return evaluateTemplateLiteral(expr, scope);
 
+    case 'StyleBlockLiteral':
+      return evaluateStyleBlockLiteral(expr, scope);
+
     default:
       throw new Error(`Unknown expression type: ${(expr as Expression).type}`);
   }
@@ -404,6 +460,16 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     }
 
     throw new Error(`Cannot access property '${expr.property}' of type ${typeof propValue}`);
+  }
+
+  // Handle StyleBlockValue property access (camelCase → kebab-case)
+  if (isStyleBlock(obj)) {
+    const kebabName = camelToKebab(expr.property);
+    const value = obj.properties[kebabName] ?? obj.properties[expr.property];
+    if (value === undefined) {
+      throw new Error(`Property '${expr.property}' does not exist on style block`);
+    }
+    return value;
   }
 
   // Handle LayerReference property access
@@ -1034,7 +1100,13 @@ function evaluateTextBody(items: TextBodyItem[], scope: Scope, children: TextChi
       const dx = item.dx ? requireNumber(evaluateExpression(item.dx, scope), 'tspan() dx') : undefined;
       const dy = item.dy ? requireNumber(evaluateExpression(item.dy, scope), 'tspan() dy') : undefined;
       const rot = item.rotation ? requireNumber(evaluateExpression(item.rotation, scope), 'tspan() rotation') : undefined;
-      children.push({ type: 'tspan', text, dx, dy, rotation: rot });
+      let tspanStyles: Record<string, string> | undefined;
+      if (item.styles) {
+        const sv = evaluateExpression(item.styles, scope);
+        if (!isStyleBlock(sv)) throw new Error('tspan() styles must be a style block');
+        tspanStyles = sv.properties;
+      }
+      children.push({ type: 'tspan', text, dx, dy, rotation: rot, styles: tspanStyles });
     } else if (item.type === 'ForLoop') {
       const start = requireNumber(evaluateExpression(item.start, scope), 'for loop start');
       const end = requireNumber(evaluateExpression(item.end, scope), 'for loop end');
@@ -1211,10 +1283,11 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       if (stmt.isDefault && scope.evalState.defaultLayerName !== null) {
         throw new Error(`Cannot define multiple default layers. '${scope.evalState.defaultLayerName}' is already the default`);
       }
-      const styles: LayerStyle = {};
-      for (const prop of stmt.styles) {
-        styles[prop.name] = prop.value;
+      const styleValue = evaluateExpression(stmt.styleExpr, scope);
+      if (!isStyleBlock(styleValue)) {
+        throw new Error('Layer style must be a style block');
       }
+      const styles: LayerStyle = { ...styleValue.properties };
       if (stmt.layerType === 'TextLayer') {
         const layerState: TextLayerState = {
           name: nameValue,
@@ -1296,16 +1369,22 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       const rotation = stmt.rotation
         ? requireNumber(evaluateExpression(stmt.rotation, scope), 'text() rotation')
         : undefined;
+      let textStyles: Record<string, string> | undefined;
+      if (stmt.styles) {
+        const sv = evaluateExpression(stmt.styles, scope);
+        if (!isStyleBlock(sv)) throw new Error('text() styles must be a style block');
+        textStyles = sv.properties;
+      }
 
       if (stmt.content) {
         // Inline form: text(x, y)`content`
         const text = evaluateTemplateLiteral(stmt.content, scope);
-        activeTextLayer.textElements.push({ x, y, rotation, children: [{ type: 'run', text }] });
+        activeTextLayer.textElements.push({ x, y, rotation, styles: textStyles, children: [{ type: 'run', text }] });
       } else if (stmt.body) {
         // Block form: text(x, y) { `text` tspan() for/if/let... }
         const children: TextChild[] = [];
         evaluateTextBody(stmt.body, scope, children);
-        activeTextLayer.textElements.push({ x, y, rotation, children });
+        activeTextLayer.textElements.push({ x, y, rotation, styles: textStyles, children });
       }
       return;
     }

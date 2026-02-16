@@ -18,9 +18,11 @@ import type {
   TemplateLiteral,
   TextStatement,
   TspanStatement,
+  StyleBlockLiteral,
 } from '../parser/ast';
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import { createPathContext, contextToObject, updateContextForCommand, setLastTangent, type PathContext } from './context';
+import { expression as expressionParser } from '../parser';
 
 // Types for annotated output
 export type AnnotatedLine =
@@ -38,7 +40,12 @@ export interface AnnotatedOutput {
 }
 
 // Value types (same as main evaluator)
-export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult | AnnotatedLayerRef;
+export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult | AnnotatedLayerRef | StyleBlockValue;
+
+export interface StyleBlockValue {
+  type: 'StyleBlockValue';
+  properties: Record<string, string>;
+}
 
 export interface AnnotatedLayerRef {
   type: 'LayerReference';
@@ -493,6 +500,36 @@ function formatError(message: string, line?: number): string {
   return message;
 }
 
+function isStyleBlock(value: Value): value is StyleBlockValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'StyleBlockValue';
+}
+
+function camelToKebab(name: string): string {
+  return name.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+}
+
+function evaluateStyleBlockLiteral(expr: StyleBlockLiteral, scope: Scope): StyleBlockValue {
+  const properties: Record<string, string> = {};
+  for (const prop of expr.properties) {
+    let resolvedValue = prop.value;
+    try {
+      const parseResult = expressionParser.parse(prop.value);
+      if (parseResult.status) {
+        const evaluated = evaluateExpression(parseResult.value, scope);
+        if (typeof evaluated === 'number') {
+          resolvedValue = String(evaluated);
+        } else if (typeof evaluated === 'string') {
+          resolvedValue = evaluated;
+        }
+      }
+    } catch {
+      // Keep raw string
+    }
+    properties[prop.name] = resolvedValue;
+  }
+  return { type: 'StyleBlockValue', properties };
+}
+
 function evaluateExpression(expr: Expression, scope: Scope): Value {
   const line = (expr as { loc?: { line: number } }).loc?.line;
 
@@ -506,6 +543,14 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'BinaryExpression': {
       const left = evaluateExpression(expr.left, scope);
       const right = evaluateExpression(expr.right, scope);
+
+      // Style block merge: <<
+      if (expr.operator === '<<') {
+        if (!isStyleBlock(left) || !isStyleBlock(right)) {
+          throw new Error(formatError('Operator << requires style block operands', line));
+        }
+        return { type: 'StyleBlockValue', properties: { ...left.properties, ...right.properties } };
+      }
 
       // String equality: == and != work for strings
       if ((expr.operator === '==' || expr.operator === '!=') &&
@@ -567,6 +612,9 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
         return String(val);
       }).join('');
 
+    case 'StyleBlockLiteral':
+      return evaluateStyleBlockLiteral(expr, scope);
+
     default:
       throw new Error(formatError(`Unknown expression type: ${(expr as Expression).type}`, line));
   }
@@ -575,6 +623,16 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
 function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
   const line = (expr as { loc?: { line: number } }).loc?.line;
   const obj = evaluateExpression(expr.object, scope);
+
+  // Handle StyleBlockValue property access (camelCase → kebab-case)
+  if (isStyleBlock(obj)) {
+    const kebabName = camelToKebab(expr.property);
+    const value = obj.properties[kebabName] ?? obj.properties[expr.property];
+    if (value === undefined) {
+      throw new Error(formatError(`Property '${expr.property}' does not exist on style block`, line));
+    }
+    return value;
+  }
 
   // Handle ContextObject property access
   if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ContextObject') {

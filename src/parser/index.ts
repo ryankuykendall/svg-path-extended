@@ -22,6 +22,7 @@ import type {
   SourceLocation,
   Comment,
   StyleProperty,
+  StyleBlockLiteral,
   LayerDefinition,
   LayerApplyBlock,
   TemplateLiteral,
@@ -244,11 +245,29 @@ const equalityExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
 );
 
 const comparisonExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
-  additiveExpression.chain((first) =>
+  mergeExpression.chain((first) =>
     P.seq(
-      P.alt(word('<='), word('>='), word('<'), word('>')),
-      additiveExpression
+      P.alt(word('<='), word('>='), token(P.regexp(/<(?!<)/)), word('>')),
+      mergeExpression
     )
+      .many()
+      .map((rest) =>
+        rest.reduce<Expression>(
+          (left, [op, right]) => ({
+            type: 'BinaryExpression',
+            operator: op as BinaryExpression['operator'],
+            left,
+            right,
+          }),
+          first
+        )
+      )
+  )
+);
+
+const mergeExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
+  additiveExpression.chain((first) =>
+    P.seq(word('<<'), additiveExpression)
       .many()
       .map((rest) =>
         rest.reduce<Expression>(
@@ -344,9 +363,10 @@ const templateLiteral: Parsimmon.Parser<TemplateLiteral> = P.seq(
   parts,
 }));
 
-// Primary expression: number, string, template literal, calc, identifier (with optional property access), function call (with optional member access), or parenthesized expression
+// Primary expression: style block, number, string, template literal, calc, identifier (with optional property access), function call (with optional member access), or parenthesized expression
 const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
   P.alt(
+    withMemberAccess(styleBlockLiteral),
     numberLiteral,
     stringLiteral,
     templateLiteral,
@@ -545,10 +565,10 @@ const functionCallStatement: Parsimmon.Parser<PathCommand> = P.seqMap(
   })
 );
 
-// Style block parser: { stroke: #cc0000; stroke-width: 4; }
-// Parses raw text between { and }, extracts declarations with regex
-const styleBlock: Parsimmon.Parser<StyleProperty[]> = P.seq(
-  word('{'),
+// Style block literal: ${ stroke: #cc0000; stroke-width: 4; }
+// Parses raw text between ${ and }, extracts declarations with regex
+const styleBlockLiteral: Parsimmon.Parser<StyleBlockLiteral> = P.seq(
+  token(P.string('${')),
   P.regexp(/[^}]*/),
   word('}')
 ).map(([, raw]) => {
@@ -559,10 +579,10 @@ const styleBlock: Parsimmon.Parser<StyleProperty[]> = P.seq(
   while ((m = re.exec(cleaned)) !== null) {
     decls.push({ type: 'StyleProperty', name: m[1].trim(), value: m[2].trim() });
   }
-  return decls;
+  return { type: 'StyleBlockLiteral' as const, properties: decls };
 });
 
-// Layer definition: define [default] PathLayer('name') { style declarations }
+// Layer definition: define [default] PathLayer('name') ${ style declarations }
 const layerDefinition: Parsimmon.Parser<LayerDefinition> = P.seqMap(
   P.index,
   keyword('define'),
@@ -571,13 +591,13 @@ const layerDefinition: Parsimmon.Parser<LayerDefinition> = P.seqMap(
   word('('),
   expression,
   word(')'),
-  styleBlock,
-  (startIndex, _define, isDefault, layerType, _lp, name, _rp, styles) => ({
+  expression,
+  (startIndex, _define, isDefault, layerType, _lp, name, _rp, styleExpr) => ({
     type: 'LayerDefinition' as const,
     layerType: layerType as 'PathLayer' | 'TextLayer',
     name,
     isDefault,
-    styles,
+    styleExpr,
     loc: indexToLoc(startIndex),
   })
 );
@@ -600,18 +620,20 @@ const layerApplyBlock: Parsimmon.Parser<LayerApplyBlock> = P.seqMap(
   })
 );
 
-// tspan statement: tspan()`content` or tspan(dx, dy)`content` or tspan(dx, dy, rotation)`content`
+// tspan statement: tspan()`content` or tspan(dx, dy)`content` or tspan(dx, dy, rotation)`content` or tspan(dx, dy, rotation, styles)`content`
 // Only valid inside text() block bodies
 const tspanStatement: Parsimmon.Parser<TspanStatement> = P.seqMap(
   P.index,
   keyword('tspan'),
   word('('),
   P.alt(
+    P.seqMap(expression, word(','), expression, word(','), expression, word(','), expression,
+      (dx: Expression, _c1: string, dy: Expression, _c2: string, rot: Expression, _c3: string, styles: Expression) => ({ dx, dy, rotation: rot, styles })),
     P.seqMap(expression, word(','), expression, word(','), expression,
       (dx: Expression, _c1: string, dy: Expression, _c2: string, rot: Expression) => ({ dx, dy, rotation: rot })),
     P.seqMap(expression, word(','), expression,
       (dx: Expression, _c: string, dy: Expression) => ({ dx, dy })),
-    P.succeed({} as { dx?: Expression; dy?: Expression; rotation?: Expression })
+    P.succeed({} as { dx?: Expression; dy?: Expression; rotation?: Expression; styles?: Expression })
   ),
   word(')'),
   templateLiteral,
@@ -680,14 +702,15 @@ const textIfStatement: Parsimmon.Parser<IfStatement> = P.seqMap(
   })
 );
 
-// text statement: text(x, y)`content` or text(x, y) { `text` tspan()... }
+// text statement: text(x, y)`content` or text(x, y, rotation)`content` or text(x, y, rotation, styles)`content` or text(x, y) { `text` tspan()... }
 const textStatement: Parsimmon.Parser<TextStatement> = P.seqMap(
   P.index,
   keyword('text'),
   word('('),
   P.seqMap(expression, word(','), expression,
     P.seq(word(','), expression).map(([, r]: [string, Expression]) => r).fallback(undefined as Expression | undefined),
-    (x: Expression, _c: string, y: Expression, rotation: Expression | undefined) => ({ x, y, rotation })),
+    P.seq(word(','), expression).map(([, s]: [string, Expression]) => s).fallback(undefined as Expression | undefined),
+    (x: Expression, _c: string, y: Expression, rotation: Expression | undefined, styles: Expression | undefined) => ({ x, y, rotation, styles })),
   word(')'),
   P.alt(
     // Block form: text(x, y) { `text` tspan()... }

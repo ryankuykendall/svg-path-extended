@@ -34,7 +34,8 @@ export type Node =
   | Identifier
   | NumberLiteral
   | StringLiteral
-  | TemplateLiteral;
+  | TemplateLiteral
+  | StyleBlockLiteral;
 
 export interface Program {
   type: 'Program';
@@ -127,7 +128,7 @@ export interface FunctionCall {
 // x + y, x * 2, etc.
 export interface BinaryExpression {
   type: 'BinaryExpression';
-  operator: '+' | '-' | '*' | '/' | '%' | '<' | '>' | '<=' | '>=' | '==' | '!=' | '&&' | '||';
+  operator: '+' | '-' | '*' | '/' | '%' | '<' | '>' | '<=' | '>=' | '==' | '!=' | '&&' | '||' | '<<';
   left: Expression;
   right: Expression;
 }
@@ -171,6 +172,12 @@ export interface TemplateLiteral {
   parts: (string | Expression)[];  // Alternating strings and expressions
 }
 
+// Style block literal: ${ stroke: red; stroke-width: 2; }
+export interface StyleBlockLiteral {
+  type: 'StyleBlockLiteral';
+  properties: StyleProperty[];
+}
+
 // text(x, y)`content` or text(x, y) { `text` tspan()... }
 export type TextBodyItem = TspanStatement | TemplateLiteral | ForLoop | IfStatement | LetDeclaration;
 
@@ -179,6 +186,7 @@ export interface TextStatement {
   x: Expression;
   y: Expression;
   rotation?: Expression;
+  styles?: Expression;
   content?: TemplateLiteral;   // Inline form: text(x, y)`content`
   body?: TextBodyItem[];       // Block form: text(x, y) { `text` tspan()... }
   loc?: SourceLocation;
@@ -190,6 +198,7 @@ export interface TspanStatement {
   dx?: Expression;
   dy?: Expression;
   rotation?: Expression;
+  styles?: Expression;
   content: TemplateLiteral;
   loc?: SourceLocation;
 }
@@ -201,13 +210,13 @@ export interface StyleProperty {
   value: string;     // raw string e.g. '#cc0000', '4 1 2 3'
 }
 
-// define [default] PathLayer('name') { style declarations }
+// define [default] PathLayer('name') ${ style declarations }
 export interface LayerDefinition {
   type: 'LayerDefinition';
   layerType: 'PathLayer' | 'TextLayer';
   name: Expression;
   isDefault: boolean;
-  styles: StyleProperty[];
+  styleExpr: Expression;
   loc?: SourceLocation;
 }
 
@@ -228,4 +237,5 @@ export type Expression =
   | Identifier
   | NumberLiteral
   | StringLiteral
-  | TemplateLiteral;
+  | TemplateLiteral
+  | StyleBlockLiteral;

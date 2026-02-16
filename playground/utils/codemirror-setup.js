@@ -294,18 +294,17 @@ export function svgPathCompletions(context) {
     }
   }
 
-  // Check if we're inside a define ... { } block for style property completions
+  // Check if we're inside a ${ } style block for style property completions
   const styleWord = context.matchBefore(/[\w-]*/);
   if (styleWord && (styleWord.from < styleWord.to || context.explicit)) {
     const textBefore = context.state.doc.sliceString(0, styleWord.from);
-    // Check if we're inside an unclosed define block: find last 'define' and check brace balance
-    const lastDefine = textBefore.lastIndexOf('define');
-    if (lastDefine !== -1) {
-      const afterDefine = textBefore.slice(lastDefine);
-      const openBraces = (afterDefine.match(/\{/g) || []).length;
-      const closeBraces = (afterDefine.match(/\}/g) || []).length;
-      if (openBraces > closeBraces) {
-        // We're inside a define block — offer style property completions
+    // Find the last '${'  and check if there's no matching '}' after it
+    const lastStyleOpen = textBefore.lastIndexOf('${');
+    if (lastStyleOpen !== -1) {
+      const afterOpen = textBefore.slice(lastStyleOpen + 2);
+      const hasClose = afterOpen.includes('}');
+      if (!hasClose) {
+        // We're inside a ${ } style block — offer style property completions
         let boost = 100;
         return {
           from: styleWord.from,

@@ -361,7 +361,7 @@ describe('CLI', () => {
     it('generates <text> elements in SVG output', () => {
       const inputFile = join(TMP_DIR, 'text-test.svgx');
       const outputFile = join(TMP_DIR, 'text-test.svg');
-      writeFileSync(inputFile, `define TextLayer('labels') { font-size: 14; fill: #333; }\nlayer('labels').apply {\n  text(50, 45)\`Hello\`\n}`);
+      writeFileSync(inputFile, "define TextLayer('labels') ${ font-size: 14; fill: #333; }\nlayer('labels').apply {\n  text(50, 45)`Hello`\n}");
       runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
 
       const content = readFileSync(outputFile, 'utf-8');
@@ -377,7 +377,7 @@ describe('CLI', () => {
     it('generates <text> with rotation', () => {
       const inputFile = join(TMP_DIR, 'text-rot.svgx');
       const outputFile = join(TMP_DIR, 'text-rot.svg');
-      writeFileSync(inputFile, `define TextLayer('t') {}\nlayer('t').apply {\n  text(10, 20, 45deg)\`Rotated\`\n}`);
+      writeFileSync(inputFile, "define TextLayer('t') ${}\nlayer('t').apply {\n  text(10, 20, 45deg)`Rotated`\n}");
       runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
 
       const content = readFileSync(outputFile, 'utf-8');
@@ -390,7 +390,7 @@ describe('CLI', () => {
     it('generates <tspan> elements', () => {
       const inputFile = join(TMP_DIR, 'text-tspan.svgx');
       const outputFile = join(TMP_DIR, 'text-tspan.svg');
-      writeFileSync(inputFile, `define TextLayer('t') {}\nlayer('t').apply {\n  text(10, 20) {\n    tspan()\`first\`\n    tspan(0, 16)\`second\`\n  }\n}`);
+      writeFileSync(inputFile, "define TextLayer('t') ${}\nlayer('t').apply {\n  text(10, 20) {\n    tspan()`first`\n    tspan(0, 16)`second`\n  }\n}");
       runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
 
       const content = readFileSync(outputFile, 'utf-8');
@@ -404,7 +404,7 @@ describe('CLI', () => {
     it('escapes XML special characters in text', () => {
       const inputFile = join(TMP_DIR, 'text-escape.svgx');
       const outputFile = join(TMP_DIR, 'text-escape.svg');
-      writeFileSync(inputFile, `define TextLayer('t') {}\nlayer('t').apply {\n  text(10, 20)\`a < b & c > d\`\n}`);
+      writeFileSync(inputFile, "define TextLayer('t') ${}\nlayer('t').apply {\n  text(10, 20)`a < b & c > d`\n}");
       runCli([`--src=${inputFile}`, `--output-svg-file=${outputFile}`]);
 
       const content = readFileSync(outputFile, 'utf-8');

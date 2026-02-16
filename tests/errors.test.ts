@@ -228,4 +228,29 @@ describe('Edge cases', () => {
       expect(result).toBe('M 1.5 0');
     });
   });
+
+  describe('style block errors', () => {
+    it('throws when using << with non-style-block left operand', () => {
+      expect(() => compile('let x = 5 << \${ stroke: red; };')).toThrow();
+    });
+
+    it('throws when using << with non-style-block right operand', () => {
+      expect(() => compile('let s = \${ stroke: red; }; let x = s << 5;')).toThrow();
+    });
+
+    it('throws when layer definition style is not a style block', () => {
+      expect(() => compile(`
+        let x = 5;
+        define PathLayer('test') x
+        layer('test').apply { M 0 0 }
+      `)).toThrow();
+    });
+
+    it('throws when accessing non-existent property on style block', () => {
+      expect(() => compile(`
+        let s = \${ stroke: red; };
+        let x = s.nonExistent;
+      `)).toThrow();
+    });
+  });
 });

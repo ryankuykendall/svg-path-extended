@@ -752,15 +752,18 @@ export const layers = `<h1>Layers</h1>
 <p>Layers let you output multiple <code>&lt;path&gt;</code> elements from a single program, each with its own styles and independent pen tracking.</p>
 <h2>Defining Layers</h2>
 <p>Use <code>define</code> to create a named layer with a style block:</p>
-<pre><code class="hljs">define PathLayer(<span class="hljs-string">&#x27;outline&#x27;</span>) {
-  stroke: <span class="hljs-comment">#cc0000;</span>
+<pre><code class="hljs">define PathLayer(<span class="hljs-string">&#x27;outline&#x27;</span>) <span class="hljs-variable">\${
+  stroke: #cc0000;
   stroke-width: 3;
   fill: none;
-}
+}</span>
 </code></pre><p>Layer names must be unique strings. The style block uses CSS/SVG property syntax — any SVG presentation attribute works (<code>stroke</code>, <code>fill</code>, <code>opacity</code>, <code>stroke-dasharray</code>, etc.).</p>
+<blockquote>
+<p><strong>Breaking change:</strong> Style blocks now use <code>\${ }</code> syntax instead of <code>{ }</code>. Update existing layer definitions: <code>{ stroke: red; }</code> → <code>\${ stroke: red; }</code>.</p>
+</blockquote>
 <h3>Default Layer</h3>
 <p>Mark one layer as <code>default</code> to receive all bare path commands (commands outside any <code>layer().apply</code> block):</p>
-<pre><code class="hljs">define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;main&#x27;</span>) {
+<pre><code class="hljs">define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;main&#x27;</span>) \${
   <span class="hljs-attr">stroke</span>: #<span class="hljs-number">333</span>;
   stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">2</span>;
   <span class="hljs-attr">fill</span>: none;
@@ -774,12 +777,12 @@ Z
 </code></pre><p>Without a default layer, bare commands go to an implicit unnamed layer.</p>
 <h2>Writing to Layers</h2>
 <p>Use <code>layer(&#39;name&#39;).apply { ... }</code> to send commands to a specific layer:</p>
-<pre><code class="hljs">define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;grid&#x27;</span>) {
+<pre><code class="hljs">define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;grid&#x27;</span>) \${
   <span class="hljs-attr">stroke</span>: #ddd;
   stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">0.5</span>;
 }
 
-define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>) {
+define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>) \${
   <span class="hljs-attr">stroke</span>: #<span class="hljs-number">333</span>;
   stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">2</span>;
   <span class="hljs-attr">fill</span>: none;
@@ -802,8 +805,8 @@ L <span class="hljs-number">100</span> <span class="hljs-number">160</span>
 Z
 </code></pre><h3>Context Isolation</h3>
 <p>Each layer has its own pen position. Commands in one layer don&#39;t affect another layer&#39;s <code>ctx</code>:</p>
-<pre><code class="hljs">define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;a&#x27;</span>) { <span class="hljs-attr">stroke</span>: red; }
-define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;b&#x27;</span>) { <span class="hljs-attr">stroke</span>: blue; }
+<pre><code class="hljs">define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;a&#x27;</span>) \${ <span class="hljs-attr">stroke</span>: red; }
+define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;b&#x27;</span>) \${ <span class="hljs-attr">stroke</span>: blue; }
 
 M <span class="hljs-number">100</span> <span class="hljs-number">100</span>    <span class="hljs-comment">// layer &#x27;a&#x27; position: (100, 100)</span>
 
@@ -815,8 +818,8 @@ M <span class="hljs-number">100</span> <span class="hljs-number">100</span>    <
 L <span class="hljs-number">200</span> <span class="hljs-number">200</span>
 </code></pre><h2>Accessing Layer Context</h2>
 <p>Use <code>layer(&#39;name&#39;).ctx</code> to read a layer&#39;s pen state from anywhere:</p>
-<pre><code class="hljs">define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;main&#x27;</span>) { <span class="hljs-attr">stroke</span>: #<span class="hljs-number">333</span>; }
-define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;markers&#x27;</span>) { <span class="hljs-attr">stroke</span>: red; <span class="hljs-attr">fill</span>: red; }
+<pre><code class="hljs">define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;main&#x27;</span>) \${ <span class="hljs-attr">stroke</span>: #<span class="hljs-number">333</span>; }
+define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;markers&#x27;</span>) \${ <span class="hljs-attr">stroke</span>: red; <span class="hljs-attr">fill</span>: red; }
 
 M <span class="hljs-number">50</span> <span class="hljs-number">50</span>
 L <span class="hljs-number">150</span> <span class="hljs-number">80</span>
@@ -860,7 +863,7 @@ L <span class="hljs-number">100</span> <span class="hljs-number">150</span>
 <h2>Dynamic Layer Names</h2>
 <p>Layer names can be expressions, including variables:</p>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> target = <span class="hljs-string">&#x27;overlay&#x27;</span>
-define <span class="hljs-title class_">PathLayer</span>(target) { <span class="hljs-attr">stroke</span>: blue; }
+define <span class="hljs-title class_">PathLayer</span>(target) \${ <span class="hljs-attr">stroke</span>: blue; }
 
 <span class="hljs-title function_">layer</span>(target).<span class="hljs-property">apply</span> {
   M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">100</span> <span class="hljs-number">100</span>
@@ -927,26 +930,26 @@ define <span class="hljs-title class_">PathLayer</span>(target) { <span class="h
 </tr>
 </tbody></table>
 <p>Each property is a semicolon-terminated declaration:</p>
-<pre><code class="hljs">define PathLayer(<span class="hljs-string">&#x27;dashed&#x27;</span>) {
-  stroke: <span class="hljs-comment">#0066cc;</span>
+<pre><code class="hljs">define PathLayer(<span class="hljs-string">&#x27;dashed&#x27;</span>) <span class="hljs-variable">\${
+  stroke: #0066cc;
   stroke-width: 2;
   stroke-dasharray: 8 4;
   fill: none;
-}
+}</span>
 </code></pre><h2>Output Format</h2>
 <p>When using the JavaScript API, <code>compile()</code> returns a structured result:</p>
 <pre><code class="hljs language-js"><span class="hljs-keyword">import</span> { compile } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;svg-path-extended&#x27;</span>;
 
 <span class="hljs-keyword">const</span> result = <span class="hljs-title function_">compile</span>(<span class="hljs-string">\`
-  define default PathLayer(&#x27;bg&#x27;) {
+  define default PathLayer(&#x27;bg&#x27;) <span class="hljs-subst">\${
     stroke: #ddd;
     fill: none;
-  }
-  define PathLayer(&#x27;fg&#x27;) {
-    stroke: #333;
-    stroke-width: 2;
+  }</span>
+  define PathLayer(&#x27;fg&#x27;) <span class="hljs-subst">\${
+    stroke: #<span class="hljs-number">333</span>;
+    stroke-width: <span class="hljs-number">2</span>;
     fill: none;
-  }
+  }</span>
 
   M 0 0 H 100 V 100 H 0 Z
 
@@ -978,19 +981,19 @@ define <span class="hljs-title class_">PathLayer</span>(target) { <span class="h
 </code></pre><h2>Full Example</h2>
 <p>A multi-layer illustration with a background grid, main shape, and annotation markers:</p>
 <pre><code class="hljs"><span class="hljs-comment">// Layer definitions</span>
-define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;grid&#x27;</span>) {
+define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;grid&#x27;</span>) \${
   <span class="hljs-attr">stroke</span>: #e0e0e0;
   stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">0.5</span>;
 }
 
-define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>) {
+define <span class="hljs-keyword">default</span> <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>) \${
   <span class="hljs-attr">stroke</span>: #<span class="hljs-number">333333</span>;
   stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">2</span>;
   <span class="hljs-attr">fill</span>: none;
   stroke-<span class="hljs-attr">linejoin</span>: round;
 }
 
-define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;points&#x27;</span>) {
+define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;points&#x27;</span>) \${
   <span class="hljs-attr">stroke</span>: #cc0000;
   <span class="hljs-attr">fill</span>: #cc0000;
 }
@@ -1029,11 +1032,11 @@ Z
 </code></pre><h2>TextLayer</h2>
 <p>TextLayers produce SVG <code>&lt;text&gt;</code> elements instead of <code>&lt;path&gt;</code> elements.</p>
 <h3>Defining a TextLayer</h3>
-<pre><code class="hljs">define TextLayer(<span class="hljs-string">&#x27;labels&#x27;</span>) {
+<pre><code class="hljs">define TextLayer(<span class="hljs-string">&#x27;labels&#x27;</span>) <span class="hljs-variable">\${
   font-size: 14;
   font-family: monospace;
-  fill: <span class="hljs-comment">#333;</span>
-}
+  fill: #333;
+}</span>
 </code></pre><h3>text() — Two Forms</h3>
 <p><strong>Inline form</strong> — simple text content:</p>
 <pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;labels&#x27;</span>).<span class="hljs-property">apply</span> {
@@ -1068,7 +1071,7 @@ Z
 <span class="hljs-keyword">if</span> (mode != <span class="hljs-string">&quot;light&quot;</span>) { <span class="hljs-comment">/* ... */</span> }
 </code></pre><h3>TextLayer Output Format</h3>
 <pre><code class="hljs language-js"><span class="hljs-keyword">const</span> result = <span class="hljs-title function_">compile</span>(<span class="hljs-string">\`
-  define TextLayer(&#x27;labels&#x27;) { font-size: 14; fill: #333; }
+  define TextLayer(&#x27;labels&#x27;) <span class="hljs-subst">\${ font-size: <span class="hljs-number">14</span>; fill: #<span class="hljs-number">333</span>; }</span>
   layer(&#x27;labels&#x27;).apply {
     text(50, 45)\\\`Start\\\`
     text(10, 180) {
@@ -1100,9 +1103,46 @@ Z
 <li>Path commands (<code>M</code>, <code>L</code>, etc.) cannot be used inside a TextLayer apply block</li>
 <li>If a TextLayer is the default layer, bare path commands will throw an error</li>
 </ul>
-<h2>Limitations</h2>
+<h2>Style Blocks</h2>
+<p>Style blocks are first-class values that can be stored in variables, merged, and accessed via dot notation.</p>
+<h3>Style Block Literals</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> styles = \${
+  stroke-<span class="hljs-attr">dasharray</span>: <span class="hljs-number">0.01</span> <span class="hljs-number">20</span>;
+  stroke-<span class="hljs-attr">linecap</span>: round;
+  stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">8.4</span>;
+};
+</code></pre><h3>Merge Operator (<code>&lt;&lt;</code>)</h3>
+<p>The <code>&lt;&lt;</code> operator merges two style blocks, with the right side overriding the left:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> base = \${ <span class="hljs-attr">stroke</span>: red; stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">2</span>; };
+<span class="hljs-keyword">let</span> merged = base &lt;&lt; \${ stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">4</span>; <span class="hljs-attr">fill</span>: blue; };
+<span class="hljs-comment">// merged has: stroke: red, stroke-width: 4, fill: blue</span>
+</code></pre><h3>Property Access</h3>
+<p>Use dot notation with camelCase to read kebab-case properties:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> styles = \${ stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">4</span>; };
+<span class="hljs-keyword">let</span> sw = styles.<span class="hljs-property">strokeWidth</span>;  <span class="hljs-comment">// reads &#x27;stroke-width&#x27; → &quot;4&quot;</span>
+</code></pre><h3>Expression Evaluation in Values</h3>
+<p>Style block values are try-evaluated: if a value parses and evaluates as an expression, its result is used. Otherwise the raw string is kept:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> dynamic = \${
+  font-<span class="hljs-attr">size</span>: <span class="hljs-title function_">calc</span>(<span class="hljs-number">12</span> + <span class="hljs-number">15</span>);       <span class="hljs-comment">// evaluates to &quot;27&quot;</span>
+  stroke-<span class="hljs-attr">width</span>: <span class="hljs-title function_">randomRange</span>(<span class="hljs-number">2</span>, <span class="hljs-number">8</span>); <span class="hljs-comment">// evaluates to a random number</span>
+  <span class="hljs-attr">stroke</span>: <span class="hljs-title function_">rgb</span>(<span class="hljs-number">232</span>, <span class="hljs-number">74</span>, <span class="hljs-number">166</span>);       <span class="hljs-comment">// kept as raw string</span>
+  <span class="hljs-attr">fill</span>: #<span class="hljs-number">996633</span>;                   <span class="hljs-comment">// kept as raw string</span>
+};
+</code></pre><h3>Layer Definitions with Style Expressions</h3>
+<p>Layer definitions accept any expression that evaluates to a style block:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> baseStyles = \${ <span class="hljs-attr">stroke</span>: red; stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">2</span>; };
+define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string">&#x27;main&#x27;</span>) baseStyles &lt;&lt; \${ <span class="hljs-attr">fill</span>: none; }
+</code></pre><h3>Per-Element Styles on Text and Tspan</h3>
+<p>Pass style blocks as the 4th argument to <code>text()</code> or <code>tspan()</code>:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> bold = \${ font-<span class="hljs-attr">weight</span>: bold; };
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;labels&#x27;</span>).<span class="hljs-property">apply</span> {
+  <span class="hljs-title function_">text</span>(<span class="hljs-number">10</span>, <span class="hljs-number">20</span>, <span class="hljs-number">0</span>, bold)<span class="hljs-string">\`Hello\`</span>
+  <span class="hljs-title function_">text</span>(<span class="hljs-params"><span class="hljs-number">50</span>, <span class="hljs-number">80</span></span>) {
+    <span class="hljs-title function_">tspan</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, \${ <span class="hljs-attr">fill</span>: red; })<span class="hljs-string">\`colored\`</span>
+  }
+}
+</code></pre><h2>Limitations</h2>
 <ul>
-<li><strong>Static style values</strong> — style properties are literal strings, not expressions (you cannot use <code>calc()</code> or variables inside style blocks)</li>
 <li><strong>No nesting</strong> — <code>layer().apply</code> blocks cannot be nested inside each other</li>
 <li><strong>Layer order</strong> — layers render in definition order (first defined = bottom)</li>
 </ul>

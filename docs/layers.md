@@ -7,7 +7,7 @@ Layers let you output multiple `<path>` elements from a single program, each wit
 Use `define` to create a named layer with a style block:
 
 ```
-define PathLayer('outline') {
+define PathLayer('outline') ${
   stroke: #cc0000;
   stroke-width: 3;
   fill: none;
@@ -16,12 +16,14 @@ define PathLayer('outline') {
 
 Layer names must be unique strings. The style block uses CSS/SVG property syntax — any SVG presentation attribute works (`stroke`, `fill`, `opacity`, `stroke-dasharray`, etc.).
 
+> **Breaking change:** Style blocks now use `${ }` syntax instead of `{ }`. Update existing layer definitions: `{ stroke: red; }` → `${ stroke: red; }`.
+
 ### Default Layer
 
 Mark one layer as `default` to receive all bare path commands (commands outside any `layer().apply` block):
 
 ```
-define default PathLayer('main') {
+define default PathLayer('main') ${
   stroke: #333;
   stroke-width: 2;
   fill: none;
@@ -41,12 +43,12 @@ Without a default layer, bare commands go to an implicit unnamed layer.
 Use `layer('name').apply { ... }` to send commands to a specific layer:
 
 ```
-define PathLayer('grid') {
+define PathLayer('grid') ${
   stroke: #ddd;
   stroke-width: 0.5;
 }
 
-define default PathLayer('shape') {
+define default PathLayer('shape') ${
   stroke: #333;
   stroke-width: 2;
   fill: none;
@@ -74,8 +76,8 @@ Z
 Each layer has its own pen position. Commands in one layer don't affect another layer's `ctx`:
 
 ```
-define default PathLayer('a') { stroke: red; }
-define PathLayer('b') { stroke: blue; }
+define default PathLayer('a') ${ stroke: red; }
+define PathLayer('b') ${ stroke: blue; }
 
 M 100 100    // layer 'a' position: (100, 100)
 
@@ -92,8 +94,8 @@ L 200 200
 Use `layer('name').ctx` to read a layer's pen state from anywhere:
 
 ```
-define default PathLayer('main') { stroke: #333; }
-define PathLayer('markers') { stroke: red; fill: red; }
+define default PathLayer('main') ${ stroke: #333; }
+define PathLayer('markers') ${ stroke: red; fill: red; }
 
 M 50 50
 L 150 80
@@ -123,7 +125,7 @@ Layer names can be expressions, including variables:
 
 ```
 let target = 'overlay'
-define PathLayer(target) { stroke: blue; }
+define PathLayer(target) ${ stroke: blue; }
 
 layer(target).apply {
   M 0 0 L 100 100
@@ -150,7 +152,7 @@ Style properties map directly to SVG presentation attributes. Common properties:
 Each property is a semicolon-terminated declaration:
 
 ```
-define PathLayer('dashed') {
+define PathLayer('dashed') ${
   stroke: #0066cc;
   stroke-width: 2;
   stroke-dasharray: 8 4;
@@ -166,11 +168,11 @@ When using the JavaScript API, `compile()` returns a structured result:
 import { compile } from 'svg-path-extended';
 
 const result = compile(`
-  define default PathLayer('bg') {
+  define default PathLayer('bg') ${
     stroke: #ddd;
     fill: none;
   }
-  define PathLayer('fg') {
+  define PathLayer('fg') ${
     stroke: #333;
     stroke-width: 2;
     fill: none;
@@ -215,19 +217,19 @@ A multi-layer illustration with a background grid, main shape, and annotation ma
 
 ```
 // Layer definitions
-define PathLayer('grid') {
+define PathLayer('grid') ${
   stroke: #e0e0e0;
   stroke-width: 0.5;
 }
 
-define default PathLayer('shape') {
+define default PathLayer('shape') ${
   stroke: #333333;
   stroke-width: 2;
   fill: none;
   stroke-linejoin: round;
 }
 
-define PathLayer('points') {
+define PathLayer('points') ${
   stroke: #cc0000;
   fill: #cc0000;
 }
@@ -272,7 +274,7 @@ TextLayers produce SVG `<text>` elements instead of `<path>` elements.
 ### Defining a TextLayer
 
 ```
-define TextLayer('labels') {
+define TextLayer('labels') ${
   font-size: 14;
   font-family: monospace;
   fill: #333;
@@ -340,7 +342,7 @@ if (mode != "light") { /* ... */ }
 
 ```js
 const result = compile(`
-  define TextLayer('labels') { font-size: 14; fill: #333; }
+  define TextLayer('labels') ${ font-size: 14; fill: #333; }
   layer('labels').apply {
     text(50, 45)\`Start\`
     text(10, 180) {
@@ -374,8 +376,76 @@ const result = compile(`
 - Path commands (`M`, `L`, etc.) cannot be used inside a TextLayer apply block
 - If a TextLayer is the default layer, bare path commands will throw an error
 
+## Style Blocks
+
+Style blocks are first-class values that can be stored in variables, merged, and accessed via dot notation.
+
+### Style Block Literals
+
+```
+let styles = ${
+  stroke-dasharray: 0.01 20;
+  stroke-linecap: round;
+  stroke-width: 8.4;
+};
+```
+
+### Merge Operator (`<<`)
+
+The `<<` operator merges two style blocks, with the right side overriding the left:
+
+```
+let base = ${ stroke: red; stroke-width: 2; };
+let merged = base << ${ stroke-width: 4; fill: blue; };
+// merged has: stroke: red, stroke-width: 4, fill: blue
+```
+
+### Property Access
+
+Use dot notation with camelCase to read kebab-case properties:
+
+```
+let styles = ${ stroke-width: 4; };
+let sw = styles.strokeWidth;  // reads 'stroke-width' → "4"
+```
+
+### Expression Evaluation in Values
+
+Style block values are try-evaluated: if a value parses and evaluates as an expression, its result is used. Otherwise the raw string is kept:
+
+```
+let dynamic = ${
+  font-size: calc(12 + 15);       // evaluates to "27"
+  stroke-width: randomRange(2, 8); // evaluates to a random number
+  stroke: rgb(232, 74, 166);       // kept as raw string
+  fill: #996633;                   // kept as raw string
+};
+```
+
+### Layer Definitions with Style Expressions
+
+Layer definitions accept any expression that evaluates to a style block:
+
+```
+let baseStyles = ${ stroke: red; stroke-width: 2; };
+define PathLayer('main') baseStyles << ${ fill: none; }
+```
+
+### Per-Element Styles on Text and Tspan
+
+Pass style blocks as the 4th argument to `text()` or `tspan()`:
+
+```
+let bold = ${ font-weight: bold; };
+layer('labels').apply {
+  text(10, 20, 0, bold)`Hello`
+  text(50, 80) {
+    tspan(0, 0, 0, ${ fill: red; })`colored`
+  }
+}
+```
+
 ## Limitations
 
-- **Static style values** — style properties are literal strings, not expressions (you cannot use `calc()` or variables inside style blocks)
 - **No nesting** — `layer().apply` blocks cannot be nested inside each other
 - **Layer order** — layers render in definition order (first defined = bottom)

@@ -577,18 +577,18 @@ L 10 20 // end point`;
 
   describe('layer definitions', () => {
     it('parses basic PathLayer definition', () => {
-      const ast = parse("define PathLayer('main') {}");
+      const ast = parse("define PathLayer('main') ${}");
       expect(ast.body).toHaveLength(1);
       expect(ast.body[0]).toMatchObject({
         type: 'LayerDefinition',
         layerType: 'PathLayer',
         isDefault: false,
-        styles: [],
+        styleExpr: { type: 'StyleBlockLiteral', properties: [] },
       });
     });
 
     it('parses default PathLayer definition', () => {
-      const ast = parse("define default PathLayer('main') {}");
+      const ast = parse("define default PathLayer('main') ${}");
       expect(ast.body[0]).toMatchObject({
         type: 'LayerDefinition',
         layerType: 'PathLayer',
@@ -597,7 +597,7 @@ L 10 20 // end point`;
     });
 
     it('parses TextLayer definition', () => {
-      const ast = parse("define TextLayer('text') {}");
+      const ast = parse("define TextLayer('text') ${}");
       expect(ast.body[0]).toMatchObject({
         type: 'LayerDefinition',
         layerType: 'TextLayer',
@@ -605,25 +605,75 @@ L 10 20 // end point`;
     });
 
     it('parses style properties', () => {
-      const ast = parse("define PathLayer('main') { stroke: #cc0000; stroke-width: 4; }");
+      const ast = parse("define PathLayer('main') ${ stroke: #cc0000; stroke-width: 4; }");
       const def = ast.body[0] as any;
       expect(def.type).toBe('LayerDefinition');
-      expect(def.styles).toHaveLength(2);
-      expect(def.styles[0]).toEqual({ type: 'StyleProperty', name: 'stroke', value: '#cc0000' });
-      expect(def.styles[1]).toEqual({ type: 'StyleProperty', name: 'stroke-width', value: '4' });
+      expect(def.styleExpr.type).toBe('StyleBlockLiteral');
+      expect(def.styleExpr.properties).toHaveLength(2);
+      expect(def.styleExpr.properties[0]).toEqual({ type: 'StyleProperty', name: 'stroke', value: '#cc0000' });
+      expect(def.styleExpr.properties[1]).toEqual({ type: 'StyleProperty', name: 'stroke-width', value: '4' });
     });
 
     it('parses style block with comments', () => {
-      const ast = parse("define PathLayer('main') { // comment\nstroke: red; }");
+      const ast = parse("define PathLayer('main') ${ // comment\nstroke: red; }");
       const def = ast.body[0] as any;
-      expect(def.styles).toHaveLength(1);
-      expect(def.styles[0].name).toBe('stroke');
+      expect(def.styleExpr.properties).toHaveLength(1);
+      expect(def.styleExpr.properties[0].name).toBe('stroke');
     });
 
     it('parses layer name as expression', () => {
-      const ast = parse("define PathLayer(myVar) {}");
+      const ast = parse("define PathLayer(myVar) ${}");
       const def = ast.body[0] as any;
       expect(def.name).toMatchObject({ type: 'Identifier', name: 'myVar' });
+    });
+  });
+
+  describe('style block literals', () => {
+    it('parses empty style block', () => {
+      const ast = parse('let s = ${};');
+      const decl = ast.body[0] as any;
+      expect(decl.value).toMatchObject({
+        type: 'StyleBlockLiteral',
+        properties: [],
+      });
+    });
+
+    it('parses style block with properties', () => {
+      const ast = parse('let s = ${ stroke: red; fill: blue; };');
+      const decl = ast.body[0] as any;
+      expect(decl.value.type).toBe('StyleBlockLiteral');
+      expect(decl.value.properties).toHaveLength(2);
+      expect(decl.value.properties[0]).toEqual({ type: 'StyleProperty', name: 'stroke', value: 'red' });
+      expect(decl.value.properties[1]).toEqual({ type: 'StyleProperty', name: 'fill', value: 'blue' });
+    });
+
+    it('parses << merge operator', () => {
+      const ast = parse('let s = ${ stroke: red; } << ${ fill: blue; };');
+      const decl = ast.body[0] as any;
+      expect(decl.value).toMatchObject({
+        type: 'BinaryExpression',
+        operator: '<<',
+        left: { type: 'StyleBlockLiteral' },
+        right: { type: 'StyleBlockLiteral' },
+      });
+    });
+
+    it('does not confuse < with <<', () => {
+      const ast = parse('let x = 1 < 2;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: { type: 'BinaryExpression', operator: '<' },
+      });
+    });
+
+    it('parses style block with member access', () => {
+      const ast = parse('let x = ${ stroke: red; }.stroke;');
+      const decl = ast.body[0] as any;
+      expect(decl.value).toMatchObject({
+        type: 'MemberExpression',
+        property: 'stroke',
+        object: { type: 'StyleBlockLiteral' },
+      });
     });
   });
 

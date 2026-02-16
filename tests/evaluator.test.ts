@@ -927,17 +927,17 @@ describe('Evaluator', () => {
     });
 
     it('evaluates template literal with expression', () => {
-      const result = compile('let name = "World"; let x = `Hello ${name}!`; log(x);');
+      const result = compile('let name = "World"; let x = `Hello \${name}!`; log(x);');
       expect(result.logs[0].parts[0].value).toBe('Hello World!');
     });
 
     it('evaluates template literal with numeric expression', () => {
-      const result = compile('let x = `Score: ${2 + 3}`; log(x);');
+      const result = compile('let x = `Score: \${2 + 3}`; log(x);');
       expect(result.logs[0].parts[0].value).toBe('Score: 5');
     });
 
     it('evaluates template literal with multiple expressions', () => {
-      const result = compile('let a = 1; let b = 2; let x = `${a} + ${b} = ${a + b}`; log(x);');
+      const result = compile('let a = 1; let b = 2; let x = `\${a} + \${b} = \${a + b}`; log(x);');
       expect(result.logs[0].parts[0].value).toBe('1 + 2 = 3');
     });
 
@@ -947,7 +947,7 @@ describe('Evaluator', () => {
     });
 
     it('template literal in log()', () => {
-      const result = compile('let n = 42; log(`The answer is ${n}`);');
+      const result = compile('let n = 42; log(`The answer is \${n}`);');
       expect(result.logs[0].parts[0].value).toBe('The answer is 42');
     });
   });
@@ -975,6 +975,95 @@ describe('Evaluator', () => {
 
     it('string + still throws error', () => {
       expect(() => compile('let x = "a" + "b";')).toThrow('requires numeric operands');
+    });
+  });
+
+  describe('style blocks', () => {
+    it('creates a style block value', () => {
+      const result = compile(`
+        let s = \${ stroke: red; stroke-width: 2; };
+        define PathLayer('test') s
+        layer('test').apply { M 0 0 L 10 10 }
+      `);
+      expect(result.layers[0].styles).toEqual({ stroke: 'red', 'stroke-width': '2' });
+    });
+
+    it('merges style blocks with <<', () => {
+      const result = compile(`
+        let base = \${ stroke: red; stroke-width: 2; };
+        let merged = base << \${ stroke-width: 4; fill: blue; };
+        define PathLayer('test') merged
+        layer('test').apply { M 0 0 }
+      `);
+      expect(result.layers[0].styles).toEqual({ stroke: 'red', 'stroke-width': '4', fill: 'blue' });
+    });
+
+    it('accesses style block property with camelCase', () => {
+      const result = compile(`
+        let s = \${ stroke-width: 4; };
+        let sw = s.strokeWidth;
+        log(sw);
+      `);
+      expect(result.logs[0].parts[0].value).toBe('4');
+    });
+
+    it('accesses simple property names with dot notation', () => {
+      const result = compilePath(`
+        let s = \${ stroke: red; fill: blue; };
+        // stroke and fill are simple names, no camel conversion needed
+        define default PathLayer('d') \${ stroke: black; }
+        M 0 0
+      `);
+      expect(result).toBe('M 0 0');
+    });
+
+    it('try-evaluates calc expressions in style block values', () => {
+      const result = compile(`
+        let s = \${ font-size: calc(12 + 15); };
+        define PathLayer('test') s
+        layer('test').apply { M 0 0 }
+      `);
+      expect(result.layers[0].styles['font-size']).toBe('27');
+    });
+
+    it('keeps raw string for non-evaluable values', () => {
+      const result = compile(`
+        define PathLayer('test') \${ stroke: rgb(232, 74, 166); fill: #996633; }
+        layer('test').apply { M 0 0 }
+      `);
+      expect(result.layers[0].styles.stroke).toBe('rgb(232, 74, 166)');
+      expect(result.layers[0].styles.fill).toBe('#996633');
+    });
+
+    it('uses style block expression in layer definition', () => {
+      const result = compile(`
+        let baseStyles = \${ stroke: red; stroke-width: 2; };
+        define PathLayer('main') baseStyles << \${ fill: none; }
+        layer('main').apply { M 0 0 L 50 50 }
+      `);
+      expect(result.layers[0].styles).toEqual({ stroke: 'red', 'stroke-width': '2', fill: 'none' });
+    });
+
+    it('evaluates style block with variable references in values', () => {
+      const result = compile(`
+        let w = 8;
+        let s = \${ stroke-width: w; };
+        define PathLayer('test') s
+        layer('test').apply { M 0 0 }
+      `);
+      expect(result.layers[0].styles['stroke-width']).toBe('8');
+    });
+
+    it('chains multiple << merges', () => {
+      const result = compile(`
+        let a = \${ stroke: red; };
+        let b = \${ fill: blue; };
+        let c = \${ opacity: 0.5; };
+        let merged = a << b << c;
+        define PathLayer('test') merged
+        layer('test').apply { M 0 0 }
+      `);
+      expect(result.layers[0].styles).toEqual({ stroke: 'red', fill: 'blue', opacity: '0.5' });
     });
   });
 });

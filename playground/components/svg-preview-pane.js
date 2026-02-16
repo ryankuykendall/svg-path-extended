@@ -123,6 +123,12 @@ export class SvgPreviewPane extends HTMLElement {
             for (const [key, value] of Object.entries(layer.styles)) {
               textEl.setAttribute(key, value);
             }
+            // Apply per-text-element styles (override layer styles)
+            if (te.styles) {
+              for (const [key, value] of Object.entries(te.styles)) {
+                textEl.setAttribute(key, value);
+              }
+            }
             for (const child of te.children) {
               if (child.type === 'run') {
                 textEl.appendChild(document.createTextNode(child.text));
@@ -132,6 +138,12 @@ export class SvgPreviewPane extends HTMLElement {
                 if (child.dx != null) tspan.setAttribute('dx', String(child.dx));
                 if (child.dy != null) tspan.setAttribute('dy', String(child.dy));
                 if (child.rotation != null) tspan.setAttribute('rotate', String(child.rotation * 180 / Math.PI));
+                // Apply per-tspan styles
+                if (child.styles) {
+                  for (const [key, value] of Object.entries(child.styles)) {
+                    tspan.setAttribute(key, value);
+                  }
+                }
                 textEl.appendChild(tspan);
               }
             }

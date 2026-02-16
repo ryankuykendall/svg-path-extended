@@ -506,18 +506,15 @@ function ensurePopupStyles(container) {
 
 // ─── Document Scanning ──────────────────────────────────────────────────────
 
-// Find all define ... { } blocks in the document and extract color declarations
+// Find all ${ } style blocks in the document and extract color declarations
 function findColorRanges(docText) {
   const results = [];
-  const defineRegex = /\bdefine\b/g;
-  let defineMatch;
+  // Match all ${ ... } style blocks (in define statements, let assignments, etc.)
+  const styleBlockRegex = /\$\{/g;
+  let blockMatch;
 
-  while ((defineMatch = defineRegex.exec(docText)) !== null) {
-    let openBrace = -1;
-    for (let i = defineMatch.index + 6; i < docText.length; i++) {
-      if (docText[i] === '{') { openBrace = i; break; }
-    }
-    if (openBrace === -1) continue;
+  while ((blockMatch = styleBlockRegex.exec(docText)) !== null) {
+    const openBrace = blockMatch.index + 1; // position of '{'
 
     let depth = 1;
     let closeBrace = -1;
