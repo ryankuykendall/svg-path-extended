@@ -20,6 +20,7 @@ export type Node =
   | LetDeclaration
   | AssignmentStatement
   | ForLoop
+  | ForEachLoop
   | IfStatement
   | FunctionDefinition
   | PathCommand
@@ -31,6 +32,10 @@ export type Node =
   | BinaryExpression
   | UnaryExpression
   | MemberExpression
+  | NullLiteral
+  | ArrayLiteral
+  | IndexExpression
+  | MethodCallExpression
   | Identifier
   | NumberLiteral
   | StringLiteral
@@ -47,6 +52,7 @@ export type Statement =
   | LetDeclaration
   | AssignmentStatement
   | ForLoop
+  | ForEachLoop
   | IfStatement
   | FunctionDefinition
   | ReturnStatement
@@ -75,6 +81,16 @@ export interface ForLoop {
   variable: string;
   start: Expression;
   end: Expression;
+  body: Statement[];
+  loc?: SourceLocation;
+}
+
+// for (item in list) { ... } or for ([item, index] in list) { ... }
+export interface ForEachLoop {
+  type: 'ForEachLoop';
+  variable: string;
+  indexVariable?: string;
+  iterable: Expression;
   body: Statement[];
   loc?: SourceLocation;
 }
@@ -109,7 +125,7 @@ export interface PathCommand {
   loc?: SourceLocation;
 }
 
-export type PathArg = NumberLiteral | Identifier | CalcExpression | FunctionCall | MemberExpression;
+export type PathArg = NumberLiteral | Identifier | CalcExpression | FunctionCall | MemberExpression | IndexExpression | MethodCallExpression;
 
 // calc(x + 10)
 export interface CalcExpression {
@@ -172,6 +188,32 @@ export interface TemplateLiteral {
   parts: (string | Expression)[];  // Alternating strings and expressions
 }
 
+// null literal
+export interface NullLiteral {
+  type: 'NullLiteral';
+}
+
+// Array literal: [1, 2, 3]
+export interface ArrayLiteral {
+  type: 'ArrayLiteral';
+  elements: Expression[];
+}
+
+// Index access: list[0]
+export interface IndexExpression {
+  type: 'IndexExpression';
+  object: Expression;
+  index: Expression;
+}
+
+// Method call: list.push(val)
+export interface MethodCallExpression {
+  type: 'MethodCallExpression';
+  object: Expression;
+  method: string;
+  args: Expression[];
+}
+
 // Style block literal: ${ stroke: red; stroke-width: 2; }
 export interface StyleBlockLiteral {
   type: 'StyleBlockLiteral';
@@ -179,7 +221,7 @@ export interface StyleBlockLiteral {
 }
 
 // text(x, y)`content` or text(x, y) { `text` tspan()... }
-export type TextBodyItem = TspanStatement | TemplateLiteral | ForLoop | IfStatement | LetDeclaration;
+export type TextBodyItem = TspanStatement | TemplateLiteral | ForLoop | ForEachLoop | IfStatement | LetDeclaration;
 
 export interface TextStatement {
   type: 'TextStatement';
@@ -234,6 +276,10 @@ export type Expression =
   | CalcExpression
   | FunctionCall
   | MemberExpression
+  | NullLiteral
+  | ArrayLiteral
+  | IndexExpression
+  | MethodCallExpression
   | Identifier
   | NumberLiteral
   | StringLiteral

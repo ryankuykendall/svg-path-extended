@@ -6,8 +6,8 @@ export { parse, parseWithComments } from './parser';
 export { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } from './evaluator';
 export { stdlib } from './stdlib';
 
-export type { Program, Statement, Expression, Node, SourceLocation, Comment, StyleProperty, StyleBlockLiteral, LayerDefinition, LayerApplyBlock, TemplateLiteral, TextStatement, TspanStatement, TextBodyItem } from './parser/ast';
-export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart, LayerOutput, CompileResult, LayerStyle, StyleBlockValue, TextElement, TextChild, PathLayerState, TextLayerState } from './evaluator';
+export type { Program, Statement, Expression, Node, SourceLocation, Comment, StyleProperty, StyleBlockLiteral, LayerDefinition, LayerApplyBlock, TemplateLiteral, TextStatement, TspanStatement, TextBodyItem, ForEachLoop, NullLiteral, ArrayLiteral, IndexExpression, MethodCallExpression } from './parser/ast';
+export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart, LayerOutput, CompileResult, LayerStyle, StyleBlockValue, ArrayValue, TextElement, TextChild, PathLayerState, TextLayerState } from './evaluator';
 export type { FormatOptions } from './evaluator/formatter';
 
 /**

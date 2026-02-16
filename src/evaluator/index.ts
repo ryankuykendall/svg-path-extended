@@ -7,11 +7,14 @@ import type {
   LetDeclaration,
   AssignmentStatement,
   ForLoop,
+  ForEachLoop,
   IfStatement,
   FunctionDefinition,
   ReturnStatement,
   FunctionCall,
   MemberExpression,
+  IndexExpression,
+  MethodCallExpression,
   LayerDefinition,
   LayerApplyBlock,
   TemplateLiteral,
@@ -33,7 +36,19 @@ import {
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 
-export type Value = number | string | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue;
+export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue;
+
+/**
+ * Represents an array value (reference semantics)
+ */
+export interface ArrayValue {
+  type: 'ArrayValue';
+  elements: Value[];
+}
+
+export function isArrayValue(value: Value): value is ArrayValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'ArrayValue';
+}
 
 /**
  * Represents an object value that supports property access (like ctx)
@@ -168,6 +183,14 @@ function expressionToSource(expr: Expression): string {
       ).join('') + '`';
     case 'StyleBlockLiteral':
       return '${ ' + expr.properties.map(p => `${p.name}: ${p.value};`).join(' ') + ' }';
+    case 'NullLiteral':
+      return 'null';
+    case 'ArrayLiteral':
+      return '[' + expr.elements.map(expressionToSource).join(', ') + ']';
+    case 'IndexExpression':
+      return `${expressionToSource(expr.object)}[${expressionToSource(expr.index)}]`;
+    case 'MethodCallExpression':
+      return `${expressionToSource(expr.object)}.${expr.method}(${expr.args.map(expressionToSource).join(', ')})`;
     default:
       return '?';
   }
@@ -343,8 +366,22 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'StringLiteral':
       return expr.value;
 
+    case 'NullLiteral':
+      return null;
+
     case 'Identifier':
       return lookupVariable(scope, expr.name);
+
+    case 'ArrayLiteral': {
+      const elements = expr.elements.map((el) => evaluateExpression(el, scope));
+      return { type: 'ArrayValue' as const, elements };
+    }
+
+    case 'IndexExpression':
+      return evaluateIndexExpression(expr, scope);
+
+    case 'MethodCallExpression':
+      return evaluateMethodCall(expr, scope);
 
     case 'BinaryExpression': {
       // Check for angle unit mismatch before evaluation for +/-
@@ -363,11 +400,24 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
         return { type: 'StyleBlockValue', properties: { ...left.properties, ...right.properties } };
       }
 
+      // Null equality checks
+      if (expr.operator === '==' || expr.operator === '!=') {
+        if (left === null || right === null) {
+          if (expr.operator === '==') return (left === null && right === null) ? 1 : 0;
+          return (left === null && right === null) ? 0 : 1;
+        }
+      }
+
       // String equality: == and != work for strings
       if ((expr.operator === '==' || expr.operator === '!=') &&
           typeof left === 'string' && typeof right === 'string') {
         if (expr.operator === '==') return left === right ? 1 : 0;
         return left !== right ? 1 : 0;
+      }
+
+      // Null in arithmetic
+      if (left === null || right === null) {
+        throw new Error('Cannot use null in arithmetic expression');
       }
 
       if (typeof left !== 'number' || typeof right !== 'number') {
@@ -393,6 +443,9 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
 
     case 'UnaryExpression': {
       const arg = evaluateExpression(expr.argument, scope);
+      if (arg === null) {
+        throw new Error('Cannot use null in arithmetic expression');
+      }
       if (typeof arg !== 'number') {
         throw new Error(`Unary operator ${expr.operator} requires numeric operand`);
       }
@@ -422,13 +475,76 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
   }
 }
 
+function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
+  const obj = evaluateExpression(expr.object, scope);
+  const index = evaluateExpression(expr.index, scope);
+
+  if (!isArrayValue(obj)) {
+    throw new Error('Index access requires an array');
+  }
+  if (typeof index !== 'number') {
+    throw new Error('Array index must be a number');
+  }
+  if (!Number.isInteger(index) || index < 0 || index >= obj.elements.length) {
+    throw new Error(`Array index ${index} out of bounds (length ${obj.elements.length})`);
+  }
+  return obj.elements[index];
+}
+
+function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
+  const obj = evaluateExpression(expr.object, scope);
+
+  if (!isArrayValue(obj)) {
+    throw new Error(`Cannot call method '${expr.method}' on non-array value`);
+  }
+
+  switch (expr.method) {
+    case 'push': {
+      if (expr.args.length !== 1) throw new Error('push() expects 1 argument');
+      const val = evaluateExpression(expr.args[0], scope);
+      obj.elements.push(val);
+      return obj.elements.length;
+    }
+    case 'pop': {
+      if (expr.args.length !== 0) throw new Error('pop() expects 0 arguments');
+      if (obj.elements.length === 0) return null;
+      return obj.elements.pop()!;
+    }
+    case 'shift': {
+      if (expr.args.length !== 0) throw new Error('shift() expects 0 arguments');
+      if (obj.elements.length === 0) return null;
+      return obj.elements.shift()!;
+    }
+    case 'unshift': {
+      if (expr.args.length !== 1) throw new Error('unshift() expects 1 argument');
+      const val = evaluateExpression(expr.args[0], scope);
+      obj.elements.unshift(val);
+      return obj.elements.length;
+    }
+    case 'empty': {
+      if (expr.args.length !== 0) throw new Error('empty() expects 0 arguments');
+      return obj.elements.length === 0 ? 1 : 0;
+    }
+    default:
+      throw new Error(`Unknown array method: ${expr.method}`);
+  }
+}
+
+function formatValueForDisplay(val: Value): string {
+  if (val === null) return 'null';
+  if (typeof val === 'number') return formatNum(val);
+  if (typeof val === 'string') return val;
+  if (isArrayValue(val)) {
+    return '[' + val.elements.map(formatValueForDisplay).join(', ') + ']';
+  }
+  return String(val);
+}
+
 function evaluateTemplateLiteral(tl: TemplateLiteral, scope: Scope): string {
   return tl.parts.map(part => {
     if (typeof part === 'string') return part;
     const val = evaluateExpression(part, scope);
-    if (typeof val === 'number') return formatNum(val);
-    if (typeof val === 'string') return val;
-    return String(val);
+    return formatValueForDisplay(val);
   }).join('');
 }
 
@@ -487,6 +603,14 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     throw new Error(`Property '${expr.property}' does not exist on layer reference`);
   }
 
+  // Handle ArrayValue property access
+  if (isArrayValue(obj)) {
+    if (expr.property === 'length') {
+      return obj.elements.length;
+    }
+    throw new Error(`Property '${expr.property}' does not exist on array. Use methods like .push(), .pop(), etc.`);
+  }
+
   throw new Error(`Cannot access property '${expr.property}' on non-object value`);
 }
 
@@ -540,7 +664,11 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
         const label = expressionToSource(arg);
         let stringValue: string;
 
-        if (typeof value === 'object' && value !== null && 'type' in value) {
+        if (value === null) {
+          stringValue = 'null';
+        } else if (isArrayValue(value)) {
+          stringValue = formatValueForDisplay(value);
+        } else if (typeof value === 'object' && value !== null && 'type' in value) {
           const typed = value as { type: string; value?: unknown };
           if (typed.type === 'ContextObject' && typed.value) {
             stringValue = JSON.stringify(typed.value, null, 2);
@@ -659,6 +787,9 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
 
     case 'Identifier': {
       const value = lookupVariable(scope, arg.name);
+      if (value === null) {
+        throw new Error('Cannot use null as a path argument');
+      }
       if (typeof value === 'number') {
         return formatNum(value);
       }
@@ -670,6 +801,9 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
 
     case 'CalcExpression': {
       const value = evaluateExpression(arg.expression, scope);
+      if (value === null) {
+        throw new Error('Cannot use null as a path argument');
+      }
       if (typeof value !== 'number') {
         throw new Error('calc() must evaluate to a number');
       }
@@ -678,6 +812,9 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
 
     case 'FunctionCall': {
       const value = evaluateFunctionCall(arg, scope);
+      if (value === null) {
+        throw new Error('Cannot use null as a path argument');
+      }
       if (typeof value === 'number') {
         return formatNum(value);
       }
@@ -695,10 +832,35 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
 
     case 'MemberExpression': {
       const value = evaluateMemberExpression(arg, scope);
+      if (value === null) {
+        throw new Error('Cannot use null as a path argument');
+      }
       if (typeof value === 'number') {
         return formatNum(value);
       }
       throw new Error(`Member expression did not evaluate to a number`);
+    }
+
+    case 'IndexExpression': {
+      const value = evaluateIndexExpression(arg, scope);
+      if (value === null) {
+        throw new Error('Cannot use null as a path argument');
+      }
+      if (typeof value === 'number') {
+        return formatNum(value);
+      }
+      throw new Error('Index expression did not evaluate to a number');
+    }
+
+    case 'MethodCallExpression': {
+      const value = evaluateMethodCall(arg, scope);
+      if (value === null) {
+        throw new Error('Cannot use null as a path argument');
+      }
+      if (typeof value === 'number') {
+        return formatNum(value);
+      }
+      throw new Error(`Method call did not return a valid path value`);
     }
 
     default:
@@ -735,6 +897,16 @@ function getNumericArgs(args: PathArg[], scope: Scope): number[] {
         numericArgs.push(value);
       }
       // PathSegments don't contribute to numeric args for context tracking
+    } else if (arg.type === 'IndexExpression') {
+      const value = evaluateIndexExpression(arg, scope);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
+    } else if (arg.type === 'MethodCallExpression') {
+      const value = evaluateMethodCall(arg, scope);
+      if (typeof value === 'number') {
+        numericArgs.push(value);
+      }
     }
   }
   return numericArgs;
@@ -1135,9 +1307,22 @@ function evaluateTextBody(items: TextBodyItem[], scope: Scope, children: TextChi
           evaluateTextBody(item.body as TextBodyItem[], loopScope, children);
         }
       }
+    } else if (item.type === 'ForEachLoop') {
+      const iterable = evaluateExpression(item.iterable, scope);
+      if (!isArrayValue(iterable)) {
+        throw new Error('for-each requires an array');
+      }
+      for (let i = 0; i < iterable.elements.length; i++) {
+        const loopScope = createScope(scope);
+        setVariable(loopScope, item.variable, iterable.elements[i]);
+        if (item.indexVariable) {
+          setVariable(loopScope, item.indexVariable, i);
+        }
+        evaluateTextBody(item.body as TextBodyItem[], loopScope, children);
+      }
     } else if (item.type === 'IfStatement') {
       const condition = evaluateExpression(item.condition, scope);
-      const isTruthy = typeof condition === 'number' ? condition !== 0 : Boolean(condition);
+      const isTruthy = condition !== null && (typeof condition === 'number' ? condition !== 0 : Boolean(condition));
       if (isTruthy) {
         evaluateTextBody(item.consequent as TextBodyItem[], scope, children);
       } else if (item.alternate) {
@@ -1221,12 +1406,29 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
 
     case 'IfStatement': {
       const condition = evaluateExpression(stmt.condition, scope);
-      const isTruthy = typeof condition === 'number' ? condition !== 0 : Boolean(condition);
+      const isTruthy = condition !== null && (typeof condition === 'number' ? condition !== 0 : Boolean(condition));
 
       if (isTruthy) {
         evaluateStatementsToAccum(stmt.consequent, createScope(scope), accum);
       } else if (stmt.alternate) {
         evaluateStatementsToAccum(stmt.alternate, createScope(scope), accum);
+      }
+      return;
+    }
+
+    case 'ForEachLoop': {
+      const iterable = evaluateExpression(stmt.iterable, scope);
+      if (!isArrayValue(iterable)) {
+        throw new Error('for-each requires an array');
+      }
+
+      for (let i = 0; i < iterable.elements.length; i++) {
+        const loopScope = createScope(scope);
+        setVariable(loopScope, stmt.variable, iterable.elements[i]);
+        if (stmt.indexVariable) {
+          setVariable(loopScope, stmt.indexVariable, i);
+        }
+        evaluateStatementsToAccum(stmt.body, loopScope, accum);
       }
       return;
     }
@@ -1242,6 +1444,12 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
     }
 
     case 'PathCommand': {
+      // Method call statements: evaluate for side effects, don't emit return value
+      if (stmt.command === '' && stmt.args.length === 1 && stmt.args[0].type === 'MethodCallExpression') {
+        evaluateMethodCall(stmt.args[0] as MethodCallExpression, scope);
+        return;
+      }
+
       // Validate path commands aren't targeting a TextLayer
       if (scope.evalState) {
         if (scope.evalState.activeLayerName) {

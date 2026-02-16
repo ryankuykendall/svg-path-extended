@@ -978,6 +978,118 @@ describe('Evaluator', () => {
     });
   });
 
+  describe('null', () => {
+    it('null is falsy in conditionals', () => {
+      expect(compilePath('let x = null; if (x) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
+    });
+
+    it('null == null is truthy', () => {
+      expect(compilePath('let x = null; if (x == null) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+    });
+
+    it('null != null is falsy', () => {
+      expect(compilePath('let x = null; if (x != null) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
+    });
+
+    it('null != 0 (null is not zero)', () => {
+      expect(compilePath('if (null == 0) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
+    });
+
+    it('null in arithmetic throws', () => {
+      expect(() => compilePath('let x = null; let y = calc(x + 1);')).toThrow(/null/i);
+    });
+
+    it('null in path args throws', () => {
+      expect(() => compilePath('let x = null; M x 0')).toThrow(/null/i);
+    });
+
+    it('log(null) displays "null"', () => {
+      const result = compile('log(null);');
+      expect(result.logs[0].parts[0].value).toBe('null');
+    });
+  });
+
+  describe('arrays', () => {
+    it('creates an array and accesses elements', () => {
+      expect(compilePath('let list = [10, 20, 30]; M list[0] list[1]')).toBe('M 10 20');
+    });
+
+    it('accesses .length', () => {
+      const result = compile('let list = [1, 2, 3]; log(list.length);');
+      expect(result.logs[0].parts[0].value).toBe('3');
+    });
+
+    it('empty() on empty array', () => {
+      expect(compilePath('let list = []; if (list.empty()) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+    });
+
+    it('empty() on non-empty array', () => {
+      expect(compilePath('let list = [1]; if (list.empty()) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
+    });
+
+    it('push adds element and returns new length', () => {
+      expect(compilePath('let list = [1, 2]; let len = list.push(3); M len list[2]')).toBe('M 3 3');
+    });
+
+    it('pop removes last element and returns it', () => {
+      expect(compilePath('let list = [1, 2, 3]; let last = list.pop(); M last list.length')).toBe('M 3 2');
+    });
+
+    it('pop on empty array returns null', () => {
+      expect(compilePath('let list = []; let x = list.pop(); if (x == null) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+    });
+
+    it('shift removes first element and returns it', () => {
+      expect(compilePath('let list = [10, 20, 30]; let first = list.shift(); M first list[0]')).toBe('M 10 20');
+    });
+
+    it('shift on empty array returns null', () => {
+      expect(compilePath('let list = []; let x = list.shift(); if (x == null) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+    });
+
+    it('unshift prepends element and returns new length', () => {
+      expect(compilePath('let list = [2, 3]; let len = list.unshift(1); M len list[0]')).toBe('M 3 1');
+    });
+
+    it('for-each iterates over array', () => {
+      expect(compilePath('let pts = [10, 20, 30]; for (p in pts) { M p 0 }')).toBe('M 10 0 M 20 0 M 30 0');
+    });
+
+    it('destructured for-each provides item and index', () => {
+      expect(compilePath('let pts = [10, 20]; for ([p, i] in pts) { M p i }')).toBe('M 10 0 M 20 1');
+    });
+
+    it('for-each over empty array produces nothing', () => {
+      expect(compilePath('let list = []; for (x in list) { M x 0 }')).toBe('');
+    });
+
+    it('reference semantics — mutations visible through all bindings', () => {
+      expect(compilePath('let arr = [1, 2]; let ref = arr; ref.push(3); M arr[2] arr.length')).toBe('M 3 3');
+    });
+
+    it('arrays in path args via index', () => {
+      expect(compilePath('let pts = [10, 20]; M pts[0] pts[1]')).toBe('M 10 20');
+    });
+
+    it('log displays arrays', () => {
+      const result = compile('let list = [1, 2, 3]; log(list);');
+      expect(result.logs[0].parts[0].value).toBe('[1, 2, 3]');
+    });
+
+    it('log displays nested arrays', () => {
+      const result = compile('let list = [1, [2, 3]]; log(list);');
+      expect(result.logs[0].parts[0].value).toBe('[1, [2, 3]]');
+    });
+
+    it('array with expressions', () => {
+      expect(compilePath('let x = 5; let list = [x, calc(x * 2), calc(x * 3)]; M list[0] list[2]')).toBe('M 5 15');
+    });
+
+    it('empty array literal has length 0', () => {
+      expect(compilePath('let list = []; M list.length 0')).toBe('M 0 0');
+    });
+  });
+
   describe('style blocks', () => {
     it('creates a style block value', () => {
       const result = compile(`

@@ -791,6 +791,132 @@ L 10 20 // end point`;
     });
   });
 
+  describe('null', () => {
+    it('parses null literal', () => {
+      const ast = parse('let x = null;');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        name: 'x',
+        value: { type: 'NullLiteral' },
+      });
+    });
+
+    it('null is a reserved word', () => {
+      expect(() => parse('let null = 10;')).toThrow();
+    });
+  });
+
+  describe('arrays', () => {
+    it('parses empty array', () => {
+      const ast = parse('let x = [];');
+      expect(ast.body[0]).toMatchObject({
+        type: 'LetDeclaration',
+        value: { type: 'ArrayLiteral', elements: [] },
+      });
+    });
+
+    it('parses array with elements', () => {
+      const ast = parse('let x = [1, 2, 3];');
+      const decl = ast.body[0] as any;
+      expect(decl.value.type).toBe('ArrayLiteral');
+      expect(decl.value.elements).toHaveLength(3);
+      expect(decl.value.elements[0]).toMatchObject({ type: 'NumberLiteral', value: 1 });
+      expect(decl.value.elements[2]).toMatchObject({ type: 'NumberLiteral', value: 3 });
+    });
+
+    it('parses index access', () => {
+      const ast = parse('let x = list[0];');
+      const decl = ast.body[0] as any;
+      expect(decl.value).toMatchObject({
+        type: 'IndexExpression',
+        object: { type: 'Identifier', name: 'list' },
+        index: { type: 'NumberLiteral', value: 0 },
+      });
+    });
+
+    it('parses chained index access', () => {
+      const ast = parse('let x = grid[0][1];');
+      const decl = ast.body[0] as any;
+      expect(decl.value).toMatchObject({
+        type: 'IndexExpression',
+        object: {
+          type: 'IndexExpression',
+          object: { type: 'Identifier', name: 'grid' },
+          index: { type: 'NumberLiteral', value: 0 },
+        },
+        index: { type: 'NumberLiteral', value: 1 },
+      });
+    });
+
+    it('parses method call', () => {
+      const ast = parse('let x = list.push(42);');
+      const decl = ast.body[0] as any;
+      expect(decl.value).toMatchObject({
+        type: 'MethodCallExpression',
+        object: { type: 'Identifier', name: 'list' },
+        method: 'push',
+        args: [{ type: 'NumberLiteral', value: 42 }],
+      });
+    });
+
+    it('parses for-each loop', () => {
+      const ast = parse('for (item in list) { M item 0 }');
+      expect(ast.body[0]).toMatchObject({
+        type: 'ForEachLoop',
+        variable: 'item',
+        iterable: { type: 'Identifier', name: 'list' },
+      });
+    });
+
+    it('parses destructured for-each loop', () => {
+      const ast = parse('for ([item, idx] in list) { M item idx }');
+      expect(ast.body[0]).toMatchObject({
+        type: 'ForEachLoop',
+        variable: 'item',
+        indexVariable: 'idx',
+        iterable: { type: 'Identifier', name: 'list' },
+      });
+    });
+
+    it('disambiguates range for-loop from for-each', () => {
+      // Range loop: has '..'
+      const ast1 = parse('for (i in 0..10) { M i 0 }');
+      expect(ast1.body[0].type).toBe('ForLoop');
+
+      // For-each: no '..'
+      const ast2 = parse('for (i in list) { M i 0 }');
+      expect(ast2.body[0].type).toBe('ForEachLoop');
+    });
+
+    it('parses index in path args', () => {
+      const ast = parse('M arr[0] arr[1]');
+      const cmd = ast.body[0] as any;
+      expect(cmd.args[0]).toMatchObject({
+        type: 'IndexExpression',
+        object: { type: 'Identifier', name: 'arr' },
+        index: { type: 'NumberLiteral', value: 0 },
+      });
+      expect(cmd.args[1]).toMatchObject({
+        type: 'IndexExpression',
+        object: { type: 'Identifier', name: 'arr' },
+        index: { type: 'NumberLiteral', value: 1 },
+      });
+    });
+
+    it('parses method call statement', () => {
+      const ast = parse('list.push(42);');
+      expect(ast.body[0]).toMatchObject({
+        type: 'PathCommand',
+        command: '',
+      });
+      const cmd = ast.body[0] as any;
+      expect(cmd.args[0]).toMatchObject({
+        type: 'MethodCallExpression',
+        method: 'push',
+      });
+    });
+  });
+
   describe('text and tspan statements', () => {
     it('parses inline text statement', () => {
       const ast = parse('text(10, 20)`hello`');

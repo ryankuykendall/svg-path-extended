@@ -12,10 +12,15 @@ import type {
   CalcExpression,
   FunctionCall,
   MemberExpression,
+  NullLiteral,
+  ArrayLiteral,
+  IndexExpression,
+  MethodCallExpression,
   PathCommand,
   LetDeclaration,
   AssignmentStatement,
   ForLoop,
+  ForEachLoop,
   IfStatement,
   FunctionDefinition,
   ReturnStatement,
@@ -100,7 +105,7 @@ const identifier: Parsimmon.Parser<Identifier> = token(
 }));
 
 // Reserved words that cannot be identifiers
-const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log', 'return', 'define', 'default', 'layer', 'apply', 'text', 'tspan'];
+const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log', 'return', 'define', 'default', 'layer', 'apply', 'text', 'tspan', 'null'];
 
 // Context-aware functions that should be parsed as statements, not path arguments
 // These functions require path context and produce path output
@@ -133,28 +138,44 @@ const nonPathCommandIdentifier: Parsimmon.Parser<Identifier> = token(
   return P.succeed({ type: 'Identifier' as const, name });
 });
 
-// Property access: chains .property after a base expression
-// Returns either the base or a MemberExpression chain
-function withMemberAccess(base: Parsimmon.Parser<Expression>): Parsimmon.Parser<Expression> {
+// Postfix operators: chains .method(args), .property, and [index] after a base expression
+function withPostfix(base: Parsimmon.Parser<Expression>): Parsimmon.Parser<Expression> {
   return base.chain((baseExpr) =>
-    P.seq(P.string('.'), token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)))
+    P.alt(
+      // .name(args) → MethodCallExpression (try first — needs '(' after '.name')
+      P.seq(
+        P.string('.'),
+        token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)),
+        P.string('(').skip(optWhitespace),
+        P.sepBy(P.lazy(() => expression), word(',')),
+        word(')')
+      ).map(([, method, , args]): { type: 'method'; method: string; args: Expression[] } =>
+        ({ type: 'method', method, args })),
+      // .name → MemberExpression
+      P.seq(P.string('.'), token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)))
+        .map(([, prop]): { type: 'member'; prop: string } => ({ type: 'member', prop })),
+      // [expr] → IndexExpression
+      P.seq(P.string('[').skip(optWhitespace), P.lazy(() => expression), word(']'))
+        .map(([, index]): { type: 'index'; index: Expression } => ({ type: 'index', index }))
+    )
       .many()
-      .map((properties) =>
-        properties.reduce<Expression>(
-          (obj, [, prop]) => ({
-            type: 'MemberExpression' as const,
-            object: obj,
-            property: prop,
-          }),
-          baseExpr
-        )
+      .map((postfixes) =>
+        postfixes.reduce<Expression>((obj, postfix) => {
+          if (postfix.type === 'method') {
+            return { type: 'MethodCallExpression' as const, object: obj, method: postfix.method, args: postfix.args };
+          } else if (postfix.type === 'member') {
+            return { type: 'MemberExpression' as const, object: obj, property: postfix.prop };
+          } else {
+            return { type: 'IndexExpression' as const, object: obj, index: postfix.index };
+          }
+        }, baseExpr)
       )
   );
 }
 
-// Member expression for path arguments (base cannot be path command letter or context-aware function call)
-// Type is narrowed to Identifier | MemberExpression to satisfy PathArg
-const pathMemberExpression: Parsimmon.Parser<Identifier | MemberExpression> =
+// Member/index expression for path arguments (base cannot be path command letter or context-aware function call)
+// Type is narrowed to PathArg-compatible types
+const pathMemberExpression: Parsimmon.Parser<PathArg> =
   // First check: fail if this is a context-aware function followed by '('
   P.lookahead(
     P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/).chain((name) => {
@@ -171,17 +192,34 @@ const pathMemberExpression: Parsimmon.Parser<Identifier | MemberExpression> =
     })
   ).then(
     nonPathCommandIdentifier.chain((baseExpr) =>
-      P.seq(P.string('.'), token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)))
+      P.alt(
+        // .name(args) → MethodCallExpression
+        P.seq(
+          P.string('.'),
+          token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)),
+          P.string('(').skip(optWhitespace),
+          P.sepBy(P.lazy(() => expression), word(',')),
+          word(')')
+        ).map(([, method, , args]): { type: 'method'; method: string; args: Expression[] } =>
+          ({ type: 'method', method, args })),
+        // .name → MemberExpression
+        P.seq(P.string('.'), token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)))
+          .map(([, prop]): { type: 'member'; prop: string } => ({ type: 'member', prop })),
+        // [expr] → IndexExpression
+        P.seq(P.string('[').skip(optWhitespace), P.lazy(() => expression), word(']'))
+          .map(([, index]): { type: 'index'; index: Expression } => ({ type: 'index', index }))
+      )
         .many()
-        .map((properties) =>
-          properties.reduce<Identifier | MemberExpression>(
-            (obj, [, prop]) => ({
-              type: 'MemberExpression' as const,
-              object: obj,
-              property: prop,
-            }),
-            baseExpr
-          )
+        .map((postfixes) =>
+          postfixes.reduce<PathArg>((obj, postfix) => {
+            if (postfix.type === 'method') {
+              return { type: 'MethodCallExpression' as const, object: obj as Expression, method: postfix.method, args: postfix.args };
+            } else if (postfix.type === 'member') {
+              return { type: 'MemberExpression' as const, object: obj as Expression, property: postfix.prop };
+            } else {
+              return { type: 'IndexExpression' as const, object: obj as Expression, index: postfix.index };
+            }
+          }, baseExpr)
         )
     )
   );
@@ -363,16 +401,33 @@ const templateLiteral: Parsimmon.Parser<TemplateLiteral> = P.seq(
   parts,
 }));
 
-// Primary expression: style block, number, string, template literal, calc, identifier (with optional property access), function call (with optional member access), or parenthesized expression
+// Null literal
+const nullLiteral: Parsimmon.Parser<NullLiteral> = keyword('null').map((): NullLiteral => ({
+  type: 'NullLiteral' as const,
+}));
+
+// Array literal: [], [1, 2, 3], [expr, expr]
+const arrayLiteral: Parsimmon.Parser<ArrayLiteral> = P.seq(
+  word('['),
+  P.sepBy(P.lazy(() => expression), word(',')),
+  word(']')
+).map(([, elements]): ArrayLiteral => ({
+  type: 'ArrayLiteral' as const,
+  elements,
+}));
+
+// Primary expression: style block, number, string, template literal, calc, null, array, identifier (with optional postfix), function call (with optional postfix), or parenthesized expression
 const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
   P.alt(
-    withMemberAccess(styleBlockLiteral),
+    withPostfix(styleBlockLiteral),
+    nullLiteral,
+    withPostfix(arrayLiteral as Parsimmon.Parser<Expression>),
     numberLiteral,
     stringLiteral,
     templateLiteral,
     calcExpression,
-    withMemberAccess(functionCall),
-    withMemberAccess(nonReservedIdentifier),
+    withPostfix(functionCall),
+    withPostfix(nonReservedIdentifier),
     P.seq(word('('), expression, word(')')).map(([, expr]) => expr)
   )
 );
@@ -489,6 +544,37 @@ const forLoop: Parsimmon.Parser<ForLoop> = P.seqMap(
   })
 );
 
+// for-each loop: for (item in list) { ... } or for ([item, index] in list) { ... }
+const forEachLoop: Parsimmon.Parser<ForEachLoop> = P.seqMap(
+  P.index,
+  keyword('for'),
+  word('('),
+  P.alt(
+    // Destructured: [item, index]
+    P.seq(
+      word('['),
+      nonReservedIdentifier,
+      word(','),
+      nonReservedIdentifier,
+      word(']')
+    ).map(([, item, , index]) => ({ variable: item.name, indexVariable: index.name })),
+    // Simple: item
+    nonReservedIdentifier.map((id) => ({ variable: id.name }))
+  ),
+  keyword('in'),
+  expression,
+  word(')'),
+  block,
+  (startIndex, _for, _lp, vars, _in, iterable, _rp, body) => ({
+    type: 'ForEachLoop' as const,
+    variable: vars.variable,
+    indexVariable: (vars as { indexVariable?: string }).indexVariable,
+    iterable,
+    body,
+    loc: indexToLoc(startIndex),
+  })
+);
+
 // if statement: if (condition) { ... } else { ... }
 const ifStatement: Parsimmon.Parser<IfStatement> = P.seqMap(
   keyword('if'),
@@ -562,6 +648,29 @@ const functionCallStatement: Parsimmon.Parser<PathCommand> = P.seqMap(
     command: '',  // Empty command means it's a function call at statement level
     args: [call],
     loc: call.loc,
+  })
+);
+
+// Method call statement: identifier.method(args); (e.g., list.push(42);)
+const methodCallStatement: Parsimmon.Parser<PathCommand> = P.seqMap(
+  P.index,
+  nonReservedIdentifier,
+  P.string('.'),
+  token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)),
+  P.string('(').skip(optWhitespace),
+  P.sepBy(P.lazy(() => expression), word(',')),
+  word(')'),
+  word(';').atMost(1),
+  (startIndex, obj, _dot, method, _open, args, _close) => ({
+    type: 'PathCommand' as const,
+    command: '',
+    args: [{
+      type: 'MethodCallExpression' as const,
+      object: obj as Expression,
+      method,
+      args,
+    } as MethodCallExpression],
+    loc: indexToLoc(startIndex),
   })
 );
 
@@ -652,6 +761,7 @@ const textBlockBody: Parsimmon.Parser<TextBodyItem[]> = P.lazy(() =>
     tspanStatement as Parsimmon.Parser<TextBodyItem>,
     templateLiteral as Parsimmon.Parser<TextBodyItem>,
     textForLoop as Parsimmon.Parser<TextBodyItem>,
+    textForEachLoop as Parsimmon.Parser<TextBodyItem>,
     textIfStatement as Parsimmon.Parser<TextBodyItem>,
     letDeclaration as Parsimmon.Parser<TextBodyItem>,
   ).many()
@@ -678,6 +788,37 @@ const textForLoop: Parsimmon.Parser<ForLoop> = P.seqMap(
     variable: id.name,
     start,
     end,
+    body: body as unknown as Statement[],
+    loc: indexToLoc(startIndex),
+  })
+);
+
+// For-each loop inside text blocks — body contains text items instead of statements
+const textForEachLoop: Parsimmon.Parser<ForEachLoop> = P.seqMap(
+  P.index,
+  keyword('for'),
+  word('('),
+  P.alt(
+    // Destructured: [item, index]
+    P.seq(
+      word('['),
+      nonReservedIdentifier,
+      word(','),
+      nonReservedIdentifier,
+      word(']')
+    ).map(([, item, , index]) => ({ variable: item.name, indexVariable: index.name })),
+    // Simple: item
+    nonReservedIdentifier.map((id) => ({ variable: id.name }))
+  ),
+  keyword('in'),
+  expression,
+  word(')'),
+  textBlock,
+  (startIndex, _for, _lp, vars, _in, iterable, _rp, body) => ({
+    type: 'ForEachLoop' as const,
+    variable: vars.variable,
+    indexVariable: (vars as { indexVariable?: string }).indexVariable,
+    iterable,
     body: body as unknown as Statement[],
     loc: indexToLoc(startIndex),
   })
@@ -730,16 +871,19 @@ const textStatement: Parsimmon.Parser<TextStatement> = P.seqMap(
 // Statement
 // Important: functionCallStatement must come BEFORE pathCommand to avoid
 // 'circle(...)' being parsed as path command 'c' + 'ircle(...)'
+// forLoop (range) tried before forEachLoop (for-each) — disambiguated by '..'
 const statement: Parsimmon.Parser<Statement> = P.alt(
   layerDefinition,
   layerApplyBlock,
   textStatement,
   letDeclaration,
   forLoop,
+  forEachLoop,
   ifStatement,
   functionDefinition,
   returnStatement,
   assignmentStatement,
+  methodCallStatement,
   functionCallStatement,
   pathCommand
 );

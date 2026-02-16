@@ -145,6 +145,167 @@ Property values are always strings.
 
 Style blocks are used in layer definitions and can be passed as per-element styles on `text()` and `tspan()`. See [Layers](layers.md) for full details.
 
+## Null
+
+The `null` literal represents the absence of a value. It is returned by `pop()` and `shift()` on empty arrays, and can be used in variable assignments and conditionals.
+
+```
+let x = null;
+```
+
+### Truthiness
+
+`null` is falsy in conditionals:
+
+```
+let x = null;
+if (x) {
+  // not reached
+} else {
+  M 0 0  // this branch runs
+}
+```
+
+### Equality
+
+`null` is only equal to itself:
+
+```
+if (x == null) { /* x is null */ }
+if (x != null) { /* x has a value */ }
+```
+
+`null == 0` evaluates to `0` (false) — null is distinct from zero.
+
+### Error Behavior
+
+Using `null` in arithmetic or as a path argument throws a descriptive error:
+
+```
+let x = null;
+let y = x + 1;     // Error: Cannot use null in arithmetic expression
+M x 0               // Error: Cannot use null as a path argument
+```
+
+## Arrays
+
+Arrays hold ordered collections of values. Elements can be numbers, strings, style blocks, other arrays, or `null`.
+
+### Literals
+
+```
+let empty = [];
+let nums = [1, 2, 3];
+let mixed = [10, "hello", [4, 5]];
+```
+
+### Index Access
+
+Access elements by zero-based index using `[expr]`:
+
+```
+let list = [10, 20, 30];
+let first = list[0];         // 10
+let second = list[1];        // 20
+M list[0] list[1]            // M 10 20
+```
+
+Out-of-bounds access throws an error.
+
+### `.length`
+
+Returns the number of elements:
+
+```
+let list = [1, 2, 3];
+log(list.length);  // 3
+```
+
+### `.empty()`
+
+Returns `1` (truthy) if the array has no elements, `0` (falsy) otherwise:
+
+```
+let list = [];
+if (list.empty()) {
+  // list is empty
+}
+```
+
+### Methods
+
+#### `.push(value)`
+
+Appends a value to the end. Returns the new length.
+
+```
+let list = [1, 2];
+let len = list.push(3);  // list is now [1, 2, 3], len is 3
+```
+
+#### `.pop()`
+
+Removes and returns the last element. Returns `null` if the array is empty.
+
+```
+let list = [1, 2, 3];
+let last = list.pop();   // last is 3, list is now [1, 2]
+let empty = [];
+let x = empty.pop();     // x is null
+```
+
+#### `.unshift(value)`
+
+Prepends a value to the start. Returns the new length.
+
+```
+let list = [2, 3];
+list.unshift(1);  // list is now [1, 2, 3]
+```
+
+#### `.shift()`
+
+Removes and returns the first element. Returns `null` if the array is empty.
+
+```
+let list = [1, 2, 3];
+let first = list.shift();  // first is 1, list is now [2, 3]
+```
+
+### Reference Semantics
+
+Arrays are passed by reference. Mutations through one binding are visible through all others:
+
+```
+let a = [1, 2, 3];
+let b = a;
+b.push(4);
+log(a.length);  // 4 — same underlying array
+```
+
+### For-Each Iteration
+
+Iterate over array elements with `for (item in list)`:
+
+```
+let points = [10, 20, 30];
+for (p in points) {
+  M p 0
+}
+// Produces: M 10 0 M 20 0 M 30 0
+```
+
+Destructure to get both item and index with `for ([item, index] in list)`:
+
+```
+let sizes = [5, 10, 15];
+for ([size, i] in sizes) {
+  circle(calc(i * 40 + 20), 50, size)
+}
+```
+
+Iterating over an empty array produces no output.
+
 ## Angle Units
 
 Numbers can have angle unit suffixes for convenience:

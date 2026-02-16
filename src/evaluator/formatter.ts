@@ -35,6 +35,12 @@ export function formatAnnotated(output: AnnotatedOutput, options: FormatOptions 
         indentLevel++;
         break;
 
+      case 'foreach_start':
+        lines.push('');
+        lines.push(indent() + `//--- for (${line.variable} in array[${line.length}]) from line ${line.line}`);
+        indentLevel++;
+        break;
+
       case 'iteration':
         lines.push(indent() + `//--- iteration ${line.index}`);
         break;

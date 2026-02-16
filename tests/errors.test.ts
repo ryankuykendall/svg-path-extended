@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parse } from '../src';
+import { parse, compile } from '../src';
 import { compilePath } from './helpers';
 
 describe('Parse errors', () => {
@@ -123,6 +123,54 @@ describe('Runtime errors', () => {
     it('throws on non-numeric range end', () => {
       expect(() => compilePath('let s = circle(50, 50, 25); for (i in 0..s) { M i 0 }')).toThrow(/numeric/i);
     });
+  });
+});
+
+describe('Null errors', () => {
+  it('null in arithmetic throws descriptive error', () => {
+    expect(() => compilePath('let x = null; let y = calc(x + 1);')).toThrow(/null.*arithmetic/i);
+  });
+
+  it('null in path argument throws descriptive error', () => {
+    expect(() => compilePath('let x = null; M x 0')).toThrow(/null.*path argument/i);
+  });
+
+  it('unary operator on null throws', () => {
+    expect(() => compilePath('let x = null; let y = calc(-x);')).toThrow(/null/i);
+  });
+});
+
+describe('Array errors', () => {
+  it('index out of bounds throws', () => {
+    expect(() => compilePath('let list = [1, 2]; M list[5] 0')).toThrow(/out of bounds/i);
+  });
+
+  it('index on non-array throws', () => {
+    expect(() => compilePath('let x = 5; M x[0] 0')).toThrow(/array/i);
+  });
+
+  it('non-numeric index throws', () => {
+    expect(() => compilePath('let list = [1, 2]; let k = "foo"; M list[k] 0')).toThrow(/number/i);
+  });
+
+  it('unknown method throws', () => {
+    expect(() => compilePath('let list = [1, 2]; let x = list.foo();')).toThrow(/unknown.*method/i);
+  });
+
+  it('for-each over non-array throws', () => {
+    expect(() => compilePath('let x = 5; for (i in x) { M i 0 }')).toThrow(/array/i);
+  });
+
+  it('push with wrong arg count throws', () => {
+    expect(() => compilePath('let list = []; list.push(1, 2);')).toThrow(/1 argument/i);
+  });
+
+  it('pop with wrong arg count throws', () => {
+    expect(() => compilePath('let list = [1]; let x = list.pop(1);')).toThrow(/0 arguments/i);
+  });
+
+  it('method on non-array throws', () => {
+    expect(() => compilePath('let x = 5; x.push(1);')).toThrow(/non-array/i);
   });
 });
 

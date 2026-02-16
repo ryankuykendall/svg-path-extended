@@ -260,6 +260,88 @@ L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</
 </code></pre><p>Property values are always strings.</p>
 <h3>Usage in Layers</h3>
 <p>Style blocks are used in layer definitions and can be passed as per-element styles on <code>text()</code> and <code>tspan()</code>. See <a href="layers.md">Layers</a> for full details.</p>
+<h2>Null</h2>
+<p>The <code>null</code> literal represents the absence of a value. It is returned by <code>pop()</code> and <code>shift()</code> on empty arrays, and can be used in variable assignments and conditionals.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> x = <span class="hljs-literal">null</span>;
+</code></pre><h3>Truthiness</h3>
+<p><code>null</code> is falsy in conditionals:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> x = <span class="hljs-literal">null</span>;
+<span class="hljs-keyword">if</span> (x) {
+  <span class="hljs-comment">// not reached</span>
+} <span class="hljs-keyword">else</span> {
+  M <span class="hljs-number">0</span> <span class="hljs-number">0</span>  <span class="hljs-comment">// this branch runs</span>
+}
+</code></pre><h3>Equality</h3>
+<p><code>null</code> is only equal to itself:</p>
+<pre><code class="hljs"><span class="hljs-keyword">if</span> (x == <span class="hljs-literal">null</span>) { <span class="hljs-comment">/* x is null */</span> }
+<span class="hljs-keyword">if</span> (x != <span class="hljs-literal">null</span>) { <span class="hljs-comment">/* x has a value */</span> }
+</code></pre><p><code>null == 0</code> evaluates to <code>0</code> (false) — null is distinct from zero.</p>
+<h3>Error Behavior</h3>
+<p>Using <code>null</code> in arithmetic or as a path argument throws a descriptive error:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> x = <span class="hljs-literal">null</span>;
+<span class="hljs-keyword">let</span> y = x + <span class="hljs-number">1</span>;     <span class="hljs-comment">// Error: Cannot use null in arithmetic expression</span>
+M x <span class="hljs-number">0</span>               <span class="hljs-comment">// Error: Cannot use null as a path argument</span>
+</code></pre><h2>Arrays</h2>
+<p>Arrays hold ordered collections of values. Elements can be numbers, strings, style blocks, other arrays, or <code>null</code>.</p>
+<h3>Literals</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> empty = [];
+<span class="hljs-keyword">let</span> nums = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>];
+<span class="hljs-keyword">let</span> mixed = [<span class="hljs-number">10</span>, <span class="hljs-string">&quot;hello&quot;</span>, [<span class="hljs-number">4</span>, <span class="hljs-number">5</span>]];
+</code></pre><h3>Index Access</h3>
+<p>Access elements by zero-based index using <code>[expr]</code>:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">10</span>, <span class="hljs-number">20</span>, <span class="hljs-number">30</span>];
+<span class="hljs-keyword">let</span> first = list[<span class="hljs-number">0</span>];         <span class="hljs-comment">// 10</span>
+<span class="hljs-keyword">let</span> second = list[<span class="hljs-number">1</span>];        <span class="hljs-comment">// 20</span>
+M list[<span class="hljs-number">0</span>] list[<span class="hljs-number">1</span>]            <span class="hljs-comment">// M 10 20</span>
+</code></pre><p>Out-of-bounds access throws an error.</p>
+<h3><code>.length</code></h3>
+<p>Returns the number of elements:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>];
+<span class="hljs-title function_">log</span>(list.<span class="hljs-property">length</span>);  <span class="hljs-comment">// 3</span>
+</code></pre><h3><code>.empty()</code></h3>
+<p>Returns <code>1</code> (truthy) if the array has no elements, <code>0</code> (falsy) otherwise:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> list = [];
+<span class="hljs-keyword">if</span> (list.<span class="hljs-title function_">empty</span>()) {
+  <span class="hljs-comment">// list is empty</span>
+}
+</code></pre><h3>Methods</h3>
+<h4><code>.push(value)</code></h4>
+<p>Appends a value to the end. Returns the new length.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>];
+<span class="hljs-keyword">let</span> len = list.<span class="hljs-title function_">push</span>(<span class="hljs-number">3</span>);  <span class="hljs-comment">// list is now [1, 2, 3], len is 3</span>
+</code></pre><h4><code>.pop()</code></h4>
+<p>Removes and returns the last element. Returns <code>null</code> if the array is empty.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>];
+<span class="hljs-keyword">let</span> last = list.<span class="hljs-title function_">pop</span>();   <span class="hljs-comment">// last is 3, list is now [1, 2]</span>
+<span class="hljs-keyword">let</span> empty = [];
+<span class="hljs-keyword">let</span> x = empty.<span class="hljs-title function_">pop</span>();     <span class="hljs-comment">// x is null</span>
+</code></pre><h4><code>.unshift(value)</code></h4>
+<p>Prepends a value to the start. Returns the new length.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">2</span>, <span class="hljs-number">3</span>];
+list.<span class="hljs-title function_">unshift</span>(<span class="hljs-number">1</span>);  <span class="hljs-comment">// list is now [1, 2, 3]</span>
+</code></pre><h4><code>.shift()</code></h4>
+<p>Removes and returns the first element. Returns <code>null</code> if the array is empty.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>];
+<span class="hljs-keyword">let</span> first = list.<span class="hljs-title function_">shift</span>();  <span class="hljs-comment">// first is 1, list is now [2, 3]</span>
+</code></pre><h3>Reference Semantics</h3>
+<p>Arrays are passed by reference. Mutations through one binding are visible through all others:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> a = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>];
+<span class="hljs-keyword">let</span> b = a;
+b.<span class="hljs-title function_">push</span>(<span class="hljs-number">4</span>);
+<span class="hljs-title function_">log</span>(a.<span class="hljs-property">length</span>);  <span class="hljs-comment">// 4 — same underlying array</span>
+</code></pre><h3>For-Each Iteration</h3>
+<p>Iterate over array elements with <code>for (item in list)</code>:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> points = [<span class="hljs-number">10</span>, <span class="hljs-number">20</span>, <span class="hljs-number">30</span>];
+<span class="hljs-keyword">for</span> (p <span class="hljs-keyword">in</span> points) {
+  M p <span class="hljs-number">0</span>
+}
+<span class="hljs-comment">// Produces: M 10 0 M 20 0 M 30 0</span>
+</code></pre><p>Destructure to get both item and index with <code>for ([item, index] in list)</code>:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> sizes = [<span class="hljs-number">5</span>, <span class="hljs-number">10</span>, <span class="hljs-number">15</span>];
+<span class="hljs-keyword">for</span> ([size, i] <span class="hljs-keyword">in</span> sizes) {
+  <span class="hljs-title function_">circle</span>(<span class="hljs-title function_">calc</span>(i * <span class="hljs-number">40</span> + <span class="hljs-number">20</span>), <span class="hljs-number">50</span>, size)
+}
+</code></pre><p>Iterating over an empty array produces no output.</p>
 <h2>Angle Units</h2>
 <p>Numbers can have angle unit suffixes for convenience:</p>
 <table>
