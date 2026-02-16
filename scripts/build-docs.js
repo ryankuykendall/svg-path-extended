@@ -65,6 +65,28 @@ marked.setOptions({
   breaks: false,
 });
 
+// Decode common HTML entities to plain text
+function decodeEntities(text) {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+// Slugify heading text for use as an id attribute
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .replace(/<[^>]*>/g, '')      // strip HTML tags
+    .replace(/&[^;]+;/g, '')      // strip HTML entities
+    .replace(/[^\w\s-]/g, '')     // strip special chars
+    .replace(/\s+/g, '-')         // spaces to hyphens
+    .replace(/-+/g, '-')          // dedupe hyphens
+    .replace(/^-|-$/g, '');       // trim leading/trailing hyphens
+}
+
 // Mapping from markdown filenames to export names
 const DOC_FILES = {
   'getting-started.md': 'gettingStarted',
@@ -76,20 +98,62 @@ const DOC_FILES = {
   'examples.md': 'examples',
 };
 
+// Fallback title from filename
+function plainTitle(filename) {
+  return filename.replace('.md', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 async function buildDocs() {
   console.log('Building documentation...\n');
 
   const exports = {};
   const missing = [];
+  const tocData = [];
 
   for (const [filename, exportName] of Object.entries(DOC_FILES)) {
     const filepath = join(DOCS_DIR, filename);
 
     try {
       const markdown = await fs.readFile(filepath, 'utf-8');
-      const html = marked.parse(markdown);
+
+      // Per-section slug tracker and heading collector
+      const seenSlugs = new Set();
+      const headings = [];
+      // Section key prefix for globally unique IDs (e.g. "syntax-variables")
+      const sectionPrefix = slugify(exportName.replace(/([A-Z])/g, '-$1'));
+
+      const renderer = {
+        heading({ tokens, depth }) {
+          const text = this.parser.parseInline(tokens);
+          const plainText = text.replace(/<[^>]*>/g, '');
+          let baseSlug = slugify(plainText);
+          let slug = `${sectionPrefix}-${baseSlug}`;
+
+          // Deduplicate slugs within section
+          if (seenSlugs.has(slug)) {
+            let n = 2;
+            while (seenSlugs.has(`${slug}-${n}`)) n++;
+            slug = `${slug}-${n}`;
+          }
+          seenSlugs.add(slug);
+
+          headings.push({ id: slug, title: decodeEntities(plainText), level: depth });
+          return `<h${depth} id="${slug}">${text}</h${depth}>\n`;
+        }
+      };
+
+      const html = marked.use({ renderer }).parse(markdown);
       exports[exportName] = html;
-      console.log(`  ✓ ${filename} → ${exportName}`);
+
+      // Extract section title from the first h1 heading
+      const sectionTitle = headings.find(h => h.level === 1)?.title || plainTitle(filename);
+      tocData.push({
+        key: exportName,
+        title: sectionTitle,
+        headings: headings.filter(h => h.level >= 2),
+      });
+
+      console.log(`  ✓ ${filename} → ${exportName} (${headings.length} headings)`);
     } catch (err) {
       if (err.code === 'ENOENT') {
         missing.push(filename);
@@ -138,6 +202,14 @@ async function buildDocs() {
     output += `  ${name},\n`;
   }
   output += `};\n\n`;
+
+  // Add TOC data for sidebar navigation
+  const escapeTocJSON = JSON.stringify(tocData, null, 2)
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$\{/g, '\\${');
+  output += `// Structured table-of-contents data for sidebar navigation\n`;
+  output += `export const tocData = JSON.parse(\`${escapeTocJSON}\`);\n\n`;
 
   // Add syntax highlighting theme CSS
   const escapeCSS = (css) => css
