@@ -148,7 +148,18 @@ export const syntax = `<h1>Syntax Reference</h1>
 <span class="hljs-keyword">let</span> y = <span class="hljs-number">75</span>;
 M x y L <span class="hljs-number">100</span> <span class="hljs-number">100</span>
 </code></pre><p><strong>Note</strong>: Single letters that are path commands (M, L, C, etc.) cannot be used as variable names.</p>
-<h2>Expressions with calc()</h2>
+<h2>Strings and Template Literals</h2>
+<p>String values use double quotes:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> name = <span class="hljs-string">&quot;World&quot;</span>;
+</code></pre><p>Template literals use backticks with <code>\${expression}</code> interpolation:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> greeting = <span class="hljs-string">\`Hello <span class="hljs-subst">\${name}</span>!\`</span>;          <span class="hljs-comment">// &quot;Hello World!&quot;</span>
+<span class="hljs-keyword">let</span> msg = <span class="hljs-string">\`Score: <span class="hljs-subst">\${<span class="hljs-number">2</span> + <span class="hljs-number">3</span>}</span>\`</span>;             <span class="hljs-comment">// &quot;Score: 5&quot;</span>
+<span class="hljs-keyword">let</span> pos = <span class="hljs-string">\`(<span class="hljs-subst">\${ctx.position.x}</span>, <span class="hljs-subst">\${ctx.position.y}</span>)\`</span>;
+</code></pre><p>Template literals are the sole string construction mechanism — the <code>+</code> operator stays strictly numeric. String equality works with <code>==</code> and <code>!=</code>:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> mode = <span class="hljs-string">&quot;dark&quot;</span>;
+<span class="hljs-keyword">if</span> (mode == <span class="hljs-string">&quot;dark&quot;</span>) { <span class="hljs-comment">/* ... */</span> }
+<span class="hljs-keyword">if</span> (mode != <span class="hljs-string">&quot;light&quot;</span>) { <span class="hljs-comment">/* ... */</span> }
+</code></pre><h2>Expressions with calc()</h2>
 <p>For mathematical expressions, wrap them in <code>calc()</code>:</p>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> r = <span class="hljs-number">50</span>;
 M <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</span> - r) <span class="hljs-number">100</span>
@@ -221,8 +232,34 @@ L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</
 <td><code>-</code></td>
 <td>Negation (unary)</td>
 </tr>
+<tr>
+<td><code>&lt;&lt;</code></td>
+<td>Style block merge</td>
+</tr>
 </tbody></table>
 <p>Operator precedence follows standard mathematical conventions.</p>
+<h2>Style Blocks</h2>
+<p>Style blocks are CSS-like key-value maps wrapped in <code>\${ }</code>. They&#39;re used for layer styles but are also first-class values — you can store them in variables, merge them, and read their properties.</p>
+<h3>Literals</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> styles = \${
+  <span class="hljs-attr">stroke</span>: #cc0000;
+  stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">3</span>;
+  <span class="hljs-attr">fill</span>: none;
+};
+</code></pre><p>Each property is a <code>name: value;</code> declaration. Values are try-evaluated as expressions — if the value parses as a valid expression (like a variable reference or <code>calc()</code>), its result is used. Otherwise the raw string is kept (e.g., <code>rgb(...)</code>, <code>#hex</code>).</p>
+<h3>Merge (<code>&lt;&lt;</code>)</h3>
+<p>The <code>&lt;&lt;</code> operator combines two style blocks. The right side overrides the left:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> base = \${ <span class="hljs-attr">stroke</span>: red; stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">2</span>; };
+<span class="hljs-keyword">let</span> merged = base &lt;&lt; \${ stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">4</span>; <span class="hljs-attr">fill</span>: blue; };
+<span class="hljs-comment">// Result: stroke: red, stroke-width: 4, fill: blue</span>
+</code></pre><p>Multiple merges can be chained: <code>a &lt;&lt; b &lt;&lt; c</code>.</p>
+<h3>Property Access</h3>
+<p>Use dot notation with camelCase names to read kebab-case properties:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> s = \${ stroke-<span class="hljs-attr">width</span>: <span class="hljs-number">4</span>; };
+<span class="hljs-keyword">let</span> sw = s.<span class="hljs-property">strokeWidth</span>;  <span class="hljs-comment">// &quot;4&quot; (reads &#x27;stroke-width&#x27;)</span>
+</code></pre><p>Property values are always strings.</p>
+<h3>Usage in Layers</h3>
+<p>Style blocks are used in layer definitions and can be passed as per-element styles on <code>text()</code> and <code>tspan()</code>. See <a href="layers.md">Layers</a> for full details.</p>
 <h2>Angle Units</h2>
 <p>Numbers can have angle unit suffixes for convenience:</p>
 <table>

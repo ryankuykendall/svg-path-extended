@@ -45,6 +45,30 @@ M x y L 100 100
 
 **Note**: Single letters that are path commands (M, L, C, etc.) cannot be used as variable names.
 
+## Strings and Template Literals
+
+String values use double quotes:
+
+```
+let name = "World";
+```
+
+Template literals use backticks with `${expression}` interpolation:
+
+```
+let greeting = `Hello ${name}!`;          // "Hello World!"
+let msg = `Score: ${2 + 3}`;             // "Score: 5"
+let pos = `(${ctx.position.x}, ${ctx.position.y})`;
+```
+
+Template literals are the sole string construction mechanism — the `+` operator stays strictly numeric. String equality works with `==` and `!=`:
+
+```
+let mode = "dark";
+if (mode == "dark") { /* ... */ }
+if (mode != "light") { /* ... */ }
+```
+
 ## Expressions with calc()
 
 For mathematical expressions, wrap them in `calc()`:
@@ -74,8 +98,52 @@ L calc(100 + r) 100
 | `\|\|` | Logical OR |
 | `!` | Logical NOT (unary) |
 | `-` | Negation (unary) |
+| `<<` | Style block merge |
 
 Operator precedence follows standard mathematical conventions.
+
+## Style Blocks
+
+Style blocks are CSS-like key-value maps wrapped in `${ }`. They're used for layer styles but are also first-class values — you can store them in variables, merge them, and read their properties.
+
+### Literals
+
+```
+let styles = ${
+  stroke: #cc0000;
+  stroke-width: 3;
+  fill: none;
+};
+```
+
+Each property is a `name: value;` declaration. Values are try-evaluated as expressions — if the value parses as a valid expression (like a variable reference or `calc()`), its result is used. Otherwise the raw string is kept (e.g., `rgb(...)`, `#hex`).
+
+### Merge (`<<`)
+
+The `<<` operator combines two style blocks. The right side overrides the left:
+
+```
+let base = ${ stroke: red; stroke-width: 2; };
+let merged = base << ${ stroke-width: 4; fill: blue; };
+// Result: stroke: red, stroke-width: 4, fill: blue
+```
+
+Multiple merges can be chained: `a << b << c`.
+
+### Property Access
+
+Use dot notation with camelCase names to read kebab-case properties:
+
+```
+let s = ${ stroke-width: 4; };
+let sw = s.strokeWidth;  // "4" (reads 'stroke-width')
+```
+
+Property values are always strings.
+
+### Usage in Layers
+
+Style blocks are used in layer definitions and can be passed as per-element styles on `text()` and `tspan()`. See [Layers](layers.md) for full details.
 
 ## Angle Units
 
