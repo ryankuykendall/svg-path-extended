@@ -1,22 +1,4 @@
-#!/usr/bin/env node
-
-/**
- * Build script for website deployment to CloudFlare Pages
- *
- * Output structure (public/):
- * ├── index.html                    # Root landing page
- * ├── _worker.js                    # CloudFlare Worker for SPA routing
- * ├── blog/                         # Blog posts (markdown)
- * └── svg-path-extended/
- *     ├── index.html                # Playground SPA entry
- *     ├── 404.html                  # Fallback for SPA routes
- *     ├── styles/
- *     ├── components/
- *     ├── state/
- *     ├── utils/
- *     └── dist/                     # Library build (for global script)
- */
-
+import { Command } from 'commander';
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -26,7 +8,7 @@ const ROOT = join(__dirname, '..');
 // Output to 'public' - standard CloudFlare Pages output directory
 const DIST = join(ROOT, 'public');
 
-async function copyDir(src, dest) {
+async function copyDir(src: string, dest: string): Promise<void> {
   await fs.mkdir(dest, { recursive: true });
   const entries = await fs.readdir(src, { withFileTypes: true });
 
@@ -42,18 +24,18 @@ async function copyDir(src, dest) {
   }
 }
 
-async function copyFile(src, dest) {
+async function copyFile(src: string, dest: string): Promise<void> {
   await fs.mkdir(dirname(dest), { recursive: true });
   await fs.copyFile(src, dest);
 }
 
-async function build() {
+async function build(): Promise<void> {
   console.log('Building website to public/...\n');
 
   // Clean dist/website
   try {
     await fs.rm(DIST, { recursive: true });
-  } catch (e) {
+  } catch {
     // Directory doesn't exist, that's fine
   }
   await fs.mkdir(DIST, { recursive: true });
@@ -103,7 +85,7 @@ async function build() {
       join(ROOT, 'dist', 'index.global.js.map'),
       join(playgroundDest, 'dist', 'index.global.js.map')
     );
-  } catch (e) {
+  } catch {
     // Map file doesn't exist, that's fine
   }
 
@@ -120,10 +102,10 @@ async function build() {
         join(ROOT, 'dist', 'worker.worker.js.map'),
         join(playgroundDest, 'dist', 'worker.worker.js.map')
       );
-    } catch (e) {
+    } catch {
       // Map file doesn't exist, that's fine
     }
-  } catch (e) {
+  } catch {
     console.warn('  Worker file not found, skipping...');
   }
 
@@ -134,7 +116,7 @@ async function build() {
     await fs.access(blogSrc);
     console.log('Copying blog...');
     await copyDir(blogSrc, blogDest);
-  } catch (e) {
+  } catch {
     // Blog directory doesn't exist, that's fine
   }
 
@@ -142,7 +124,16 @@ async function build() {
   console.log(`Output: ${DIST}`);
 }
 
-build().catch(err => {
-  console.error('Build failed:', err);
-  process.exit(1);
-});
+const program = new Command();
+program
+  .name('build-website')
+  .description('Build website for CloudFlare Pages deployment')
+  .action(async () => {
+    try {
+      await build();
+    } catch (err) {
+      console.error('Build failed:', err);
+      process.exit(1);
+    }
+  });
+program.parse();

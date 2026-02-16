@@ -1,0 +1,45 @@
+# Scripts
+
+All scripts in this directory are TypeScript files executed via `tsx`.
+
+## Conventions
+
+- **TypeScript only** — all scripts use `.ts` extension
+- **Commander CLI** — every script uses Commander for `--help`, argument parsing, and description
+- **Executed via `tsx`** — scripts are not compiled; npm scripts use `tsx scripts/X.ts`
+- **Async pattern** — wrap main logic in Commander's `.action()` callback
+
+## Template for New Scripts
+
+```ts
+import { Command } from 'commander';
+
+const program = new Command();
+program
+  .name('script-name')
+  .description('What this script does')
+  .option('--flag <value>', 'Description of flag')
+  .action(async (opts) => {
+    // Main logic here
+  });
+program.parse();
+```
+
+## Existing Scripts
+
+| Script | Purpose |
+|---|---|
+| `build-docs.ts` | Convert markdown docs to `playground/utils/docs-content.js` |
+| `build-blog.ts` | Convert blog markdown to `playground/utils/blog-content.js` |
+| `build-website.ts` | Assemble CloudFlare Pages output in `public/` |
+| `new-blog-post.ts` | Scaffold a new blog post with frontmatter |
+| `rotate-admin-token.ts` | Generate and deploy a new admin token via Wrangler |
+| `install-git-hooks.ts` | Install git hooks from `scripts/git-hooks/` |
+
+## Git Hooks
+
+Git hooks live in `scripts/git-hooks/` as TypeScript files. The `install-git-hooks.ts` script writes shims into `.git/hooks/` that invoke the TypeScript source via `npx tsx`.
+
+| Hook | Purpose |
+|---|---|
+| `git-hooks/post-commit.ts` | Remind to update CHANGELOG.md |
