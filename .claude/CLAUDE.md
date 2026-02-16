@@ -57,6 +57,10 @@ Build library → scope components → identify reuse → storybook-driven desig
 - Local: `npm run dev:website` → http://localhost:3000
 - Deployed: https://pedestal.design/svg-path-extended/
 
+## Changelog
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). When updating it, always cover **all** work since the last entry — review `git log` from the previous entry's date, not just the current task. Organize entries under Added/Fixed/Changed with Core/Playground/Documentation/Development sub-sections.
+
 ## Summary Instructions
 
 When compacting, prioritize:

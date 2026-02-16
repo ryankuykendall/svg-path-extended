@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-02-16
+
+### Added
+
+#### Core
+- Multi-layer support — `path` layers for SVG paths and `text` layers for text elements with template literals.
+- Style blocks as first-class values with merge (`+`), property access (`.fill`), and per-element inline styles.
+- Arrays and `null` as first-class data types with `len()`, `push()`, `map()`, `filter()`, `reduce()`, `join()`, index access, and spread.
+- `for`/`if`/`let` control flow inside text blocks.
+- Radians-based text/tspan rotation (converted to degrees at render time).
+
+#### Playground
+- Thumbnail system — R2-backed storage, crop modal, landing page thumbnails, admin backfill view, and supersampled rasterization with step-down halving.
+- Layer controls panel for toggling visibility and managing multi-layer compositions.
+- Inline color picker and TextLayer style editor in the code editor.
+- Scoped autocompletion for function parameters and layer keywords.
+- Docs sidebar with anchor navigation and scroll spy.
+- Export legend improvements — snap-to-grid positioning, advanced settings with font embedding, Baumans branding, compact metadata line, content-driven width, and 128-line code limit.
+- Shared SVG snapshot utility for consistent multi-layer rendering across export, thumbnails, and preview.
+- Loading spinner on workspace transitions with stale SVG preview clearing.
+- Admin token rotation script (`npm run website:admin-token`) with Wrangler secret + redeploy.
+
+#### Documentation
+- Layers documentation covering PathLayer, TextLayer, template literals, and style blocks.
+- Style blocks and template literals documented in syntax reference.
+- Arrays and null documented in syntax reference.
+- Conditionals docs updated to include `else if` syntax.
+- Blog post: *The SVG Serialization Trap*.
+
+### Fixed
+
+#### Playground
+- Navigator viewport stroke vanishing on large canvases.
+- Navigator blank for text-only layers (clone text elements for minimap).
+- Navigator per-layer styling and viewport-fill zoom for small canvases.
+- Overflow menu clipped in workspace cards.
+- Empty admin thumbnails — wait for in-progress generation and validate results.
+- Thumbnail worker path resolution in production.
+
+### Changed
+
+#### Core
+- Deprecated global stroke/fill controls in favor of per-layer styling.
+
+#### Development
+- Converted all scripts from JavaScript/Bash to TypeScript with Commander CLI framework for `--help`, argument parsing, and type safety.
+- Scripts now run via `tsx` instead of `node`; added `commander` as a dev dependency.
+- Added `scripts/CLAUDE.md` prescribing TypeScript + Commander conventions for new scripts.
+- Git hook installer (`install-git-hooks.ts`) now writes shims that invoke TypeScript source via `npx tsx`.
+- Added `playground/CLAUDE.md` and `src/CLAUDE.md` with conventions and workflow guardrails; refreshed project-level CLAUDE.md for multi-layer era.
+
 ## [Unreleased] - 2026-02-09
 
 ### Added
