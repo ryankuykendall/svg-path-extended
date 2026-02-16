@@ -395,15 +395,9 @@ export class SvgPreviewPane extends HTMLElement {
           }
           navGroup.appendChild(navPath);
         } else if (el.tagName === 'text') {
-          // Text is illegible at navigator scale; render a small circle indicator
-          const x = parseFloat(el.getAttribute('x')) || 0;
-          const y = parseFloat(el.getAttribute('y')) || 0;
-          const indicator = document.createElementNS(SVG_NS, 'circle');
-          indicator.setAttribute('cx', String(x));
-          indicator.setAttribute('cy', String(y));
-          indicator.setAttribute('r', '3');
-          indicator.setAttribute('fill', el.getAttribute('fill') || el.getAttribute('stroke') || DEFAULT_STROKE);
-          navGroup.appendChild(indicator);
+          // Clone text element into navigator for a faithful minimap
+          const navText = el.cloneNode(true);
+          navGroup.appendChild(navText);
         }
       }
     } else {
