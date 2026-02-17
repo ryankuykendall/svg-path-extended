@@ -145,6 +145,7 @@ Disallow: /pathogen/preferences
 Disallow: /pathogen/admin/
 Disallow: /pathogen/storybook
 Sitemap: https://pedestal.design/sitemap.xml
+Content-Signal: search=yes, ai-input=yes, ai-train=no
 `;
   await fs.writeFile(join(DIST, 'robots.txt'), robotsTxt);
 
