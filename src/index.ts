@@ -7,7 +7,8 @@ export { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } fro
 export { stdlib } from './stdlib';
 
 export type { Program, Statement, Expression, Node, SourceLocation, Comment, StyleProperty, StyleBlockLiteral, LayerDefinition, LayerApplyBlock, TemplateLiteral, TextStatement, TspanStatement, TextBodyItem, ForEachLoop, NullLiteral, ArrayLiteral, IndexExpression, MethodCallExpression } from './parser/ast';
-export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart, LayerOutput, CompileResult, LayerStyle, StyleBlockValue, ArrayValue, TextElement, TextChild, PathLayerState, TextLayerState } from './evaluator';
+export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart, LayerOutput, CompileResult, LayerStyle, StyleBlockValue, ArrayValue, PointValue, TextElement, TextChild, PathLayerState, TextLayerState } from './evaluator';
+export { isPointValue } from './evaluator';
 export type { FormatOptions } from './evaluator/formatter';
 
 /**

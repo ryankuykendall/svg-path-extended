@@ -27,6 +27,9 @@ export const stdlibCompletions = [
   // ctx object (used with polar/tangent functions)
   { label: 'ctx', type: 'variable', info: 'ctx - Path context object' },
 
+  // Point constructor
+  { label: 'Point', type: 'function', info: 'Point(x, y) - Create a 2D point' },
+
   // Layer types
   { label: 'PathLayer', type: 'keyword', info: "PathLayer('name') - Path layer type for define" },
   { label: 'TextLayer', type: 'keyword', info: "TextLayer('name') - Text layer type for define" },
@@ -252,6 +255,54 @@ export function svgPathCompletions(context) {
       // Check for user-defined object variables
       const doc = context.state.doc.toString();
       const from = singleProp.from + obj.length + 1;
+
+      // Check for Point variables (let x = Point(...) or method results returning Points)
+      const pointVarRegex2 = new RegExp(`let\\s+${obj}\\s*=\\s*(Point|\\w+\\.(translate|polarTranslate|midpoint|lerp|rotate))\\s*\\(`);
+      if (pointVarRegex2.test(doc)) {
+        return {
+          from,
+          options: [
+            { label: 'x', type: 'property', info: `${obj}.x - X coordinate`, boost: 10 },
+            { label: 'y', type: 'property', info: `${obj}.y - Y coordinate`, boost: 9 },
+            { label: 'translate()', type: 'function', info: `${obj}.translate(dx, dy) - Offset by deltas`, boost: 8,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'translate()' }, selection: { anchor: from + 10 } });
+              },
+            },
+            { label: 'polarTranslate()', type: 'function', info: `${obj}.polarTranslate(angle, distance) - Polar offset`, boost: 7,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'polarTranslate()' }, selection: { anchor: from + 15 } });
+              },
+            },
+            { label: 'midpoint()', type: 'function', info: `${obj}.midpoint(point) - Halfway between two points`, boost: 6,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'midpoint()' }, selection: { anchor: from + 9 } });
+              },
+            },
+            { label: 'lerp()', type: 'function', info: `${obj}.lerp(point, t) - Linear interpolation`, boost: 5,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'lerp()' }, selection: { anchor: from + 5 } });
+              },
+            },
+            { label: 'rotate()', type: 'function', info: `${obj}.rotate(angle, origin) - Rotate around point`, boost: 4,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'rotate()' }, selection: { anchor: from + 7 } });
+              },
+            },
+            { label: 'distanceTo()', type: 'function', info: `${obj}.distanceTo(point) - Euclidean distance`, boost: 3,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'distanceTo()' }, selection: { anchor: from + 11 } });
+              },
+            },
+            { label: 'angleTo()', type: 'function', info: `${obj}.angleTo(point) - Angle in radians`, boost: 2,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'angleTo()' }, selection: { anchor: from + 8 } });
+              },
+            },
+          ],
+          validFor: /^\w*$/,
+        };
+      }
 
       // Check for polarOffset which returns dx, dy
       const offsetVarRegex = new RegExp(`let\\s+${obj}\\s*=\\s*polarOffset\\s*\\(`);

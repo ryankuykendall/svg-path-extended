@@ -271,6 +271,123 @@ let y = x + 1;     // Error: Cannot use null in arithmetic expression
 M x 0               // Error: Cannot use null as a path argument
 ```
 
+## Points
+
+Points represent 2D coordinates and provide geometric operations for SVG path construction.
+
+### Constructor
+
+Create a point with `Point(x, y)`:
+
+```
+let center = Point(200, 200);
+let origin = Point(0, 0);
+```
+
+### Properties
+
+| Property | Returns | Description |
+|---|---|---|
+| `.x` | number | X coordinate |
+| `.y` | number | Y coordinate |
+
+```
+let pt = Point(100, 200);
+M pt.x pt.y           // M 100 200
+L calc(pt.x + 10) pt.y  // L 110 200
+```
+
+### Methods
+
+All angles are in radians, consistent with the standard library.
+
+#### `.translate(dx, dy)`
+
+Returns a new point offset by the given deltas:
+
+```
+let pt = Point(100, 100);
+let moved = pt.translate(10, -20);  // Point(110, 80)
+```
+
+#### `.polarTranslate(angle, distance)`
+
+Returns a new point offset by angle and distance:
+
+```
+let pt = Point(100, 100);
+let moved = pt.polarTranslate(0, 50);     // Point(150, 100)
+let up = pt.polarTranslate(-0.5pi, 30);   // 30 units upward
+```
+
+#### `.midpoint(other)`
+
+Returns the midpoint between two points:
+
+```
+let a = Point(0, 0);
+let b = Point(100, 100);
+let mid = a.midpoint(b);  // Point(50, 50)
+```
+
+#### `.lerp(other, t)`
+
+Linear interpolation between two points. `t=0` returns this point, `t=1` returns the other:
+
+```
+let a = Point(0, 0);
+let b = Point(100, 200);
+let quarter = a.lerp(b, 0.25);  // Point(25, 50)
+```
+
+#### `.rotate(angle, origin)`
+
+Rotates this point around a center point:
+
+```
+let pt = Point(100, 0);
+let center = Point(0, 0);
+let rotated = pt.rotate(90deg, center);  // Point(0, 100) approximately
+```
+
+#### `.distanceTo(other)`
+
+Returns the Euclidean distance between two points:
+
+```
+let a = Point(0, 0);
+let b = Point(3, 4);
+log(a.distanceTo(b));  // 5
+```
+
+#### `.angleTo(other)`
+
+Returns the angle in radians from this point to another:
+
+```
+let a = Point(0, 0);
+let b = Point(1, 0);
+log(a.angleTo(b));  // 0 (pointing right)
+```
+
+### Display
+
+`log()` shows points in a readable format:
+
+```
+let pt = Point(100, 200);
+log(pt);  // Point(100, 200)
+```
+
+### Template Literals
+
+Points display as `Point(x, y)` when interpolated in template literals:
+
+```
+let pt = Point(42, 99);
+let msg = `position: ${pt}`;  // "position: Point(42, 99)"
+```
+
 ## Arrays
 
 Arrays hold ordered collections of values. Elements can be numbers, strings, style blocks, other arrays, or `null`.

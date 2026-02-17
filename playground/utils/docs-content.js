@@ -324,6 +324,79 @@ L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</
 <pre><code class="hljs"><span class="hljs-keyword">let</span> x = <span class="hljs-literal">null</span>;
 <span class="hljs-keyword">let</span> y = x + <span class="hljs-number">1</span>;     <span class="hljs-comment">// Error: Cannot use null in arithmetic expression</span>
 M x <span class="hljs-number">0</span>               <span class="hljs-comment">// Error: Cannot use null as a path argument</span>
+</code></pre><h2 id="syntax-points">Points</h2>
+<p>Points represent 2D coordinates and provide geometric operations for SVG path construction.</p>
+<h3 id="syntax-constructor">Constructor</h3>
+<p>Create a point with <code>Point(x, y)</code>:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> center = <span class="hljs-title class_">Point</span>(<span class="hljs-number">200</span>, <span class="hljs-number">200</span>);
+<span class="hljs-keyword">let</span> origin = <span class="hljs-title class_">Point</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>);
+</code></pre><h3 id="syntax-properties">Properties</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>.x</code></td>
+<td>number</td>
+<td>X coordinate</td>
+</tr>
+<tr>
+<td><code>.y</code></td>
+<td>number</td>
+<td>Y coordinate</td>
+</tr>
+</tbody></table>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> pt = <span class="hljs-title class_">Point</span>(<span class="hljs-number">100</span>, <span class="hljs-number">200</span>);
+M pt.<span class="hljs-property">x</span> pt.<span class="hljs-property">y</span>           <span class="hljs-comment">// M 100 200</span>
+L <span class="hljs-title function_">calc</span>(pt.<span class="hljs-property">x</span> + <span class="hljs-number">10</span>) pt.<span class="hljs-property">y</span>  <span class="hljs-comment">// L 110 200</span>
+</code></pre><h3 id="syntax-methods">Methods</h3>
+<p>All angles are in radians, consistent with the standard library.</p>
+<h4 id="syntax-translatedx-dy"><code>.translate(dx, dy)</code></h4>
+<p>Returns a new point offset by the given deltas:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> pt = <span class="hljs-title class_">Point</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>);
+<span class="hljs-keyword">let</span> moved = pt.<span class="hljs-title function_">translate</span>(<span class="hljs-number">10</span>, -<span class="hljs-number">20</span>);  <span class="hljs-comment">// Point(110, 80)</span>
+</code></pre><h4 id="syntax-polartranslateangle-distance"><code>.polarTranslate(angle, distance)</code></h4>
+<p>Returns a new point offset by angle and distance:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> pt = <span class="hljs-title class_">Point</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>);
+<span class="hljs-keyword">let</span> moved = pt.<span class="hljs-title function_">polarTranslate</span>(<span class="hljs-number">0</span>, <span class="hljs-number">50</span>);     <span class="hljs-comment">// Point(150, 100)</span>
+<span class="hljs-keyword">let</span> up = pt.<span class="hljs-title function_">polarTranslate</span>(-<span class="hljs-number">0.</span>5pi, <span class="hljs-number">30</span>);   <span class="hljs-comment">// 30 units upward</span>
+</code></pre><h4 id="syntax-midpointother"><code>.midpoint(other)</code></h4>
+<p>Returns the midpoint between two points:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> a = <span class="hljs-title class_">Point</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>);
+<span class="hljs-keyword">let</span> b = <span class="hljs-title class_">Point</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>);
+<span class="hljs-keyword">let</span> mid = a.<span class="hljs-title function_">midpoint</span>(b);  <span class="hljs-comment">// Point(50, 50)</span>
+</code></pre><h4 id="syntax-lerpother-t"><code>.lerp(other, t)</code></h4>
+<p>Linear interpolation between two points. <code>t=0</code> returns this point, <code>t=1</code> returns the other:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> a = <span class="hljs-title class_">Point</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>);
+<span class="hljs-keyword">let</span> b = <span class="hljs-title class_">Point</span>(<span class="hljs-number">100</span>, <span class="hljs-number">200</span>);
+<span class="hljs-keyword">let</span> quarter = a.<span class="hljs-title function_">lerp</span>(b, <span class="hljs-number">0.25</span>);  <span class="hljs-comment">// Point(25, 50)</span>
+</code></pre><h4 id="syntax-rotateangle-origin"><code>.rotate(angle, origin)</code></h4>
+<p>Rotates this point around a center point:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> pt = <span class="hljs-title class_">Point</span>(<span class="hljs-number">100</span>, <span class="hljs-number">0</span>);
+<span class="hljs-keyword">let</span> center = <span class="hljs-title class_">Point</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>);
+<span class="hljs-keyword">let</span> rotated = pt.<span class="hljs-title function_">rotate</span>(90deg, center);  <span class="hljs-comment">// Point(0, 100) approximately</span>
+</code></pre><h4 id="syntax-distancetoother"><code>.distanceTo(other)</code></h4>
+<p>Returns the Euclidean distance between two points:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> a = <span class="hljs-title class_">Point</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>);
+<span class="hljs-keyword">let</span> b = <span class="hljs-title class_">Point</span>(<span class="hljs-number">3</span>, <span class="hljs-number">4</span>);
+<span class="hljs-title function_">log</span>(a.<span class="hljs-title function_">distanceTo</span>(b));  <span class="hljs-comment">// 5</span>
+</code></pre><h4 id="syntax-angletoother"><code>.angleTo(other)</code></h4>
+<p>Returns the angle in radians from this point to another:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> a = <span class="hljs-title class_">Point</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>);
+<span class="hljs-keyword">let</span> b = <span class="hljs-title class_">Point</span>(<span class="hljs-number">1</span>, <span class="hljs-number">0</span>);
+<span class="hljs-title function_">log</span>(a.<span class="hljs-title function_">angleTo</span>(b));  <span class="hljs-comment">// 0 (pointing right)</span>
+</code></pre><h3 id="syntax-display">Display</h3>
+<p><code>log()</code> shows points in a readable format:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> pt = <span class="hljs-title class_">Point</span>(<span class="hljs-number">100</span>, <span class="hljs-number">200</span>);
+<span class="hljs-title function_">log</span>(pt);  <span class="hljs-comment">// Point(100, 200)</span>
+</code></pre><h3 id="syntax-template-literals">Template Literals</h3>
+<p>Points display as <code>Point(x, y)</code> when interpolated in template literals:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> pt = <span class="hljs-title class_">Point</span>(<span class="hljs-number">42</span>, <span class="hljs-number">99</span>);
+<span class="hljs-keyword">let</span> msg = <span class="hljs-string">\`position: <span class="hljs-subst">\${pt}</span>\`</span>;  <span class="hljs-comment">// &quot;position: Point(42, 99)&quot;</span>
 </code></pre><h2 id="syntax-arrays">Arrays</h2>
 <p>Arrays hold ordered collections of values. Elements can be numbers, strings, style blocks, other arrays, or <code>null</code>.</p>
 <h3 id="syntax-literals-2">Literals</h3>
@@ -347,7 +420,7 @@ M list[<span class="hljs-number">0</span>] list[<span class="hljs-number">1</spa
 <span class="hljs-keyword">if</span> (list.<span class="hljs-title function_">empty</span>()) {
   <span class="hljs-comment">// list is empty</span>
 }
-</code></pre><h3 id="syntax-methods">Methods</h3>
+</code></pre><h3 id="syntax-methods-2">Methods</h3>
 <h4 id="syntax-pushvalue"><code>.push(value)</code></h4>
 <p>Appends a value to the end. Returns the new length.</p>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>];
@@ -1965,6 +2038,71 @@ export const tocData = JSON.parse(`[
         "level": 3
       },
       {
+        "id": "syntax-points",
+        "title": "Points",
+        "level": 2
+      },
+      {
+        "id": "syntax-constructor",
+        "title": "Constructor",
+        "level": 3
+      },
+      {
+        "id": "syntax-properties",
+        "title": "Properties",
+        "level": 3
+      },
+      {
+        "id": "syntax-methods",
+        "title": "Methods",
+        "level": 3
+      },
+      {
+        "id": "syntax-translatedx-dy",
+        "title": ".translate(dx, dy)",
+        "level": 4
+      },
+      {
+        "id": "syntax-polartranslateangle-distance",
+        "title": ".polarTranslate(angle, distance)",
+        "level": 4
+      },
+      {
+        "id": "syntax-midpointother",
+        "title": ".midpoint(other)",
+        "level": 4
+      },
+      {
+        "id": "syntax-lerpother-t",
+        "title": ".lerp(other, t)",
+        "level": 4
+      },
+      {
+        "id": "syntax-rotateangle-origin",
+        "title": ".rotate(angle, origin)",
+        "level": 4
+      },
+      {
+        "id": "syntax-distancetoother",
+        "title": ".distanceTo(other)",
+        "level": 4
+      },
+      {
+        "id": "syntax-angletoother",
+        "title": ".angleTo(other)",
+        "level": 4
+      },
+      {
+        "id": "syntax-display",
+        "title": "Display",
+        "level": 3
+      },
+      {
+        "id": "syntax-template-literals",
+        "title": "Template Literals",
+        "level": 3
+      },
+      {
         "id": "syntax-arrays",
         "title": "Arrays",
         "level": 2
@@ -1990,7 +2128,7 @@ export const tocData = JSON.parse(`[
         "level": 3
       },
       {
-        "id": "syntax-methods",
+        "id": "syntax-methods-2",
         "title": "Methods",
         "level": 3
       },

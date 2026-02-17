@@ -216,6 +216,68 @@ describe('String errors', () => {
   });
 });
 
+describe('Point errors', () => {
+  it('Point() with wrong arg count throws', () => {
+    expect(() => compilePath('let pt = Point(1);')).toThrow(/2 arguments/i);
+  });
+
+  it('Point() with no args throws', () => {
+    expect(() => compilePath('let pt = Point();')).toThrow(/2 arguments/i);
+  });
+
+  it('Point() with three args throws', () => {
+    expect(() => compilePath('let pt = Point(1, 2, 3);')).toThrow(/2 arguments/i);
+  });
+
+  it('Point() with non-numeric x throws', () => {
+    expect(() => compilePath('let pt = Point("a", 1);')).toThrow(/number/i);
+  });
+
+  it('Point() with non-numeric y throws', () => {
+    expect(() => compilePath('let pt = Point(1, "b");')).toThrow(/number/i);
+  });
+
+  it('accessing non-existent property on Point throws', () => {
+    expect(() => compilePath('let pt = Point(1, 2); let z = pt.z;')).toThrow(/does not exist.*Point/i);
+  });
+
+  it('calling unknown method on Point throws', () => {
+    expect(() => compilePath('let pt = Point(1, 2); let r = pt.foo();')).toThrow(/unknown.*method/i);
+  });
+
+  it('.translate() with wrong arg count throws', () => {
+    expect(() => compilePath('let pt = Point(1, 2); pt.translate(1);')).toThrow(/2 arguments/i);
+  });
+
+  it('.midpoint() with non-Point arg throws', () => {
+    expect(() => compilePath('let pt = Point(1, 2); pt.midpoint(5);')).toThrow(/Point/i);
+  });
+
+  it('.lerp() with non-Point first arg throws', () => {
+    expect(() => compilePath('let pt = Point(1, 2); pt.lerp(5, 0.5);')).toThrow(/Point/i);
+  });
+
+  it('.lerp() with non-number t throws', () => {
+    expect(() => compilePath('let p1 = Point(0, 0); let p2 = Point(1, 1); p1.lerp(p2, "half");')).toThrow(/number/i);
+  });
+
+  it('.rotate() with non-number angle throws', () => {
+    expect(() => compilePath('let pt = Point(1, 0); let c = Point(0, 0); pt.rotate("x", c);')).toThrow(/number/i);
+  });
+
+  it('.rotate() with non-Point origin throws', () => {
+    expect(() => compilePath('let pt = Point(1, 0); pt.rotate(90deg, 5);')).toThrow(/Point/i);
+  });
+
+  it('.distanceTo() with non-Point arg throws', () => {
+    expect(() => compilePath('let pt = Point(0, 0); pt.distanceTo(5);')).toThrow(/Point/i);
+  });
+
+  it('.angleTo() with non-Point arg throws', () => {
+    expect(() => compilePath('let pt = Point(0, 0); pt.angleTo(5);')).toThrow(/Point/i);
+  });
+});
+
 describe('Edge cases', () => {
   describe('empty constructs', () => {
     it('handles single-value range', () => {

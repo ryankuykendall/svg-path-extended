@@ -36,7 +36,7 @@ import {
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 
-export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue;
+export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue;
 
 /**
  * Represents an array value (reference semantics)
@@ -48,6 +48,19 @@ export interface ArrayValue {
 
 export function isArrayValue(value: Value): value is ArrayValue {
   return typeof value === 'object' && value !== null && 'type' in value && value.type === 'ArrayValue';
+}
+
+/**
+ * Represents a 2D point value with geometric operations
+ */
+export interface PointValue {
+  type: 'PointValue';
+  x: number;
+  y: number;
+}
+
+export function isPointValue(value: Value): value is PointValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'PointValue';
 }
 
 /**
@@ -504,6 +517,70 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
 function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
 
+  // Point methods
+  if (isPointValue(obj)) {
+    switch (expr.method) {
+      case 'translate': {
+        if (expr.args.length !== 2) throw new Error('translate() expects 2 arguments');
+        const dx = evaluateExpression(expr.args[0], scope);
+        const dy = evaluateExpression(expr.args[1], scope);
+        if (typeof dx !== 'number') throw new Error('translate() dx must be a number');
+        if (typeof dy !== 'number') throw new Error('translate() dy must be a number');
+        return { type: 'PointValue', x: obj.x + dx, y: obj.y + dy };
+      }
+      case 'polarTranslate': {
+        if (expr.args.length !== 2) throw new Error('polarTranslate() expects 2 arguments');
+        const angle = evaluateExpression(expr.args[0], scope);
+        const distance = evaluateExpression(expr.args[1], scope);
+        if (typeof angle !== 'number') throw new Error('polarTranslate() angle must be a number');
+        if (typeof distance !== 'number') throw new Error('polarTranslate() distance must be a number');
+        return { type: 'PointValue', x: obj.x + Math.cos(angle) * distance, y: obj.y + Math.sin(angle) * distance };
+      }
+      case 'midpoint': {
+        if (expr.args.length !== 1) throw new Error('midpoint() expects 1 argument');
+        const other = evaluateExpression(expr.args[0], scope);
+        if (!isPointValue(other)) throw new Error('midpoint() argument must be a Point');
+        return { type: 'PointValue', x: (obj.x + other.x) / 2, y: (obj.y + other.y) / 2 };
+      }
+      case 'lerp': {
+        if (expr.args.length !== 2) throw new Error('lerp() expects 2 arguments');
+        const other = evaluateExpression(expr.args[0], scope);
+        const t = evaluateExpression(expr.args[1], scope);
+        if (!isPointValue(other)) throw new Error('lerp() first argument must be a Point');
+        if (typeof t !== 'number') throw new Error('lerp() second argument (t) must be a number');
+        return { type: 'PointValue', x: obj.x + (other.x - obj.x) * t, y: obj.y + (other.y - obj.y) * t };
+      }
+      case 'rotate': {
+        if (expr.args.length !== 2) throw new Error('rotate() expects 2 arguments');
+        const angle = evaluateExpression(expr.args[0], scope);
+        const origin = evaluateExpression(expr.args[1], scope);
+        if (typeof angle !== 'number') throw new Error('rotate() angle must be a number');
+        if (!isPointValue(origin)) throw new Error('rotate() origin must be a Point');
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const dx = obj.x - origin.x;
+        const dy = obj.y - origin.y;
+        return { type: 'PointValue', x: origin.x + dx * cos - dy * sin, y: origin.y + dx * sin + dy * cos };
+      }
+      case 'distanceTo': {
+        if (expr.args.length !== 1) throw new Error('distanceTo() expects 1 argument');
+        const other = evaluateExpression(expr.args[0], scope);
+        if (!isPointValue(other)) throw new Error('distanceTo() argument must be a Point');
+        const dx = other.x - obj.x;
+        const dy = other.y - obj.y;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+      case 'angleTo': {
+        if (expr.args.length !== 1) throw new Error('angleTo() expects 1 argument');
+        const other = evaluateExpression(expr.args[0], scope);
+        if (!isPointValue(other)) throw new Error('angleTo() argument must be a Point');
+        return Math.atan2(other.y - obj.y, other.x - obj.x);
+      }
+      default:
+        throw new Error(`Unknown Point method: ${expr.method}`);
+    }
+  }
+
   // String methods
   if (typeof obj === 'string') {
     switch (expr.method) {
@@ -589,6 +666,9 @@ function formatValueForDisplay(val: Value): string {
   if (val === null) return 'null';
   if (typeof val === 'number') return formatNum(val);
   if (typeof val === 'string') return val;
+  if (isPointValue(val)) {
+    return `Point(${formatNum(val.x)}, ${formatNum(val.y)})`;
+  }
   if (isArrayValue(val)) {
     return '[' + val.elements.map(formatValueForDisplay).join(', ') + ']';
   }
@@ -605,6 +685,13 @@ function evaluateTemplateLiteral(tl: TemplateLiteral, scope: Scope): string {
 
 function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
+
+  // Handle PointValue property access
+  if (isPointValue(obj)) {
+    if (expr.property === 'x') return obj.x;
+    if (expr.property === 'y') return obj.y;
+    throw new Error(`Property '${expr.property}' does not exist on Point`);
+  }
 
   // Handle ContextObject property access
   if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ContextObject') {
@@ -729,6 +816,8 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
 
         if (value === null) {
           stringValue = 'null';
+        } else if (isPointValue(value)) {
+          stringValue = formatValueForDisplay(value);
         } else if (isArrayValue(value)) {
           stringValue = formatValueForDisplay(value);
         } else if (typeof value === 'object' && value !== null && 'type' in value) {
@@ -774,6 +863,18 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
       throw new Error(`Undefined layer: '${nameValue}'`);
     }
     return { type: 'LayerReference' as const, layer: layerState };
+  }
+
+  // Handle Point() constructor
+  if (call.name === 'Point') {
+    if (call.args.length !== 2) {
+      throw new Error(`Point() expects 2 arguments, got ${call.args.length}`);
+    }
+    const x = evaluateExpression(call.args[0], scope);
+    const y = evaluateExpression(call.args[1], scope);
+    if (typeof x !== 'number') throw new Error('Point() x must be a number');
+    if (typeof y !== 'number') throw new Error('Point() y must be a number');
+    return { type: 'PointValue' as const, x, y };
   }
 
   // Check if it's a context-aware function

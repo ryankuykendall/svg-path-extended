@@ -1189,6 +1189,91 @@ describe('Evaluator', () => {
     });
   });
 
+  describe('points', () => {
+    it('creates a point with Point(x, y)', () => {
+      expect(compilePath('let pt = Point(100, 200); M pt.x pt.y')).toBe('M 100 200');
+    });
+
+    it('accesses .x and .y properties', () => {
+      expect(compilePath('let pt = Point(42, 99); M pt.x pt.y')).toBe('M 42 99');
+    });
+
+    it('uses point properties in calc expressions', () => {
+      expect(compilePath('let pt = Point(100, 200); M calc(pt.x + 10) calc(pt.y - 50)')).toBe('M 110 150');
+    });
+
+    it('.translate(dx, dy) returns offset point', () => {
+      expect(compilePath('let pt = Point(100, 100); let moved = pt.translate(10, -20); M moved.x moved.y')).toBe('M 110 80');
+    });
+
+    it('.polarTranslate(angle, distance) returns point at polar offset', () => {
+      const result = compilePath('let pt = Point(100, 100); let moved = pt.polarTranslate(0, 50); M moved.x moved.y');
+      expect(result).toBe('M 150 100');
+    });
+
+    it('.midpoint(other) returns halfway point', () => {
+      expect(compilePath('let p1 = Point(0, 0); let p2 = Point(100, 100); let mid = p1.midpoint(p2); M mid.x mid.y')).toBe('M 50 50');
+    });
+
+    it('.lerp(other, t) interpolates between points', () => {
+      expect(compilePath('let p1 = Point(0, 0); let p2 = Point(100, 200); let mid = p1.lerp(p2, 0.25); M mid.x mid.y')).toBe('M 25 50');
+    });
+
+    it('.lerp(other, 0) returns this point', () => {
+      expect(compilePath('let p1 = Point(10, 20); let p2 = Point(100, 200); let result = p1.lerp(p2, 0); M result.x result.y')).toBe('M 10 20');
+    });
+
+    it('.lerp(other, 1) returns other point', () => {
+      expect(compilePath('let p1 = Point(10, 20); let p2 = Point(100, 200); let result = p1.lerp(p2, 1); M result.x result.y')).toBe('M 100 200');
+    });
+
+    it('.rotate(angle, origin) rotates around center', () => {
+      const result = compilePath('let pt = Point(100, 0); let center = Point(0, 0); let r = pt.rotate(90deg, center); M r.x r.y', { toFixed: 2 });
+      // 100,0 rotated 90deg CW around origin → approximately 0,100
+      const match = result.match(/^M (-?[\d.]+) (-?[\d.]+)$/);
+      expect(match).not.toBeNull();
+      expect(parseFloat(match![1])).toBeCloseTo(0, 0);
+      expect(parseFloat(match![2])).toBeCloseTo(100, 0);
+    });
+
+    it('.distanceTo(other) returns Euclidean distance', () => {
+      expect(compilePath('let p1 = Point(0, 0); let p2 = Point(3, 4); let dist = p1.distanceTo(p2); M dist 0')).toBe('M 5 0');
+    });
+
+    it('.angleTo(other) returns angle in radians', () => {
+      expect(compilePath('let p1 = Point(0, 0); let p2 = Point(1, 0); let ang = p1.angleTo(p2); M ang 0')).toBe('M 0 0');
+    });
+
+    it('.angleTo(other) returns correct angle for vertical', () => {
+      const result = compilePath('let p1 = Point(0, 0); let p2 = Point(0, 1); let ang = p1.angleTo(p2); M ang 0');
+      const match = result.match(/^M ([\d.]+) 0$/);
+      expect(match).not.toBeNull();
+      expect(parseFloat(match![1])).toBeCloseTo(Math.PI / 2);
+    });
+
+    it('log(point) displays Point(x, y)', () => {
+      const result = compile('let pt = Point(100, 200); log(pt);');
+      expect(result.logs[0].parts[0].value).toBe('Point(100, 200)');
+    });
+
+    it('point in template literal displays Point(x, y)', () => {
+      const result = compile('let pt = Point(42, 99); log(`pos: ${pt}`);');
+      expect(result.logs[0].parts[0].value).toBe('pos: Point(42, 99)');
+    });
+
+    it('chained operations work', () => {
+      expect(compilePath('let pt = Point(0, 0); let moved = pt.translate(50, 50).translate(10, 10); M moved.x moved.y')).toBe('M 60 60');
+    });
+
+    it('point methods work in calc expressions', () => {
+      expect(compilePath('let p1 = Point(0, 0); let p2 = Point(6, 8); M calc(p1.distanceTo(p2) * 2) 0')).toBe('M 20 0');
+    });
+
+    it('works with for loops', () => {
+      expect(compilePath('let center = Point(100, 100); for (i in 0..2) { M calc(center.x + i * 10) center.y }')).toBe('M 100 100 M 110 100 M 120 100');
+    });
+  });
+
   describe('style blocks', () => {
     it('creates a style block value', () => {
       const result = compile(`
