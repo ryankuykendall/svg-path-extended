@@ -13,7 +13,7 @@ export const routes = [
   { path: '/workspace/new', view: 'new-workspace' },  // Must be before :slugId route
   { path: '/workspace/:slugId', view: 'workspace' },  // Format: slug--id or just id
   { path: '/preferences', view: 'preferences' },
-  { path: '/docs', view: 'docs' },
+  // /docs is now a static SEO page served by the worker — no SPA route needed
   { path: '/storybook', view: 'storybook-detail' },
   { path: '/storybook/:component', view: 'storybook-detail' },
   { path: '/blog', view: 'blog' },

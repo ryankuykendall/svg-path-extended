@@ -105,6 +105,9 @@ class AppShell extends HTMLElement {
     if (href.startsWith('http://') || href.startsWith('https://')) return false;
     if (href.startsWith('javascript:')) return false;
     if (href.startsWith('#')) return false;
+    // SEO pages are full page loads, not SPA-routed
+    const seoPages = ['/pathogen/docs', '/pathogen/explore', '/pathogen/featured'];
+    if (seoPages.some(p => href === p || href.startsWith(p + '/'))) return false;
     return true;
   }
 

@@ -3,6 +3,12 @@
 
 export const blogIndex = [
   {
+    "slug": "seo-pages-cloudflare-workers-routing",
+    "title": "Adding SEO Pages to a CloudFlare Pages SPA: The Routing Sequel",
+    "date": "2026-02-17",
+    "description": "After solving SPA routing on CloudFlare Pages, we needed to add server-rendered and static pages alongside the SPA. New platform, new surprises — 308 redirects, stale workers, build pipeline ordering, and the art of making static and dynamic content coexist."
+  },
+  {
     "slug": "svg-serialization-trap",
     "title": "The SVG Serialization Trap: Why createElementNS Broke Our Thumbnail Pipeline",
     "date": "2026-02-11",
@@ -132,6 +138,93 @@ not_found_handling = <span class="hljs-string">&quot;single-page-application&quo
 <p>What should have been a 10-minute configuration task became a hours-long debugging session. The core issue isn&#39;t that CloudFlare Pages can&#39;t handle SPA routing—it clearly can, with <code>_worker.js</code>. The issue is that the documentation guides developers toward solutions that don&#39;t work (<code>_redirects</code> with 200 rewrites), while the solution that does work (<code>_worker.js</code>) is poorly documented and not presented as the primary approach.</p>
 <p>For developers facing similar struggles: skip the <code>_redirects</code> file for complex SPA routing. Go directly to <code>_worker.js</code>. It gives you full control, works reliably, and once you understand the pattern, it&#39;s actually simpler than trying to make <code>_redirects</code> rules work.</p>
 <p>The CloudFlare Pages platform is powerful, but its documentation needs significant improvement to match that power. Until then, blog posts like this one—born from developer frustration—will have to fill the gaps.</p>
+`,
+  'seo-pages-cloudflare-workers-routing': `<h1>Adding SEO Pages to a CloudFlare Pages SPA: The Routing Sequel</h1>
+<h2>The Goal</h2>
+<p>After getting our SPA working on CloudFlare Pages (a saga documented in <a href="/pathogen/blog/cloudflare-pages-spa-routing-struggle">the first post</a>), we had a new problem: search engines couldn&#39;t see any of our content. The SPA renders everything client-side with Web Components and Shadow DOM. Googlebot sees an empty shell. Docs, workspace galleries, curated showcases — all invisible to crawlers.</p>
+<p>The plan was straightforward: add three SEO-friendly pages that render real HTML.</p>
+<ol>
+<li><strong>Docs</strong> — static HTML generated at build time, served from the filesystem</li>
+<li><strong>Explore</strong> — a paginated grid of public workspaces, rendered by the worker at request time</li>
+<li><strong>Featured</strong> — an admin-curated showcase, also worker-rendered</li>
+</ol>
+<p>All three would share navigation look-and-feel with the SPA. Users clicking between them and the SPA should feel like they&#39;re on one coherent site.</p>
+<p>We already had <code>_worker.js</code> handling SPA routing. Extending it to serve SEO pages seemed like it would be the easy part. It was not.</p>
+<h2>The Architecture</h2>
+<p>The routing hierarchy we needed was simple:</p>
+<pre><code class="hljs">/pathogen/api/*         → API handlers (existing)
+/pathogen/docs          → static HTML file
+/pathogen/explore       → worker-rendered HTML
+/pathogen/featured      → worker-rendered HTML
+/pathogen/* (no ext)    → SPA index.html (existing)
+everything <span class="hljs-keyword">else</span>         → static assets (existing)
+</code></pre><p>Worker-rendered pages were easy — the worker already intercepts all requests, so adding <code>renderExplorePage()</code> and <code>renderFeaturedPage()</code> functions was just a matter of checking the path and returning a <code>new Response()</code> with HTML content. No platform surprises there.</p>
+<p>The static docs page, however, introduced a cascade of platform behaviors we didn&#39;t expect.</p>
+<h2>Surprise 1: The 308 Redirect Phantom</h2>
+<p>We generated a complete HTML page at <code>public/pathogen/docs/index.html</code> during the build. The plan was simple: when the worker sees <code>/pathogen/docs</code>, use <code>env.ASSETS.fetch()</code> to serve the static file.</p>
+<pre><code class="hljs language-javascript"><span class="hljs-keyword">if</span> (path === <span class="hljs-string">&#x27;/pathogen/docs&#x27;</span> || path === <span class="hljs-string">&#x27;/pathogen/docs/&#x27;</span>) {
+  url.<span class="hljs-property">pathname</span> = <span class="hljs-string">&#x27;/pathogen/docs/index.html&#x27;</span>;
+  <span class="hljs-keyword">return</span> env.<span class="hljs-property">ASSETS</span>.<span class="hljs-title function_">fetch</span>(url.<span class="hljs-title function_">toString</span>());
+}
+</code></pre><p>Testing locally with <code>curl</code>, we got back 1,234 bytes — far too small for our 160KB docs page. That&#39;s the SPA&#39;s <code>index.html</code>. Our route wasn&#39;t matching.</p>
+<p>More investigation revealed something unexpected: requesting <code>/pathogen/docs/index.html</code> directly returned a <strong>308 Permanent Redirect</strong> to <code>/pathogen/docs/</code>. CloudFlare Pages automatically strips <code>.html</code> extensions and trailing <code>/index</code> from URLs, issuing 308 redirects. This is the platform&#39;s &quot;pretty URLs&quot; feature, and it runs at the static asset layer — potentially before or alongside the worker.</p>
+<p>Here&#39;s what&#39;s confusing: this behavior doesn&#39;t affect our worker route. The worker intercepts <code>/pathogen/docs</code> before the static asset layer gets involved. The 308 exists if someone visits <code>/pathogen/docs/index.html</code> directly, but our worker code never does — it catches the clean URL first. So the 308 was a red herring. But we spent considerable time investigating it because it seemed like it could explain why the wrong content was being served.</p>
+<p>The actual problem was something else entirely.</p>
+<h2>Surprise 2: The Zombie Worker Strikes Again</h2>
+<p>After adding the SEO routes, rebuilding the site, and restarting the dev server, our new routes still returned the SPA. Every request to <code>/pathogen/docs</code> showed &quot;My Workspaces&quot; — the SPA landing page.</p>
+<p>If this sounds familiar, it should. We documented the exact same problem in our <a href="/pathogen/blog/cloudflare-pages-spa-routing-struggle">first CloudFlare Pages blog post</a>. The <code>wrangler pages dev</code> command spawns a <code>workerd</code> subprocess that can survive the parent process being killed. When you restart <code>wrangler</code>, it may start a fresh process while the old one keeps running on the same port — or the old one keeps answering requests while the new one fails to bind.</p>
+<p>The fix was the same as before: stop the dev server, verify no orphaned <code>workerd</code> processes are running, and restart cleanly. After that, all three SEO routes served the correct content.</p>
+<p>This is now a pattern. Every time we make significant changes to <code>_worker.js</code>, we have to be paranoid about stale processes. The platform doesn&#39;t warn you. The old code just keeps running while you stare at your changes wondering why they don&#39;t work.</p>
+<h2>Surprise 3: The Build Pipeline Race</h2>
+<p>Our build pipeline runs in stages:</p>
+<pre><code class="hljs">npm run build           → compile the library
+npm run <span class="hljs-attr">build</span>:docs      → generate <span class="hljs-keyword">static</span> docs <span class="hljs-variable constant_">HTML</span>
+npm run <span class="hljs-attr">build</span>:blog      → generate blog content <span class="hljs-variable language_">module</span>
+tsx build-website.<span class="hljs-property">ts</span>    → assemble everything into public/
+</code></pre><p>The docs build generates <code>website/docs-static/index.html</code> — a complete HTML page with sidebar navigation, syntax highlighting, and progressive enhancement scripts. The website build then copies it to <code>public/pathogen/docs/index.html</code>.</p>
+<p>But here&#39;s the trap: <code>build-website.ts</code> starts by wiping the entire <code>public/</code> directory. If the docs build wrote directly to <code>public/pathogen/docs/</code>, those files would be deleted moments later when the website build started.</p>
+<p>We initially made this mistake. The docs page generated beautifully, the website build completed successfully, but the docs page was gone — replaced by a clean copy of the SPA without the static docs.</p>
+<p>The fix was an intermediate output directory. The docs build writes to <code>website/docs-static/</code>, which the website build copies into <code>public/pathogen/docs/</code> after the clean step. Simple, but the kind of issue that&#39;s invisible when each build step works correctly in isolation.</p>
+<p>This isn&#39;t a CloudFlare-specific problem, but it&#39;s the kind of subtle ordering bug that emerges when you&#39;re juggling static generation, worker rendering, and SPA routing in a single deployment.</p>
+<h2>Surprise 4: Static Assets and Worker Priority</h2>
+<p>CloudFlare Pages has an implicit priority order: static assets are served first, and the worker handles everything else. This means if you have a file at <code>public/pathogen/docs/index.html</code>, the platform might serve it before your worker even runs.</p>
+<p>In practice, this worked in our favor for the docs page — but it also meant we needed to be deliberate about which routes are handled by the worker versus served as static assets. For <code>/pathogen/docs</code>, the worker explicitly hands off to the static asset layer via <code>env.ASSETS.fetch()</code>. For <code>/pathogen/explore</code> and <code>/pathogen/featured</code>, the worker generates HTML on the fly.</p>
+<p>The mental model you need: the worker is a middleware layer, and <code>env.ASSETS.fetch()</code> is how you call &quot;next&quot; to let the static asset layer handle a request. If you don&#39;t call it, the worker is the end of the line.</p>
+<p>What the documentation doesn&#39;t make clear is the interaction between the worker, the static asset layer, and the 308 redirect behavior. All three are happening, and understanding which runs when requires experimentation rather than documentation.</p>
+<h2>The Navigation Consistency Problem</h2>
+<p>With three rendering modes — SPA (client-side), static (build-time), and worker (request-time) — keeping navigation consistent is harder than it sounds.</p>
+<p>The SPA uses a <code>&lt;app-header&gt;</code> Web Component with Shadow DOM. The static docs page and worker-rendered pages use plain HTML. They need to look identical: same 56px height, same logo, same nav links, same hover states, same theme toggle.</p>
+<p>Our first pass duplicated the nav bar CSS and HTML across all three rendering contexts. This immediately created a problem: the SPA had a theme toggle and Preferences link that the SEO pages didn&#39;t. Clicking from Docs to Workspaces, the nav bar would gain two elements. Clicking back, they&#39;d disappear. The effect was jarring — the navigation felt broken even though every page was technically correct in isolation.</p>
+<p>The fix had two parts. First, we extracted the theme toggle into a standalone Web Component (<code>&lt;theme-toggle&gt;</code>) that works in any context — SPA or static HTML. It reads and writes the same <code>localStorage</code> key, dispatches the same events, and needs no framework or imports. Adding it to SEO pages is just a <code>&lt;script type=&quot;module&quot;&gt;</code> tag and a <code>&lt;theme-toggle&gt;</code> element in the header.</p>
+<p>Second, we added the Preferences link to every page&#39;s navigation — SEO pages included. Even though Preferences is an SPA route, linking to it from static pages works via a full page load. The important thing is that every nav bar has the same links in the same order.</p>
+<h2>Flash of Wrong Theme</h2>
+<p>Static HTML pages have a subtlety that SPAs handle automatically: the theme. Our SPA initializes the theme manager before any rendering occurs, so the user never sees a flash of the wrong color scheme. Static pages, however, start rendering immediately — before any JavaScript runs.</p>
+<p>If a user has dark mode saved in <code>localStorage</code> but the page&#39;s HTML defaults to light, they&#39;ll see a brief flash of light theme before the JS kicks in and switches to dark. The fix is a tiny inline <code>&lt;script&gt;</code> in the <code>&lt;head&gt;</code> — before the CSS even loads:</p>
+<pre><code class="hljs language-javascript">(<span class="hljs-keyword">function</span>(<span class="hljs-params"></span>){
+  <span class="hljs-keyword">var</span> t = <span class="hljs-variable language_">localStorage</span>.<span class="hljs-title function_">getItem</span>(<span class="hljs-string">&#x27;pathogen-theme&#x27;</span>);
+  <span class="hljs-keyword">if</span> (t === <span class="hljs-string">&#x27;light&#x27;</span> || t === <span class="hljs-string">&#x27;dark&#x27;</span>) {
+    <span class="hljs-variable language_">document</span>.<span class="hljs-property">documentElement</span>.<span class="hljs-title function_">setAttribute</span>(<span class="hljs-string">&#x27;data-theme&#x27;</span>, t);
+  }
+})();
+</code></pre><p>This runs synchronously, blocking the parser for microseconds while it sets the theme attribute. By the time the browser processes the <code>&lt;link rel=&quot;stylesheet&quot;&gt;</code> for <code>theme.css</code>, the correct custom properties are already active. No flash.</p>
+<h2>The <code>robots.txt</code> and <code>sitemap.xml</code> Dance</h2>
+<p>We also needed to tell search engines about the new pages. This meant generating <code>robots.txt</code> (allow these paths, disallow those) and <code>sitemap.xml</code> (here are all the URLs we want indexed).</p>
+<p>The sitemap needed to be dynamic — blog posts are added as markdown files, and the build should discover them automatically. We enumerate <code>website/blog/*.md</code>, strip the extension to get slugs, and generate <code>&lt;url&gt;</code> entries for each.</p>
+<p>One oversight: we initially forgot to include <code>/pathogen/blog</code> in both <code>robots.txt</code> and <code>sitemap.xml</code>. The blog pages were already crawlable via the SPA&#39;s static rendering, but without being listed in robots.txt and the sitemap, search engines had no way to discover them efficiently. A small thing, but the kind of omission that undermines the entire SEO effort.</p>
+<h2>Lessons Learned</h2>
+<h3>1. Always restart <code>wrangler</code> cleanly</h3>
+<p>Kill orphaned <code>workerd</code> processes. Always. Check <code>ps aux | grep workerd</code> after stopping the dev server. This is the single most time-wasting gotcha in CloudFlare Pages development. Until CloudFlare fixes the process management, treat every restart as potentially stale.</p>
+<h3>2. Build pipeline ordering matters</h3>
+<p>If one build step cleans an output directory and another writes to it, they need to run in the right order with an intermediate staging area. This is Build Systems 101, but it&#39;s easy to overlook when you&#39;re adding features incrementally and each step works in isolation.</p>
+<h3>3. Navigation consistency beats navigation logic</h3>
+<p>When you have multiple rendering modes, every page should show the same navigation — same links, same order, same interactive elements. It&#39;s tempting to hide links that &quot;don&#39;t apply&quot; on certain pages. Don&#39;t. Users perceive the nav bar as a constant. When it changes between pages, the site feels broken.</p>
+<h3>4. Theme flash prevention needs to be in <code>&lt;head&gt;</code></h3>
+<p>Any page that supports user-selected themes needs an inline script in <code>&lt;head&gt;</code> that runs before the stylesheet loads. This is well-known in the SSR world but easy to forget when you&#39;re adding static pages to an existing SPA.</p>
+<h3>5. Standalone Web Components bridge the gap</h3>
+<p>When you need UI elements that work identically across SPA and static contexts, standalone Web Components — no imports, no framework, self-registering — are the right abstraction. Our <code>&lt;theme-toggle&gt;</code> works everywhere because it depends on nothing except the DOM and <code>localStorage</code>.</p>
+<h2>Conclusion</h2>
+<p>Adding SEO-friendly pages to a CloudFlare Pages SPA is achievable, but the platform makes you earn it. The documentation doesn&#39;t cover the interaction between workers, static assets, and automatic redirects. The dev server&#39;s process management will waste your time. And the challenge of maintaining visual consistency across rendering modes is a design problem that no platform can solve for you.</p>
+<p>The final architecture — static HTML for docs, worker-rendered HTML for dynamic pages, SPA for interactive features, all sharing a common nav bar and theme system — works well. Getting there required more debugging than coding. As with our first CloudFlare Pages adventure, the platform is powerful enough to do everything we need. The documentation just hasn&#39;t caught up with the use cases yet.</p>
 `,
   'svg-serialization-trap': `<h1>The SVG Serialization Trap: Why <code>createElementNS</code> Broke Our Thumbnail Pipeline</h1>
 <h2>The Setup</h2>

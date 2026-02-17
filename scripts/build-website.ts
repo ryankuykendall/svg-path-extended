@@ -109,6 +109,17 @@ async function build(): Promise<void> {
     console.warn('  Worker file not found, skipping...');
   }
 
+  // Copy static docs page if it exists
+  try {
+    const docsStaticSrc = join(ROOT, 'website', 'docs-static');
+    const docsStaticDest = join(playgroundDest, 'docs');
+    await fs.access(docsStaticSrc);
+    console.log('Copying static docs page...');
+    await copyDir(docsStaticSrc, docsStaticDest);
+  } catch {
+    console.warn('  Static docs page not found (run build:docs first)');
+  }
+
   // Copy blog if it exists
   try {
     const blogSrc = join(ROOT, 'website', 'blog');
@@ -119,6 +130,77 @@ async function build(): Promise<void> {
   } catch {
     // Blog directory doesn't exist, that's fine
   }
+
+  // Generate robots.txt
+  console.log('Generating robots.txt...');
+  const robotsTxt = `User-agent: *
+Allow: /pathogen/docs
+Allow: /pathogen/explore
+Allow: /pathogen/featured
+Allow: /pathogen/blog
+Disallow: /pathogen/api/
+Disallow: /pathogen/workspace/
+Disallow: /pathogen/preferences
+Disallow: /pathogen/admin/
+Disallow: /pathogen/storybook
+Sitemap: https://pedestal.design/sitemap.xml
+`;
+  await fs.writeFile(join(DIST, 'robots.txt'), robotsTxt);
+
+  // Generate sitemap.xml
+  console.log('Generating sitemap.xml...');
+  const today = new Date().toISOString().split('T')[0];
+
+  // Discover blog post slugs from markdown files
+  let blogSlugs: string[] = [];
+  try {
+    const blogDir = join(ROOT, 'website', 'blog');
+    const blogFiles = await fs.readdir(blogDir);
+    blogSlugs = blogFiles
+      .filter(f => f.endsWith('.md'))
+      .map(f => f.replace('.md', ''));
+  } catch { /* no blog dir */ }
+
+  const blogUrls = [
+    `  <url>
+    <loc>https://pedestal.design/pathogen/blog</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>`,
+    ...blogSlugs.map(slug =>
+      `  <url>
+    <loc>https://pedestal.design/pathogen/blog/${slug}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>`),
+  ];
+
+  const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://pedestal.design/pathogen/docs</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://pedestal.design/pathogen/explore</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://pedestal.design/pathogen/featured</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+${blogUrls.join('\n')}
+</urlset>
+`;
+  await fs.writeFile(join(DIST, 'sitemap.xml'), sitemapXml);
 
   console.log('\nBuild complete!');
   console.log(`Output: ${DIST}`);

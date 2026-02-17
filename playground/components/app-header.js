@@ -6,6 +6,7 @@ import { routeUrl, buildWorkspaceSlugId, navigateTo } from '../utils/router.js';
 import { copyURL } from '../utils/url-state.js';
 import { workspaceApi } from '../services/api.js';
 import { themeManager } from '../utils/theme.js';
+import './shared/theme-toggle.js';
 
 const styles = `
   :host {
@@ -97,37 +98,6 @@ const styles = `
     align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
-  }
-
-  /* Theme toggle button */
-  .theme-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-md, 8px);
-    border: 1px solid var(--border-color, #e2e8f0);
-    background: var(--bg-secondary, #ffffff);
-    color: var(--text-secondary, #64748b);
-    cursor: pointer;
-    transition: all var(--transition-base, 0.15s ease);
-  }
-
-  .theme-toggle:hover {
-    border-color: var(--accent-color, #10b981);
-    color: var(--accent-color, #10b981);
-    background: var(--accent-subtle, rgba(16, 185, 129, 0.1));
-  }
-
-  .theme-toggle svg {
-    width: 18px;
-    height: 18px;
-    transition: transform var(--transition-base, 0.15s ease);
-  }
-
-  .theme-toggle:hover svg {
-    transform: rotate(15deg);
   }
 
   .action-btn {
@@ -331,10 +301,8 @@ class AppHeader extends HTMLElement {
       this.updateWorkspaceActions();
     });
 
-    // Subscribe to theme changes
-    this._themeUnsubscribe = themeManager.subscribe(() => {
-      this.updateThemeIcon();
-    });
+    // Subscribe to theme changes (keep themeManager in sync with the component)
+    this._themeUnsubscribe = themeManager.subscribe(() => {});
 
     // Close menu on outside click
     this._handleOutsideClick = (e) => {
@@ -368,13 +336,12 @@ class AppHeader extends HTMLElement {
   }
 
   setupEventListeners() {
-    this.shadowRoot.addEventListener('click', (e) => {
-      // Theme toggle
-      if (e.target.closest('.theme-toggle')) {
-        themeManager.cycle();
-        return;
-      }
+    // Sync theme-toggle component changes back to themeManager
+    this.shadowRoot.addEventListener('theme-change', (e) => {
+      themeManager.setPreference(e.detail.preference);
+    });
 
+    this.shadowRoot.addEventListener('click', (e) => {
       // Navigation links
       const navLink = e.target.closest('[data-route]');
       if (navLink) {
@@ -481,47 +448,10 @@ class AppHeader extends HTMLElement {
     const routeToView = {
       '/': 'landing',
       '/workspace/:slugId': 'workspace',
-      '/docs': 'docs',
       '/blog': 'blog',
       '/preferences': 'preferences'
     };
     return routeToView[route] === currentView;
-  }
-
-  updateThemeIcon() {
-    const btn = this.shadowRoot.querySelector('.theme-toggle');
-    if (!btn) return;
-
-    const preference = themeManager.getPreference();
-    btn.innerHTML = this.getThemeIcon(preference);
-    btn.title = this.getThemeTitle(preference);
-  }
-
-  getThemeIcon(preference) {
-    switch (preference) {
-      case 'light':
-        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5"/>
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-        </svg>`;
-      case 'dark':
-        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>`;
-      default: // system
-        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <path d="M8 21h8M12 17v4"/>
-        </svg>`;
-    }
-  }
-
-  getThemeTitle(preference) {
-    switch (preference) {
-      case 'light': return 'Light mode (click to switch to dark)';
-      case 'dark': return 'Dark mode (click to switch to system)';
-      default: return 'System theme (click to switch to light)';
-    }
   }
 
   render() {
@@ -529,7 +459,6 @@ class AppHeader extends HTMLElement {
     const workspaceId = store.get('workspaceId');
     const isWorkspaceView = currentView === 'workspace';
     const hasWorkspace = isWorkspaceView && workspaceId;
-    const themePreference = themeManager.getPreference();
 
     this.shadowRoot.innerHTML = `
       <style>${styles}</style>
@@ -546,9 +475,15 @@ class AppHeader extends HTMLElement {
           <button class="nav-link ${currentView === 'landing' ? 'active' : ''}" data-route="/">
             Workspaces
           </button>
-          <button class="nav-link ${currentView === 'docs' ? 'active' : ''}" data-route="/docs">
+          <a class="nav-link" href="/pathogen/docs">
             Docs
-          </button>
+          </a>
+          <a class="nav-link" href="/pathogen/explore">
+            Explore
+          </a>
+          <a class="nav-link" href="/pathogen/featured">
+            Featured
+          </a>
           <button class="nav-link ${currentView === 'blog' ? 'active' : ''}" data-route="/blog">
             Blog
           </button>
@@ -558,9 +493,7 @@ class AppHeader extends HTMLElement {
         </nav>
 
         <div class="actions">
-          <button class="theme-toggle" title="${this.getThemeTitle(themePreference)}">
-            ${this.getThemeIcon(themePreference)}
-          </button>
+          <theme-toggle></theme-toggle>
 
           ${isWorkspaceView ? `
             <button id="export-btn" class="action-btn" title="Export to file (Ctrl+S)">Export</button>
@@ -628,16 +561,13 @@ class AppHeader extends HTMLElement {
     const workspaceId = store.get('workspaceId');
     const isWorkspaceView = currentView === 'workspace';
     const hasWorkspace = isWorkspaceView && workspaceId;
-    const themePreference = themeManager.getPreference();
 
     const actionsContainer = this.shadowRoot.querySelector('.actions');
     if (!actionsContainer) return;
 
     // Update visibility of workspace-specific actions
     actionsContainer.innerHTML = `
-      <button class="theme-toggle" title="${this.getThemeTitle(themePreference)}">
-        ${this.getThemeIcon(themePreference)}
-      </button>
+      <theme-toggle></theme-toggle>
 
       ${isWorkspaceView ? `
         <button id="export-btn" class="action-btn" title="Export to file (Ctrl+S)">Export</button>
