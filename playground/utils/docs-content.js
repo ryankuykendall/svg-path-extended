@@ -159,6 +159,49 @@ M x y L <span class="hljs-number">100</span> <span class="hljs-number">100</span
 <pre><code class="hljs"><span class="hljs-keyword">let</span> mode = <span class="hljs-string">&quot;dark&quot;</span>;
 <span class="hljs-keyword">if</span> (mode == <span class="hljs-string">&quot;dark&quot;</span>) { <span class="hljs-comment">/* ... */</span> }
 <span class="hljs-keyword">if</span> (mode != <span class="hljs-string">&quot;light&quot;</span>) { <span class="hljs-comment">/* ... */</span> }
+</code></pre><h3 id="syntax-length"><code>.length</code></h3>
+<p>Returns the number of characters in the string:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> str = <span class="hljs-string">\`Hello\`</span>;
+<span class="hljs-title function_">log</span>(str.<span class="hljs-property">length</span>);  <span class="hljs-comment">// 5</span>
+</code></pre><h3 id="syntax-empty"><code>.empty()</code></h3>
+<p>Returns <code>1</code> (truthy) if the string has no characters, <code>0</code> (falsy) otherwise:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> str = <span class="hljs-string">\`\`</span>;
+<span class="hljs-keyword">if</span> (str.<span class="hljs-title function_">empty</span>()) {
+  <span class="hljs-comment">// string is empty</span>
+}
+</code></pre><h3 id="syntax-index-access">Index Access</h3>
+<p>Access individual characters by zero-based index using <code>[expr]</code>:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> str = <span class="hljs-string">\`Hello\`</span>;
+<span class="hljs-keyword">let</span> first = str[<span class="hljs-number">0</span>];   <span class="hljs-comment">// &quot;H&quot;</span>
+<span class="hljs-keyword">let</span> last = str[<span class="hljs-number">4</span>];     <span class="hljs-comment">// &quot;o&quot;</span>
+</code></pre><p>Out-of-bounds access throws an error.</p>
+<h3 id="syntax-split"><code>.split()</code></h3>
+<p>Splits a string into an array of individual characters:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> str = <span class="hljs-string">\`abc\`</span>;
+<span class="hljs-keyword">let</span> chars = str.<span class="hljs-title function_">split</span>();  <span class="hljs-comment">// [&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]</span>
+<span class="hljs-keyword">for</span> (ch <span class="hljs-keyword">in</span> chars) {
+  <span class="hljs-title function_">log</span>(ch);
+}
+</code></pre><h3 id="syntax-appendvalue"><code>.append(value)</code></h3>
+<p>Returns a new string with the given value appended to the end:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> str = <span class="hljs-string">\`Hello\`</span>;
+<span class="hljs-keyword">let</span> result = str.<span class="hljs-title function_">append</span>(<span class="hljs-string">\` World\`</span>);  <span class="hljs-comment">// &quot;Hello World&quot;</span>
+</code></pre><h3 id="syntax-prependvalue"><code>.prepend(value)</code></h3>
+<p>Returns a new string with the given value prepended to the beginning:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> str = <span class="hljs-string">\`World\`</span>;
+<span class="hljs-keyword">let</span> result = str.<span class="hljs-title function_">prepend</span>(<span class="hljs-string">\`Hello \`</span>);  <span class="hljs-comment">// &quot;Hello World&quot;</span>
+</code></pre><h3 id="syntax-includessubstring"><code>.includes(substring)</code></h3>
+<p>Returns <code>1</code> (truthy) if the string contains the given substring, <code>0</code> (falsy) otherwise:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> str = <span class="hljs-string">\`Hello World\`</span>;
+<span class="hljs-keyword">if</span> (str.<span class="hljs-title function_">includes</span>(<span class="hljs-string">\`World\`</span>)) {
+  <span class="hljs-comment">// found it</span>
+}
+</code></pre><h3 id="syntax-slicestart-end"><code>.slice(start, end)</code></h3>
+<p>Returns a substring from <code>start</code> (inclusive) to <code>end</code> (exclusive). Negative indices count from the end:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> str = <span class="hljs-string">\`Hello World\`</span>;
+<span class="hljs-keyword">let</span> sub = str.<span class="hljs-title function_">slice</span>(<span class="hljs-number">0</span>, <span class="hljs-number">5</span>);    <span class="hljs-comment">// &quot;Hello&quot;</span>
+<span class="hljs-keyword">let</span> end = str.<span class="hljs-title function_">slice</span>(<span class="hljs-number">6</span>, <span class="hljs-number">11</span>);   <span class="hljs-comment">// &quot;World&quot;</span>
+<span class="hljs-keyword">let</span> last3 = str.<span class="hljs-title function_">slice</span>(-<span class="hljs-number">3</span>, <span class="hljs-number">11</span>); <span class="hljs-comment">// &quot;rld&quot;</span>
 </code></pre><h2 id="syntax-expressions-with-calc">Expressions with calc()</h2>
 <p>For mathematical expressions, wrap them in <code>calc()</code>:</p>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> r = <span class="hljs-number">50</span>;
@@ -287,18 +330,18 @@ M x <span class="hljs-number">0</span>               <span class="hljs-comment">
 <pre><code class="hljs"><span class="hljs-keyword">let</span> empty = [];
 <span class="hljs-keyword">let</span> nums = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>];
 <span class="hljs-keyword">let</span> mixed = [<span class="hljs-number">10</span>, <span class="hljs-string">&quot;hello&quot;</span>, [<span class="hljs-number">4</span>, <span class="hljs-number">5</span>]];
-</code></pre><h3 id="syntax-index-access">Index Access</h3>
+</code></pre><h3 id="syntax-index-access-2">Index Access</h3>
 <p>Access elements by zero-based index using <code>[expr]</code>:</p>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">10</span>, <span class="hljs-number">20</span>, <span class="hljs-number">30</span>];
 <span class="hljs-keyword">let</span> first = list[<span class="hljs-number">0</span>];         <span class="hljs-comment">// 10</span>
 <span class="hljs-keyword">let</span> second = list[<span class="hljs-number">1</span>];        <span class="hljs-comment">// 20</span>
 M list[<span class="hljs-number">0</span>] list[<span class="hljs-number">1</span>]            <span class="hljs-comment">// M 10 20</span>
 </code></pre><p>Out-of-bounds access throws an error.</p>
-<h3 id="syntax-length"><code>.length</code></h3>
+<h3 id="syntax-length-2"><code>.length</code></h3>
 <p>Returns the number of elements:</p>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> list = [<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>];
 <span class="hljs-title function_">log</span>(list.<span class="hljs-property">length</span>);  <span class="hljs-comment">// 3</span>
-</code></pre><h3 id="syntax-empty"><code>.empty()</code></h3>
+</code></pre><h3 id="syntax-empty-2"><code>.empty()</code></h3>
 <p>Returns <code>1</code> (truthy) if the array has no elements, <code>0</code> (falsy) otherwise:</p>
 <pre><code class="hljs"><span class="hljs-keyword">let</span> list = [];
 <span class="hljs-keyword">if</span> (list.<span class="hljs-title function_">empty</span>()) {
@@ -1827,6 +1870,46 @@ export const tocData = JSON.parse(`[
         "level": 2
       },
       {
+        "id": "syntax-length",
+        "title": ".length",
+        "level": 3
+      },
+      {
+        "id": "syntax-empty",
+        "title": ".empty()",
+        "level": 3
+      },
+      {
+        "id": "syntax-index-access",
+        "title": "Index Access",
+        "level": 3
+      },
+      {
+        "id": "syntax-split",
+        "title": ".split()",
+        "level": 3
+      },
+      {
+        "id": "syntax-appendvalue",
+        "title": ".append(value)",
+        "level": 3
+      },
+      {
+        "id": "syntax-prependvalue",
+        "title": ".prepend(value)",
+        "level": 3
+      },
+      {
+        "id": "syntax-includessubstring",
+        "title": ".includes(substring)",
+        "level": 3
+      },
+      {
+        "id": "syntax-slicestart-end",
+        "title": ".slice(start, end)",
+        "level": 3
+      },
+      {
         "id": "syntax-expressions-with-calc",
         "title": "Expressions with calc()",
         "level": 2
@@ -1892,17 +1975,17 @@ export const tocData = JSON.parse(`[
         "level": 3
       },
       {
-        "id": "syntax-index-access",
+        "id": "syntax-index-access-2",
         "title": "Index Access",
         "level": 3
       },
       {
-        "id": "syntax-length",
+        "id": "syntax-length-2",
         "title": ".length",
         "level": 3
       },
       {
-        "id": "syntax-empty",
+        "id": "syntax-empty-2",
         "title": ".empty()",
         "level": 3
       },

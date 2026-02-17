@@ -174,6 +174,48 @@ describe('Array errors', () => {
   });
 });
 
+describe('String errors', () => {
+  it('index out of bounds throws', () => {
+    expect(() => compilePath('let str = `abc`; let x = str[5];')).toThrow(/out of bounds/i);
+  });
+
+  it('negative index throws', () => {
+    expect(() => compilePath('let str = `abc`; let x = str[-1];')).toThrow(/out of bounds/i);
+  });
+
+  it('non-integer index throws', () => {
+    expect(() => compilePath('let str = `abc`; let x = str[1.5];')).toThrow(/out of bounds|integer/i);
+  });
+
+  it('unknown string method throws', () => {
+    expect(() => compilePath('let str = `abc`; let x = str.foo();')).toThrow(/unknown.*method/i);
+  });
+
+  it('.append() with wrong arg count throws', () => {
+    expect(() => compilePath('let str = `abc`; str.append();')).toThrow(/1 argument/i);
+  });
+
+  it('.prepend() with wrong arg count throws', () => {
+    expect(() => compilePath('let str = `abc`; str.prepend();')).toThrow(/1 argument/i);
+  });
+
+  it('.includes() with wrong arg count throws', () => {
+    expect(() => compilePath('let str = `abc`; str.includes();')).toThrow(/1 argument/i);
+  });
+
+  it('.slice() with wrong arg count throws', () => {
+    expect(() => compilePath('let str = `abc`; str.slice(0);')).toThrow(/2 arguments/i);
+  });
+
+  it('.split() with args throws', () => {
+    expect(() => compilePath('let str = `abc`; str.split("x");')).toThrow(/0 arguments/i);
+  });
+
+  it('.empty() with args throws', () => {
+    expect(() => compilePath('let str = `abc`; str.empty(1);')).toThrow(/0 arguments/i);
+  });
+});
+
 describe('Edge cases', () => {
   describe('empty constructs', () => {
     it('handles single-value range', () => {

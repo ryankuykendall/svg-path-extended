@@ -69,6 +69,90 @@ if (mode == "dark") { /* ... */ }
 if (mode != "light") { /* ... */ }
 ```
 
+### `.length`
+
+Returns the number of characters in the string:
+
+```
+let str = `Hello`;
+log(str.length);  // 5
+```
+
+### `.empty()`
+
+Returns `1` (truthy) if the string has no characters, `0` (falsy) otherwise:
+
+```
+let str = ``;
+if (str.empty()) {
+  // string is empty
+}
+```
+
+### Index Access
+
+Access individual characters by zero-based index using `[expr]`:
+
+```
+let str = `Hello`;
+let first = str[0];   // "H"
+let last = str[4];     // "o"
+```
+
+Out-of-bounds access throws an error.
+
+### `.split()`
+
+Splits a string into an array of individual characters:
+
+```
+let str = `abc`;
+let chars = str.split();  // ["a", "b", "c"]
+for (ch in chars) {
+  log(ch);
+}
+```
+
+### `.append(value)`
+
+Returns a new string with the given value appended to the end:
+
+```
+let str = `Hello`;
+let result = str.append(` World`);  // "Hello World"
+```
+
+### `.prepend(value)`
+
+Returns a new string with the given value prepended to the beginning:
+
+```
+let str = `World`;
+let result = str.prepend(`Hello `);  // "Hello World"
+```
+
+### `.includes(substring)`
+
+Returns `1` (truthy) if the string contains the given substring, `0` (falsy) otherwise:
+
+```
+let str = `Hello World`;
+if (str.includes(`World`)) {
+  // found it
+}
+```
+
+### `.slice(start, end)`
+
+Returns a substring from `start` (inclusive) to `end` (exclusive). Negative indices count from the end:
+
+```
+let str = `Hello World`;
+let sub = str.slice(0, 5);    // "Hello"
+let end = str.slice(6, 11);   // "World"
+let last3 = str.slice(-3, 11); // "rld"
+```
+
 ## Expressions with calc()
 
 For mathematical expressions, wrap them in `calc()`:

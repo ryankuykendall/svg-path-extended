@@ -291,6 +291,68 @@ export function svgPathCompletions(context) {
           validFor: /^\w*$/,
         };
       }
+
+      // Check for string variables (let x = `...` or let x = "...")
+      const stringVarRegex = new RegExp(`let\\s+${obj}\\s*=\\s*(\`|")`);
+      // Also check for string method results (let x = str.append/prepend/slice)
+      const stringMethodRegex = new RegExp(`let\\s+${obj}\\s*=\\s*\\w+\\.(append|prepend|slice)\\s*\\(`);
+      if (stringVarRegex.test(doc) || stringMethodRegex.test(doc)) {
+        return {
+          from,
+          options: [
+            { label: 'length', type: 'property', info: `${obj}.length - Number of characters`, boost: 8 },
+            { label: 'empty()', type: 'function', info: `${obj}.empty() - 1 if empty, 0 otherwise`, boost: 7 },
+            { label: 'split()', type: 'function', info: `${obj}.split() - Array of characters`, boost: 6 },
+            { label: 'includes()', type: 'function', info: `${obj}.includes(substr) - 1 if contains substring`, boost: 5,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'includes()' }, selection: { anchor: from + 9 } });
+              },
+            },
+            { label: 'append()', type: 'function', info: `${obj}.append(str) - New string with value at end`, boost: 4,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'append()' }, selection: { anchor: from + 7 } });
+              },
+            },
+            { label: 'prepend()', type: 'function', info: `${obj}.prepend(str) - New string with value at start`, boost: 3,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'prepend()' }, selection: { anchor: from + 8 } });
+              },
+            },
+            { label: 'slice()', type: 'function', info: `${obj}.slice(start, end) - Extract substring`, boost: 2,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'slice()' }, selection: { anchor: from + 6 } });
+              },
+            },
+          ],
+          validFor: /^\w*$/,
+        };
+      }
+
+      // Check for array variables (let x = [...] or let x = str.split())
+      const arrayVarRegex = new RegExp(`let\\s+${obj}\\s*=\\s*\\[`);
+      const splitResultRegex = new RegExp(`let\\s+${obj}\\s*=\\s*\\w+\\.split\\s*\\(`);
+      if (arrayVarRegex.test(doc) || splitResultRegex.test(doc)) {
+        return {
+          from,
+          options: [
+            { label: 'length', type: 'property', info: `${obj}.length - Number of elements`, boost: 8 },
+            { label: 'empty()', type: 'function', info: `${obj}.empty() - 1 if empty, 0 otherwise`, boost: 7 },
+            { label: 'push()', type: 'function', info: `${obj}.push(value) - Append and return new length`, boost: 6,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'push()' }, selection: { anchor: from + 5 } });
+              },
+            },
+            { label: 'pop()', type: 'function', info: `${obj}.pop() - Remove and return last element`, boost: 5 },
+            { label: 'unshift()', type: 'function', info: `${obj}.unshift(value) - Prepend and return new length`, boost: 4,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'unshift()' }, selection: { anchor: from + 8 } });
+              },
+            },
+            { label: 'shift()', type: 'function', info: `${obj}.shift() - Remove and return first element`, boost: 3 },
+          ],
+          validFor: /^\w*$/,
+        };
+      }
     }
   }
 

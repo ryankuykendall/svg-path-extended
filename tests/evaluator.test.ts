@@ -1090,6 +1090,105 @@ describe('Evaluator', () => {
     });
   });
 
+  describe('string operations', () => {
+    it('.length returns character count', () => {
+      const result = compile('let str = `Hello`; log(str.length);');
+      expect(result.logs[0].parts[0].value).toBe('5');
+    });
+
+    it('.length on empty string returns 0', () => {
+      expect(compilePath('let str = ``; M str.length 0')).toBe('M 0 0');
+    });
+
+    it('.empty() on empty string returns truthy', () => {
+      expect(compilePath('let str = ``; if (str.empty()) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+    });
+
+    it('.empty() on non-empty string returns falsy', () => {
+      expect(compilePath('let str = `hello`; if (str.empty()) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
+    });
+
+    it('index access returns character at position', () => {
+      const result = compile('let str = `Hello`; log(str[0]);');
+      expect(result.logs[0].parts[0].value).toBe('H');
+    });
+
+    it('index access works at different positions', () => {
+      const result = compile('let str = `abc`; log(str[0]); log(str[1]); log(str[2]);');
+      expect(result.logs[0].parts[0].value).toBe('a');
+      expect(result.logs[1].parts[0].value).toBe('b');
+      expect(result.logs[2].parts[0].value).toBe('c');
+    });
+
+    it('.split() returns array of characters', () => {
+      const result = compile('let str = `abc`; let chars = str.split(); log(chars);');
+      expect(result.logs[0].parts[0].value).toBe('[a, b, c]');
+    });
+
+    it('.split() returns empty array for empty string', () => {
+      expect(compilePath('let str = ``; let chars = str.split(); M chars.length 0')).toBe('M 0 0');
+    });
+
+    it('.split() result can be iterated', () => {
+      const result = compile('let str = `abc`; for (ch in str.split()) { log(ch); }');
+      expect(result.logs).toHaveLength(3);
+      expect(result.logs[0].parts[0].value).toBe('a');
+      expect(result.logs[1].parts[0].value).toBe('b');
+      expect(result.logs[2].parts[0].value).toBe('c');
+    });
+
+    it('.append() creates new string with value at end', () => {
+      const result = compile('let str = `Hello`; let r = str.append(` World`); log(r);');
+      expect(result.logs[0].parts[0].value).toBe('Hello World');
+    });
+
+    it('.append() does not mutate original', () => {
+      const result = compile('let str = `Hello`; let r = str.append(` World`); log(str);');
+      expect(result.logs[0].parts[0].value).toBe('Hello');
+    });
+
+    it('.prepend() creates new string with value at beginning', () => {
+      const result = compile('let str = `World`; let r = str.prepend(`Hello `); log(r);');
+      expect(result.logs[0].parts[0].value).toBe('Hello World');
+    });
+
+    it('.prepend() does not mutate original', () => {
+      const result = compile('let str = `World`; let r = str.prepend(`Hello `); log(str);');
+      expect(result.logs[0].parts[0].value).toBe('World');
+    });
+
+    it('.includes() returns truthy when substring found', () => {
+      expect(compilePath('let str = `Hello World`; if (str.includes(`World`)) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+    });
+
+    it('.includes() returns falsy when substring not found', () => {
+      expect(compilePath('let str = `Hello World`; if (str.includes(`Foo`)) { M 1 0 } else { M 0 0 }')).toBe('M 0 0');
+    });
+
+    it('.includes() works with empty substring', () => {
+      expect(compilePath('let str = `Hello`; if (str.includes(``)) { M 1 0 } else { M 0 0 }')).toBe('M 1 0');
+    });
+
+    it('.slice() extracts substring', () => {
+      const result = compile('let str = `Hello World`; log(str.slice(0, 5));');
+      expect(result.logs[0].parts[0].value).toBe('Hello');
+    });
+
+    it('.slice() with different range', () => {
+      const result = compile('let str = `Hello World`; log(str.slice(6, 11));');
+      expect(result.logs[0].parts[0].value).toBe('World');
+    });
+
+    it('.slice() with negative start', () => {
+      const result = compile('let str = `Hello World`; log(str.slice(-5, 11));');
+      expect(result.logs[0].parts[0].value).toBe('World');
+    });
+
+    it('string length in path context', () => {
+      expect(compilePath('let str = `abc`; M str.length 0')).toBe('M 3 0');
+    });
+  });
+
   describe('style blocks', () => {
     it('creates a style block value', () => {
       const result = compile(`

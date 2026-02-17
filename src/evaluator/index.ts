@@ -479,8 +479,18 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
   const index = evaluateExpression(expr.index, scope);
 
+  if (typeof obj === 'string') {
+    if (typeof index !== 'number') {
+      throw new Error('String index must be a number');
+    }
+    if (!Number.isInteger(index) || index < 0 || index >= obj.length) {
+      throw new Error(`String index ${index} out of bounds (length ${obj.length})`);
+    }
+    return obj[index];
+  }
+
   if (!isArrayValue(obj)) {
-    throw new Error('Index access requires an array');
+    throw new Error('Index access requires an array or string');
   }
   if (typeof index !== 'number') {
     throw new Error('Array index must be a number');
@@ -494,6 +504,51 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
 function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
 
+  // String methods
+  if (typeof obj === 'string') {
+    switch (expr.method) {
+      case 'empty': {
+        if (expr.args.length !== 0) throw new Error('empty() expects 0 arguments');
+        return obj.length === 0 ? 1 : 0;
+      }
+      case 'split': {
+        if (expr.args.length !== 0) throw new Error('split() expects 0 arguments');
+        const chars = Array.from(obj);
+        return { type: 'ArrayValue' as const, elements: chars };
+      }
+      case 'append': {
+        if (expr.args.length !== 1) throw new Error('append() expects 1 argument');
+        const val = evaluateExpression(expr.args[0], scope);
+        if (typeof val !== 'string') throw new Error('append() argument must be a string');
+        return obj + val;
+      }
+      case 'prepend': {
+        if (expr.args.length !== 1) throw new Error('prepend() expects 1 argument');
+        const val = evaluateExpression(expr.args[0], scope);
+        if (typeof val !== 'string') throw new Error('prepend() argument must be a string');
+        return val + obj;
+      }
+      case 'includes': {
+        if (expr.args.length !== 1) throw new Error('includes() expects 1 argument');
+        const val = evaluateExpression(expr.args[0], scope);
+        if (typeof val !== 'string') throw new Error('includes() argument must be a string');
+        return obj.includes(val) ? 1 : 0;
+      }
+      case 'slice': {
+        if (expr.args.length !== 2) throw new Error('slice() expects 2 arguments');
+        const start = evaluateExpression(expr.args[0], scope);
+        const end = evaluateExpression(expr.args[1], scope);
+        if (typeof start !== 'number' || typeof end !== 'number') {
+          throw new Error('slice() arguments must be numbers');
+        }
+        return obj.slice(start, end);
+      }
+      default:
+        throw new Error(`Unknown string method: ${expr.method}`);
+    }
+  }
+
+  // Array methods
   if (!isArrayValue(obj)) {
     throw new Error(`Cannot call method '${expr.method}' on non-array value`);
   }
@@ -609,6 +664,14 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
       return obj.elements.length;
     }
     throw new Error(`Property '${expr.property}' does not exist on array. Use methods like .push(), .pop(), etc.`);
+  }
+
+  // Handle string property access
+  if (typeof obj === 'string') {
+    if (expr.property === 'length') {
+      return obj.length;
+    }
+    throw new Error(`Property '${expr.property}' does not exist on string`);
   }
 
   throw new Error(`Cannot access property '${expr.property}' on non-object value`);
