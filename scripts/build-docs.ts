@@ -329,6 +329,7 @@ async function buildDocs(): Promise<void> {
     .sidebar-header { padding: 1rem; border-bottom: 1px solid var(--border-color, #e2e8f0); }
     .sidebar-header h1 { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
     .sidebar-header .subtitle { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--text-secondary); }
+    .sidebar-header .markdown-link { display: inline-block; margin-top: 0.375rem; font-size: 0.6875rem; color: var(--text-tertiary, #94a3b8); text-decoration: underline; }
     .sidebar-nav { flex: 1; overflow-y: auto; padding: 0.5rem 0; }
     .sidebar-section { margin-bottom: 0.125rem; }
     .section-toggle {
@@ -438,6 +439,7 @@ async function buildDocs(): Promise<void> {
       <div class="sidebar-header">
         <h1>Documentation</h1>
         <p class="subtitle">svg-path-extended</p>
+        <a href="/pathogen/docs/docs.md" class="markdown-link">View as Markdown</a>
       </div>
       <nav class="sidebar-nav">${sidebarHtml}
       </nav>
@@ -562,6 +564,36 @@ async function buildDocs(): Promise<void> {
   await fs.mkdir(STATIC_DOCS_DIR, { recursive: true });
   await fs.writeFile(join(STATIC_DOCS_DIR, 'index.html'), staticPage);
   console.log(`Generated: website/docs-static/index.html`);
+
+  // ─── Generate single-page markdown docs for AI/LLM consumption ─────
+  console.log('\nGenerating single-page markdown docs...');
+
+  const mdParts: string[] = [
+    `# svg-path-extended Documentation`,
+    '',
+    `> This is the complete documentation for svg-path-extended in a single page.`,
+    `> For the formatted version with navigation, see [the HTML docs](/pathogen/docs).`,
+    '',
+    '---',
+  ];
+
+  for (const filename of Object.keys(DOC_FILES)) {
+    const filepath = join(DOCS_DIR, filename);
+    try {
+      const content = await fs.readFile(filepath, 'utf-8');
+      mdParts.push('', content.trimEnd(), '', '---');
+    } catch {
+      // Skip missing files (already warned above)
+    }
+  }
+
+  // Remove trailing separator
+  if (mdParts[mdParts.length - 1] === '---') {
+    mdParts.pop();
+  }
+
+  await fs.writeFile(join(STATIC_DOCS_DIR, 'docs.md'), mdParts.join('\n') + '\n');
+  console.log(`Generated: website/docs-static/docs.md`);
 }
 
 const program = new Command();

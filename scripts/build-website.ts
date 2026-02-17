@@ -135,6 +135,7 @@ async function build(): Promise<void> {
   console.log('Generating robots.txt...');
   const robotsTxt = `User-agent: *
 Allow: /pathogen/docs
+Allow: /pathogen/docs/docs.md
 Allow: /pathogen/explore
 Allow: /pathogen/featured
 Allow: /pathogen/blog
@@ -181,6 +182,12 @@ Sitemap: https://pedestal.design/sitemap.xml
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://pedestal.design/pathogen/docs</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://pedestal.design/pathogen/docs/docs.md</loc>
     <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
