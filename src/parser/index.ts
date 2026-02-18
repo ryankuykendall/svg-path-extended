@@ -14,7 +14,9 @@ import type {
   MemberExpression,
   NullLiteral,
   ArrayLiteral,
+  ObjectLiteral,
   IndexExpression,
+  IndexedAssignmentStatement,
   MethodCallExpression,
   PathCommand,
   LetDeclaration,
@@ -416,7 +418,28 @@ const arrayLiteral: Parsimmon.Parser<ArrayLiteral> = P.seq(
   elements,
 }));
 
-// Primary expression: style block, number, string, template literal, calc, null, array, identifier (with optional postfix), function call (with optional postfix), or parenthesized expression
+// Object literal: { key: value, ... }
+const objectProperty: Parsimmon.Parser<{ key: string; value: Expression }> = P.seqMap(
+  P.alt(
+    nonReservedIdentifier.map((id: Identifier) => id.name),
+    stringLiteral.map((s: StringLiteral) => s.value)
+  ),
+  word(':'),
+  P.lazy(() => expression),
+  (key, _colon, value) => ({ key, value })
+);
+
+const objectLiteral: Parsimmon.Parser<ObjectLiteral> = P.seq(
+  word('{'),
+  P.sepBy(objectProperty, word(',')),
+  word(',').atMost(1),  // optional trailing comma
+  word('}')
+).map(([, properties]): ObjectLiteral => ({
+  type: 'ObjectLiteral' as const,
+  properties,
+}));
+
+// Primary expression: style block, number, string, template literal, calc, null, array, object, identifier (with optional postfix), function call (with optional postfix), or parenthesized expression
 const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
   P.alt(
     withPostfix(styleBlockLiteral),
@@ -427,6 +450,7 @@ const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
     templateLiteral,
     calcExpression,
     withPostfix(functionCall),
+    withPostfix(objectLiteral as Parsimmon.Parser<Expression>),
     withPostfix(nonReservedIdentifier),
     P.seq(word('('), expression, word(')')).map(([, expr]) => expr)
   )
@@ -620,6 +644,37 @@ const returnStatement: Parsimmon.Parser<ReturnStatement> = P.seqMap(
     value,
   })
 );
+
+// Indexed assignment statement: obj['key'] = value; or arr[0] = value;
+const indexedAssignmentStatement: Parsimmon.Parser<IndexedAssignmentStatement> = P.seqMap(
+  P.index,
+  withPostfix(
+    P.alt(
+      functionCall as Parsimmon.Parser<Expression>,
+      nonReservedIdentifier as Parsimmon.Parser<Expression>
+    )
+  ),
+  token(P.regexp(/=(?!=)/)),
+  expression,
+  word(';'),
+  (startIndex, lhs, _eq, value, _semi) => {
+    if (lhs.type !== 'IndexExpression') {
+      return P.fail('expected index expression on left side of assignment') as unknown as IndexedAssignmentStatement;
+    }
+    return {
+      type: 'IndexedAssignmentStatement' as const,
+      object: lhs.object,
+      index: lhs.index,
+      value,
+      loc: indexToLoc(startIndex),
+    };
+  }
+).chain(result => {
+  if (result && result.type === 'IndexedAssignmentStatement') {
+    return P.succeed(result);
+  }
+  return P.fail('expected indexed assignment');
+});
 
 // Assignment statement: x = expr;
 const assignmentStatement: Parsimmon.Parser<AssignmentStatement> = P.seqMap(
@@ -881,6 +936,7 @@ const statement: Parsimmon.Parser<Statement> = P.alt(
   ifStatement,
   functionDefinition,
   returnStatement,
+  indexedAssignmentStatement,
   assignmentStatement,
   methodCallStatement,
   functionCallStatement,

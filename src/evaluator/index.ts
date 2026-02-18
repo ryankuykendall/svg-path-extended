@@ -6,6 +6,7 @@ import type {
   PathCommand,
   LetDeclaration,
   AssignmentStatement,
+  IndexedAssignmentStatement,
   ForLoop,
   ForEachLoop,
   IfStatement,
@@ -39,7 +40,7 @@ import {
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 
-export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference;
+export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference | ObjectValue | ObjectNamespace;
 
 /**
  * Represents an array value (reference semantics)
@@ -64,6 +65,25 @@ export interface PointValue {
 
 export function isPointValue(value: Value): value is PointValue {
   return typeof value === 'object' && value !== null && 'type' in value && value.type === 'PointValue';
+}
+
+/**
+ * Represents a plain key-value object (reference semantics)
+ */
+export interface ObjectValue {
+  type: 'ObjectValue';
+  properties: Map<string, Value>;
+}
+
+export function isObjectValue(value: Value): value is ObjectValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'ObjectValue';
+}
+
+/**
+ * Sentinel for Object namespace (Object.keys, Object.values, etc.)
+ */
+export interface ObjectNamespace {
+  type: 'ObjectNamespace';
 }
 
 /**
@@ -220,6 +240,8 @@ function expressionToSource(expr: Expression): string {
       return `${expressionToSource(expr.object)}[${expressionToSource(expr.index)}]`;
     case 'MethodCallExpression':
       return `${expressionToSource(expr.object)}.${expr.method}(${expr.args.map(expressionToSource).join(', ')})`;
+    case 'ObjectLiteral':
+      return '{' + expr.properties.map(p => `${p.key}: ${expressionToSource(p.value)}`).join(', ') + '}';
     default:
       return '?';
   }
@@ -278,6 +300,10 @@ function lookupVariable(scope: Scope, name: string): Value {
   }
   if (scope.parent) {
     return lookupVariable(scope.parent, name);
+  }
+  // Object namespace
+  if (name === 'Object') {
+    return { type: 'ObjectNamespace' } as ObjectNamespace;
   }
   // Check stdlib
   if (name in stdlib) {
@@ -407,6 +433,14 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
       return { type: 'ArrayValue' as const, elements };
     }
 
+    case 'ObjectLiteral': {
+      const props = new Map<string, Value>();
+      for (const { key, value } of expr.properties) {
+        props.set(key, evaluateExpression(value, scope));
+      }
+      return { type: 'ObjectValue', properties: props } as ObjectValue;
+    }
+
     case 'IndexExpression':
       return evaluateIndexExpression(expr, scope);
 
@@ -509,6 +543,13 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
   const index = evaluateExpression(expr.index, scope);
 
+  if (isObjectValue(obj)) {
+    if (typeof index !== 'string') {
+      throw new Error('Object key must be a string');
+    }
+    return obj.properties.get(index) ?? null;
+  }
+
   if (typeof obj === 'string') {
     if (typeof index !== 'number') {
       throw new Error('String index must be a number');
@@ -520,7 +561,7 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
   }
 
   if (!isArrayValue(obj)) {
-    throw new Error('Index access requires an array or string');
+    throw new Error('Index access requires an array, object, or string');
   }
   if (typeof index !== 'number') {
     throw new Error('Array index must be a number');
@@ -657,6 +698,49 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
     }
   }
 
+  // ObjectNamespace methods (Object.keys, Object.values, Object.entries, Object.delete)
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ObjectNamespace') {
+    const args = expr.args.map(a => evaluateExpression(a, scope));
+    switch (expr.method) {
+      case 'keys': {
+        if (args.length !== 1 || !isObjectValue(args[0])) throw new Error('Object.keys() expects 1 object argument');
+        return { type: 'ArrayValue', elements: Array.from(args[0].properties.keys()) };
+      }
+      case 'values': {
+        if (args.length !== 1 || !isObjectValue(args[0])) throw new Error('Object.values() expects 1 object argument');
+        return { type: 'ArrayValue', elements: Array.from(args[0].properties.values()) };
+      }
+      case 'entries': {
+        if (args.length !== 1 || !isObjectValue(args[0])) throw new Error('Object.entries() expects 1 object argument');
+        const entries = Array.from(args[0].properties.entries()).map(
+          ([k, v]) => ({ type: 'ArrayValue' as const, elements: [k, v] as Value[] })
+        );
+        return { type: 'ArrayValue', elements: entries };
+      }
+      case 'delete': {
+        if (args.length !== 2 || !isObjectValue(args[0])) throw new Error('Object.delete() expects 2 arguments (object, key)');
+        const key = args[1];
+        if (typeof key !== 'string') throw new Error('Object.delete() key must be a string');
+        const val = args[0].properties.get(key) ?? null;
+        args[0].properties.delete(key);
+        return val;
+      }
+      default:
+        throw new Error(`Unknown Object method: ${expr.method}`);
+    }
+  }
+
+  // ObjectValue methods
+  if (isObjectValue(obj)) {
+    if (expr.method === 'has') {
+      if (expr.args.length !== 1) throw new Error('has() expects 1 argument');
+      const key = evaluateExpression(expr.args[0], scope);
+      if (typeof key !== 'string') throw new Error('has() argument must be a string');
+      return obj.properties.has(key) ? 1 : 0;
+    }
+    throw new Error(`Unknown object method: ${expr.method}`);
+  }
+
   // String methods
   if (typeof obj === 'string') {
     switch (expr.method) {
@@ -744,6 +828,11 @@ function formatValueForDisplay(val: Value): string {
   if (typeof val === 'string') return val;
   if (isPointValue(val)) {
     return `Point(${formatNum(val.x)}, ${formatNum(val.y)})`;
+  }
+  if (isObjectValue(val)) {
+    const entries = Array.from(val.properties.entries())
+      .map(([k, v]) => `${k}: ${formatValueForDisplay(v)}`);
+    return '{' + entries.join(', ') + '}';
   }
   if (isArrayValue(val)) {
     return '[' + val.elements.map(formatValueForDisplay).join(', ') + ']';
@@ -866,6 +955,12 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     throw new Error(`Property '${expr.property}' does not exist on layer reference`);
   }
 
+  // Handle ObjectValue property access (dot notation)
+  if (isObjectValue(obj)) {
+    if (expr.property === 'length') return obj.properties.size;
+    return obj.properties.get(expr.property) ?? null;
+  }
+
   // Handle ArrayValue property access
   if (isArrayValue(obj)) {
     if (expr.property === 'length') {
@@ -938,6 +1033,8 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
         if (value === null) {
           stringValue = 'null';
         } else if (isPointValue(value)) {
+          stringValue = formatValueForDisplay(value);
+        } else if (isObjectValue(value)) {
           stringValue = formatValueForDisplay(value);
         } else if (isArrayValue(value)) {
           stringValue = formatValueForDisplay(value);
@@ -1661,6 +1758,26 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       return;
     }
 
+    case 'IndexedAssignmentStatement': {
+      const obj = evaluateExpression(stmt.object, scope);
+      const index = evaluateExpression(stmt.index, scope);
+      const value = evaluateExpression(stmt.value, scope);
+
+      if (isObjectValue(obj)) {
+        if (typeof index !== 'string') throw new Error('Object key must be a string');
+        obj.properties.set(index, value);
+        return;
+      }
+      if (isArrayValue(obj)) {
+        if (typeof index !== 'number') throw new Error('Array index must be a number');
+        if (!Number.isInteger(index) || index < 0 || index >= obj.elements.length)
+          throw new Error(`Array index ${index} out of bounds`);
+        obj.elements[index] = value;
+        return;
+      }
+      throw new Error('Indexed assignment requires an object or array');
+    }
+
     case 'ForLoop': {
       const start = evaluateExpression(stmt.start, scope);
       const end = evaluateExpression(stmt.end, scope);
@@ -1713,15 +1830,41 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
 
     case 'ForEachLoop': {
       const iterable = evaluateExpression(stmt.iterable, scope);
+
+      // Object iteration
+      if (isObjectValue(iterable)) {
+        const keys = Array.from(iterable.properties.keys());
+        for (const key of keys) {
+          const loopScope = createScope(scope);
+          if (stmt.indexVariable) {
+            // for ([key, value] in obj) — key-value pairs
+            setVariable(loopScope, stmt.variable, key);
+            setVariable(loopScope, stmt.indexVariable, iterable.properties.get(key)!);
+          } else {
+            // for (key in obj) — keys only
+            setVariable(loopScope, stmt.variable, key);
+          }
+          evaluateStatementsToAccum(stmt.body, loopScope, accum);
+        }
+        return;
+      }
+
+      // Array iteration (with smart destructuring)
       if (!isArrayValue(iterable)) {
-        throw new Error('for-each requires an array');
+        throw new Error('for-each requires an array or object');
       }
 
       for (let i = 0; i < iterable.elements.length; i++) {
         const loopScope = createScope(scope);
-        setVariable(loopScope, stmt.variable, iterable.elements[i]);
-        if (stmt.indexVariable) {
-          setVariable(loopScope, stmt.indexVariable, i);
+        const element = iterable.elements[i];
+        if (stmt.indexVariable && isArrayValue(element)) {
+          // Smart destructuring: element is array → destructure
+          setVariable(loopScope, stmt.variable, element.elements[0] ?? null);
+          setVariable(loopScope, stmt.indexVariable, element.elements[1] ?? null);
+        } else {
+          // Standard: item + loop index
+          setVariable(loopScope, stmt.variable, element);
+          if (stmt.indexVariable) setVariable(loopScope, stmt.indexVariable, i);
         }
         evaluateStatementsToAccum(stmt.body, loopScope, accum);
       }

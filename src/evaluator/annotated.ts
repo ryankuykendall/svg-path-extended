@@ -14,6 +14,7 @@ import type {
   FunctionCall,
   MemberExpression,
   IndexExpression,
+  IndexedAssignmentStatement,
   MethodCallExpression,
   Comment,
   LayerDefinition,
@@ -44,7 +45,7 @@ export interface AnnotatedOutput {
 }
 
 // Value types (same as main evaluator)
-export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | AnnotatedLayerRef | StyleBlockValue | ArrayValue;
+export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | AnnotatedLayerRef | StyleBlockValue | ArrayValue | ObjectValue | ObjectNamespace;
 
 export interface ArrayValue {
   type: 'ArrayValue';
@@ -53,6 +54,19 @@ export interface ArrayValue {
 
 function isArrayValue(value: Value): value is ArrayValue {
   return typeof value === 'object' && value !== null && 'type' in value && value.type === 'ArrayValue';
+}
+
+export interface ObjectValue {
+  type: 'ObjectValue';
+  properties: Map<string, Value>;
+}
+
+function isObjectValue(value: Value): value is ObjectValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'ObjectValue';
+}
+
+export interface ObjectNamespace {
+  type: 'ObjectNamespace';
 }
 
 export interface StyleBlockValue {
@@ -125,6 +139,9 @@ function lookupVariable(scope: Scope, name: string): Value {
   }
   if (scope.parent) {
     return lookupVariable(scope.parent, name);
+  }
+  if (name === 'Object') {
+    return { type: 'ObjectNamespace' } as ObjectNamespace;
   }
   if (name in stdlib) {
     return stdlib[name as keyof typeof stdlib] as unknown as Value;
@@ -556,7 +573,11 @@ function evaluateStyleBlockLiteral(expr: StyleBlockLiteral, scope: Scope): Style
 function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
   const index = evaluateExpression(expr.index, scope);
-  if (!isArrayValue(obj)) throw new Error('Index access requires an array');
+  if (isObjectValue(obj)) {
+    if (typeof index !== 'string') throw new Error('Object key must be a string');
+    return obj.properties.get(index) ?? null;
+  }
+  if (!isArrayValue(obj)) throw new Error('Index access requires an array or object');
   if (typeof index !== 'number') throw new Error('Array index must be a number');
   if (!Number.isInteger(index) || index < 0 || index >= obj.elements.length) {
     throw new Error(`Array index ${index} out of bounds (length ${obj.elements.length})`);
@@ -566,6 +587,50 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
 
 function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
+
+  // ObjectNamespace methods
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ObjectNamespace') {
+    const args = expr.args.map(a => evaluateExpression(a, scope));
+    switch (expr.method) {
+      case 'keys': {
+        if (args.length !== 1 || !isObjectValue(args[0])) throw new Error('Object.keys() expects 1 object argument');
+        return { type: 'ArrayValue', elements: Array.from(args[0].properties.keys()) };
+      }
+      case 'values': {
+        if (args.length !== 1 || !isObjectValue(args[0])) throw new Error('Object.values() expects 1 object argument');
+        return { type: 'ArrayValue', elements: Array.from(args[0].properties.values()) };
+      }
+      case 'entries': {
+        if (args.length !== 1 || !isObjectValue(args[0])) throw new Error('Object.entries() expects 1 object argument');
+        const entries = Array.from(args[0].properties.entries()).map(
+          ([k, v]) => ({ type: 'ArrayValue' as const, elements: [k, v] as Value[] })
+        );
+        return { type: 'ArrayValue', elements: entries };
+      }
+      case 'delete': {
+        if (args.length !== 2 || !isObjectValue(args[0])) throw new Error('Object.delete() expects 2 arguments (object, key)');
+        const key = args[1];
+        if (typeof key !== 'string') throw new Error('Object.delete() key must be a string');
+        const val = args[0].properties.get(key) ?? null;
+        args[0].properties.delete(key);
+        return val;
+      }
+      default:
+        throw new Error(`Unknown Object method: ${expr.method}`);
+    }
+  }
+
+  // ObjectValue methods
+  if (isObjectValue(obj)) {
+    if (expr.method === 'has') {
+      if (expr.args.length !== 1) throw new Error('has() expects 1 argument');
+      const key = evaluateExpression(expr.args[0], scope);
+      if (typeof key !== 'string') throw new Error('has() argument must be a string');
+      return obj.properties.has(key) ? 1 : 0;
+    }
+    throw new Error(`Unknown object method: ${expr.method}`);
+  }
+
   if (!isArrayValue(obj)) throw new Error(`Cannot call method '${expr.method}' on non-array value`);
   switch (expr.method) {
     case 'push': {
@@ -615,6 +680,14 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'ArrayLiteral': {
       const elements = expr.elements.map((el) => evaluateExpression(el, scope));
       return { type: 'ArrayValue' as const, elements };
+    }
+
+    case 'ObjectLiteral': {
+      const props = new Map<string, Value>();
+      for (const { key, value } of expr.properties) {
+        props.set(key, evaluateExpression(value, scope));
+      }
+      return { type: 'ObjectValue', properties: props } as ObjectValue;
     }
 
     case 'IndexExpression':
@@ -709,6 +782,11 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
         if (val === null) return 'null';
         if (typeof val === 'number') return String(val);
         if (typeof val === 'string') return val;
+        if (isObjectValue(val)) {
+          const entries = Array.from(val.properties.entries())
+            .map(([k, v]) => `${k}: ${v === null ? 'null' : String(v)}`);
+          return '{' + entries.join(', ') + '}';
+        }
         if (isArrayValue(val)) return '[' + val.elements.map(e => {
           if (e === null) return 'null';
           if (typeof e === 'number') return String(e);
@@ -765,6 +843,12 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     }
 
     throw new Error(formatError(`Cannot access property '${expr.property}' of type ${typeof propValue}`, line));
+  }
+
+  // Handle ObjectValue property access (dot notation)
+  if (isObjectValue(obj)) {
+    if (expr.property === 'length') return obj.properties.size;
+    return obj.properties.get(expr.property) ?? null;
   }
 
   // Handle ArrayValue property access
@@ -1030,14 +1114,59 @@ function evaluateStatementPlain(stmt: Statement, scope: Scope): string {
       return '';
     }
 
+    case 'IndexedAssignmentStatement': {
+      const obj = evaluateExpression(stmt.object, scope);
+      const index = evaluateExpression(stmt.index, scope);
+      const value = evaluateExpression(stmt.value, scope);
+      if (isObjectValue(obj)) {
+        if (typeof index !== 'string') throw new Error('Object key must be a string');
+        obj.properties.set(index, value);
+      } else if (isArrayValue(obj)) {
+        if (typeof index !== 'number') throw new Error('Array index must be a number');
+        if (!Number.isInteger(index) || index < 0 || index >= obj.elements.length)
+          throw new Error(`Array index ${index} out of bounds`);
+        obj.elements[index] = value;
+      } else {
+        throw new Error('Indexed assignment requires an object or array');
+      }
+      return '';
+    }
+
     case 'ForEachLoop': {
       const iterable = evaluateExpression(stmt.iterable, scope);
-      if (!isArrayValue(iterable)) throw new Error('for-each requires an array');
+
+      // Object iteration
+      if (isObjectValue(iterable)) {
+        const results: string[] = [];
+        const keys = Array.from(iterable.properties.keys());
+        for (const key of keys) {
+          const loopScope = createScope(scope);
+          if (stmt.indexVariable) {
+            setVariable(loopScope, stmt.variable, key);
+            setVariable(loopScope, stmt.indexVariable, iterable.properties.get(key)!);
+          } else {
+            setVariable(loopScope, stmt.variable, key);
+          }
+          for (const bodyStmt of stmt.body) {
+            const result = evaluateStatementPlain(bodyStmt, loopScope);
+            if (result) results.push(result);
+          }
+        }
+        return results.join(' ');
+      }
+
+      if (!isArrayValue(iterable)) throw new Error('for-each requires an array or object');
       const results: string[] = [];
       for (let i = 0; i < iterable.elements.length; i++) {
         const loopScope = createScope(scope);
-        setVariable(loopScope, stmt.variable, iterable.elements[i]);
-        if (stmt.indexVariable) setVariable(loopScope, stmt.indexVariable, i);
+        const element = iterable.elements[i];
+        if (stmt.indexVariable && isArrayValue(element)) {
+          setVariable(loopScope, stmt.variable, element.elements[0] ?? null);
+          setVariable(loopScope, stmt.indexVariable, element.elements[1] ?? null);
+        } else {
+          setVariable(loopScope, stmt.variable, element);
+          if (stmt.indexVariable) setVariable(loopScope, stmt.indexVariable, i);
+        }
         for (const bodyStmt of stmt.body) {
           const result = evaluateStatementPlain(bodyStmt, loopScope);
           if (result) results.push(result);
@@ -1229,9 +1358,56 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
       break;
     }
 
+    case 'IndexedAssignmentStatement': {
+      const obj = evaluateExpression(stmt.object, scope);
+      const index = evaluateExpression(stmt.index, scope);
+      const value = evaluateExpression(stmt.value, scope);
+      if (isObjectValue(obj)) {
+        if (typeof index !== 'string') throw new Error('Object key must be a string');
+        obj.properties.set(index, value);
+      } else if (isArrayValue(obj)) {
+        if (typeof index !== 'number') throw new Error('Array index must be a number');
+        if (!Number.isInteger(index) || index < 0 || index >= obj.elements.length)
+          throw new Error(`Array index ${index} out of bounds`);
+        obj.elements[index] = value;
+      } else {
+        throw new Error('Indexed assignment requires an object or array');
+      }
+      break;
+    }
+
     case 'ForEachLoop': {
       const iterable = evaluateExpression(stmt.iterable, scope);
-      if (!isArrayValue(iterable)) throw new Error('for-each requires an array');
+
+      // Object iteration in annotated mode
+      if (isObjectValue(iterable)) {
+        const keys = Array.from(iterable.properties.keys());
+        ctx.output.push({
+          type: 'foreach_start',
+          variable: stmt.variable,
+          length: keys.length,
+          line: stmt.loc?.line ?? 0,
+        });
+        ctx.indentLevel++;
+        for (let i = 0; i < keys.length; i++) {
+          ctx.output.push({ type: 'iteration', index: i });
+          const loopScope = createScope(scope);
+          if (stmt.indexVariable) {
+            setVariable(loopScope, stmt.variable, keys[i]);
+            setVariable(loopScope, stmt.indexVariable, iterable.properties.get(keys[i])!);
+          } else {
+            setVariable(loopScope, stmt.variable, keys[i]);
+          }
+          for (const bodyStmt of stmt.body) {
+            evaluateStatementAnnotated(bodyStmt, loopScope, ctx);
+          }
+        }
+        ctx.indentLevel--;
+        ctx.output.push({ type: 'loop_end' });
+        break;
+      }
+
+      if (!isArrayValue(iterable)) throw new Error('for-each requires an array or object');
 
       ctx.output.push({
         type: 'foreach_start',
@@ -1258,15 +1434,27 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
         if (shouldShow) {
           ctx.output.push({ type: 'iteration', index: i });
           const loopScope = createScope(scope);
-          setVariable(loopScope, stmt.variable, iterable.elements[i]);
-          if (stmt.indexVariable) setVariable(loopScope, stmt.indexVariable, i);
+          const element = iterable.elements[i];
+          if (stmt.indexVariable && isArrayValue(element)) {
+            setVariable(loopScope, stmt.variable, element.elements[0] ?? null);
+            setVariable(loopScope, stmt.indexVariable, element.elements[1] ?? null);
+          } else {
+            setVariable(loopScope, stmt.variable, element);
+            if (stmt.indexVariable) setVariable(loopScope, stmt.indexVariable, i);
+          }
           for (const bodyStmt of stmt.body) {
             evaluateStatementAnnotated(bodyStmt, loopScope, ctx);
           }
         } else {
           const loopScope = createScope(scope);
-          setVariable(loopScope, stmt.variable, iterable.elements[i]);
-          if (stmt.indexVariable) setVariable(loopScope, stmt.indexVariable, i);
+          const element = iterable.elements[i];
+          if (stmt.indexVariable && isArrayValue(element)) {
+            setVariable(loopScope, stmt.variable, element.elements[0] ?? null);
+            setVariable(loopScope, stmt.indexVariable, element.elements[1] ?? null);
+          } else {
+            setVariable(loopScope, stmt.variable, element);
+            if (stmt.indexVariable) setVariable(loopScope, stmt.indexVariable, i);
+          }
           for (const bodyStmt of stmt.body) {
             evaluateStatementPlain(bodyStmt, loopScope);
           }

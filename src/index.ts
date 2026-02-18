@@ -6,9 +6,9 @@ export { parse, parseWithComments } from './parser';
 export { evaluate, evaluateAnnotated, formatAnnotated, evaluateWithContext } from './evaluator';
 export { stdlib } from './stdlib';
 
-export type { Program, Statement, Expression, Node, SourceLocation, Comment, StyleProperty, StyleBlockLiteral, LayerDefinition, LayerApplyBlock, TemplateLiteral, TextStatement, TspanStatement, TextBodyItem, ForEachLoop, NullLiteral, ArrayLiteral, IndexExpression, MethodCallExpression } from './parser/ast';
-export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart, LayerOutput, CompileResult, LayerStyle, StyleBlockValue, ArrayValue, PointValue, TextElement, TextChild, PathLayerState, TextLayerState } from './evaluator';
-export { isPointValue } from './evaluator';
+export type { Program, Statement, Expression, Node, SourceLocation, Comment, StyleProperty, StyleBlockLiteral, LayerDefinition, LayerApplyBlock, TemplateLiteral, TextStatement, TspanStatement, TextBodyItem, ForEachLoop, NullLiteral, ArrayLiteral, ObjectLiteral, IndexExpression, IndexedAssignmentStatement, MethodCallExpression } from './parser/ast';
+export type { AnnotatedOutput, AnnotatedLine, EvaluateWithContextResult, EvaluateWithContextOptions, PathContext, Point, CommandHistoryEntry, LogEntry, LogPart, LayerOutput, CompileResult, LayerStyle, StyleBlockValue, ArrayValue, ObjectValue, PointValue, TextElement, TextChild, PathLayerState, TextLayerState } from './evaluator';
+export { isPointValue, isObjectValue } from './evaluator';
 export type { FormatOptions } from './evaluator/formatter';
 
 /**

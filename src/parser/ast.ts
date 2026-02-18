@@ -19,6 +19,7 @@ export type Node =
   | Comment
   | LetDeclaration
   | AssignmentStatement
+  | IndexedAssignmentStatement
   | ForLoop
   | ForEachLoop
   | IfStatement
@@ -34,6 +35,7 @@ export type Node =
   | MemberExpression
   | NullLiteral
   | ArrayLiteral
+  | ObjectLiteral
   | IndexExpression
   | MethodCallExpression
   | Identifier
@@ -51,6 +53,7 @@ export type Statement =
   | Comment
   | LetDeclaration
   | AssignmentStatement
+  | IndexedAssignmentStatement
   | ForLoop
   | ForEachLoop
   | IfStatement
@@ -199,6 +202,21 @@ export interface ArrayLiteral {
   elements: Expression[];
 }
 
+// Object literal: { key: value, ... }
+export interface ObjectLiteral {
+  type: 'ObjectLiteral';
+  properties: { key: string; value: Expression }[];
+}
+
+// Indexed assignment: obj['key'] = value; or arr[0] = value;
+export interface IndexedAssignmentStatement {
+  type: 'IndexedAssignmentStatement';
+  object: Expression;
+  index: Expression;
+  value: Expression;
+  loc?: SourceLocation;
+}
+
 // Index access: list[0]
 export interface IndexExpression {
   type: 'IndexExpression';
@@ -278,6 +296,7 @@ export type Expression =
   | MemberExpression
   | NullLiteral
   | ArrayLiteral
+  | ObjectLiteral
   | IndexExpression
   | MethodCallExpression
   | Identifier
