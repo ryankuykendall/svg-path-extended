@@ -445,7 +445,105 @@ layer('labels').apply {
 }
 ```
 
+## Transforms
+
+Apply SVG matrix transformations (translate, rotate, scale) at the layer level. Transforms are set via method calls on `ctx.transform` and rendered as SVG `transform` attributes on the output elements.
+
+### Translate
+
+```
+define PathLayer('shape') ${ stroke: #333; fill: none; }
+
+layer('shape').ctx.transform.translate.set(50, 50)
+
+layer('shape').apply {
+  M 0 0 L 100 0 L 100 100 Z
+}
+// Output: <path d="..." transform="translate(50, 50)"/>
+```
+
+### Rotate
+
+Angles are in **radians** (consistent with polar commands). Use `deg` suffix for degrees:
+
+```
+layer('shape').ctx.transform.rotate.set(45deg)         // around origin
+layer('shape').ctx.transform.rotate.set(45deg, 50, 50) // around (50, 50)
+```
+
+### Scale
+
+```
+layer('shape').ctx.transform.scale.set(2, 2)             // uniform scale
+layer('shape').ctx.transform.scale.set(2, 2, 50, 50)     // scale around (50, 50)
+```
+
+### Reset
+
+```
+layer('shape').ctx.transform.translate.reset()  // clear translate only
+layer('shape').ctx.transform.rotate.reset()     // clear rotate only
+layer('shape').ctx.transform.scale.reset()      // clear scale only
+layer('shape').ctx.transform.reset()            // clear all transforms
+```
+
+### Read Access
+
+```
+layer('shape').ctx.transform.translate.x    // 0 if not set
+layer('shape').ctx.transform.translate.y
+layer('shape').ctx.transform.rotate.angle   // 0 if not set
+layer('shape').ctx.transform.scale.x        // 1 if not set (default scale)
+layer('shape').ctx.transform.scale.y        // 1 if not set
+```
+
+### Default Context (No Layers)
+
+When no layers are defined, use `ctx.transform` directly:
+
+```
+ctx.transform.translate.set(25, 25)
+ctx.transform.rotate.set(45deg)
+M 0 0 L 100 0
+```
+
+### Inside Apply Blocks
+
+Inside a `layer().apply` block, `ctx` refers to the active layer's context:
+
+```
+layer('shape').apply {
+  ctx.transform.translate.set(10, 20)
+  M 0 0 L 50 50
+}
+```
+
+### Combined Transforms
+
+When multiple transforms are set, they are applied in SVG order: **translate → rotate → scale** (translate applied last visually):
+
+```
+layer('shape').ctx.transform.translate.set(10, 20)
+layer('shape').ctx.transform.rotate.set(90deg)
+layer('shape').ctx.transform.scale.set(2, 2)
+// Output: transform="translate(10, 20) rotate(90) scale(2, 2)"
+```
+
+### Per-Layer Isolation
+
+Each layer has independent transforms — setting a transform on one layer does not affect others:
+
+```
+define PathLayer('a') ${ stroke: red; }
+define PathLayer('b') ${ stroke: blue; }
+
+layer('a').ctx.transform.translate.set(10, 10)
+layer('b').ctx.transform.scale.set(2, 2)
+// Layer 'a' gets translate(10, 10), layer 'b' gets scale(2, 2)
+```
+
 ## Limitations
 
 - **No nesting** — `layer().apply` blocks cannot be nested inside each other
 - **Layer order** — layers render in definition order (first defined = bottom)
+- **PathLayer transforms only** — transforms are currently available on PathLayers via `ctx.transform`; TextLayer transform support can be added later

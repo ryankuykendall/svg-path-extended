@@ -1376,10 +1376,65 @@ define <span class="hljs-title class_">PathLayer</span>(<span class="hljs-string
     <span class="hljs-title function_">tspan</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, \${ <span class="hljs-attr">fill</span>: red; })<span class="hljs-string">\`colored\`</span>
   }
 }
+</code></pre><h2 id="layers-transforms">Transforms</h2>
+<p>Apply SVG matrix transformations (translate, rotate, scale) at the layer level. Transforms are set via method calls on <code>ctx.transform</code> and rendered as SVG <code>transform</code> attributes on the output elements.</p>
+<h3 id="layers-translate">Translate</h3>
+<pre><code class="hljs">define PathLayer(<span class="hljs-string">&#x27;shape&#x27;</span>) <span class="hljs-variable">\${ stroke: #333; fill: none; }</span>
+
+layer(<span class="hljs-string">&#x27;shape&#x27;</span>).ctx.transform.translate.set(50, 50)
+
+layer(<span class="hljs-string">&#x27;shape&#x27;</span>).apply {
+  M 0 0 L 100 0 L 100 100 Z
+}
+// Output: &lt;path d=<span class="hljs-string">&quot;...&quot;</span> transform=<span class="hljs-string">&quot;translate(50, 50)&quot;</span>/&gt;
+</code></pre><h3 id="layers-rotate">Rotate</h3>
+<p>Angles are in <strong>radians</strong> (consistent with polar commands). Use <code>deg</code> suffix for degrees:</p>
+<pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">rotate</span>.<span class="hljs-title function_">set</span>(45deg)         <span class="hljs-comment">// around origin</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">rotate</span>.<span class="hljs-title function_">set</span>(45deg, <span class="hljs-number">50</span>, <span class="hljs-number">50</span>) <span class="hljs-comment">// around (50, 50)</span>
+</code></pre><h3 id="layers-scale">Scale</h3>
+<pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">scale</span>.<span class="hljs-title function_">set</span>(<span class="hljs-number">2</span>, <span class="hljs-number">2</span>)             <span class="hljs-comment">// uniform scale</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">scale</span>.<span class="hljs-title function_">set</span>(<span class="hljs-number">2</span>, <span class="hljs-number">2</span>, <span class="hljs-number">50</span>, <span class="hljs-number">50</span>)     <span class="hljs-comment">// scale around (50, 50)</span>
+</code></pre><h3 id="layers-reset">Reset</h3>
+<pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">translate</span>.<span class="hljs-title function_">reset</span>()  <span class="hljs-comment">// clear translate only</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">rotate</span>.<span class="hljs-title function_">reset</span>()     <span class="hljs-comment">// clear rotate only</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">scale</span>.<span class="hljs-title function_">reset</span>()      <span class="hljs-comment">// clear scale only</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-title function_">reset</span>()            <span class="hljs-comment">// clear all transforms</span>
+</code></pre><h3 id="layers-read-access">Read Access</h3>
+<pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">translate</span>.<span class="hljs-property">x</span>    <span class="hljs-comment">// 0 if not set</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">translate</span>.<span class="hljs-property">y</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">rotate</span>.<span class="hljs-property">angle</span>   <span class="hljs-comment">// 0 if not set</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">scale</span>.<span class="hljs-property">x</span>        <span class="hljs-comment">// 1 if not set (default scale)</span>
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">scale</span>.<span class="hljs-property">y</span>        <span class="hljs-comment">// 1 if not set</span>
+</code></pre><h3 id="layers-default-context-no-layers">Default Context (No Layers)</h3>
+<p>When no layers are defined, use <code>ctx.transform</code> directly:</p>
+<pre><code class="hljs">ctx.<span class="hljs-property">transform</span>.<span class="hljs-property">translate</span>.<span class="hljs-title function_">set</span>(<span class="hljs-number">25</span>, <span class="hljs-number">25</span>)
+ctx.<span class="hljs-property">transform</span>.<span class="hljs-property">rotate</span>.<span class="hljs-title function_">set</span>(45deg)
+M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">100</span> <span class="hljs-number">0</span>
+</code></pre><h3 id="layers-inside-apply-blocks">Inside Apply Blocks</h3>
+<p>Inside a <code>layer().apply</code> block, <code>ctx</code> refers to the active layer&#39;s context:</p>
+<pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">apply</span> {
+  ctx.<span class="hljs-property">transform</span>.<span class="hljs-property">translate</span>.<span class="hljs-title function_">set</span>(<span class="hljs-number">10</span>, <span class="hljs-number">20</span>)
+  M <span class="hljs-number">0</span> <span class="hljs-number">0</span> L <span class="hljs-number">50</span> <span class="hljs-number">50</span>
+}
+</code></pre><h3 id="layers-combined-transforms">Combined Transforms</h3>
+<p>When multiple transforms are set, they are applied in SVG order: <strong>translate → rotate → scale</strong> (translate applied last visually):</p>
+<pre><code class="hljs"><span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">translate</span>.<span class="hljs-title function_">set</span>(<span class="hljs-number">10</span>, <span class="hljs-number">20</span>)
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">rotate</span>.<span class="hljs-title function_">set</span>(90deg)
+<span class="hljs-title function_">layer</span>(<span class="hljs-string">&#x27;shape&#x27;</span>).<span class="hljs-property">ctx</span>.<span class="hljs-property">transform</span>.<span class="hljs-property">scale</span>.<span class="hljs-title function_">set</span>(<span class="hljs-number">2</span>, <span class="hljs-number">2</span>)
+<span class="hljs-comment">// Output: transform=&quot;translate(10, 20) rotate(90) scale(2, 2)&quot;</span>
+</code></pre><h3 id="layers-per-layer-isolation">Per-Layer Isolation</h3>
+<p>Each layer has independent transforms — setting a transform on one layer does not affect others:</p>
+<pre><code class="hljs">define PathLayer(<span class="hljs-string">&#x27;a&#x27;</span>) <span class="hljs-variable">\${ stroke: red; }</span>
+define PathLayer(<span class="hljs-string">&#x27;b&#x27;</span>) <span class="hljs-variable">\${ stroke: blue; }</span>
+
+layer(<span class="hljs-string">&#x27;a&#x27;</span>).ctx.transform.translate.set(10, 10)
+layer(<span class="hljs-string">&#x27;b&#x27;</span>).ctx.transform.scale.set(2, 2)
+// Layer <span class="hljs-string">&#x27;a&#x27;</span> gets translate(10, 10), layer <span class="hljs-string">&#x27;b&#x27;</span> gets scale(2, 2)
 </code></pre><h2 id="layers-limitations">Limitations</h2>
 <ul>
 <li><strong>No nesting</strong> — <code>layer().apply</code> blocks cannot be nested inside each other</li>
 <li><strong>Layer order</strong> — layers render in definition order (first defined = bottom)</li>
+<li><strong>PathLayer transforms only</strong> — transforms are currently available on PathLayers via <code>ctx.transform</code>; TextLayer transform support can be added later</li>
 </ul>
 `;
 
@@ -2537,6 +2592,56 @@ export const tocData = JSON.parse(`[
       {
         "id": "layers-per-element-styles-on-text-and-tspan",
         "title": "Per-Element Styles on Text and Tspan",
+        "level": 3
+      },
+      {
+        "id": "layers-transforms",
+        "title": "Transforms",
+        "level": 2
+      },
+      {
+        "id": "layers-translate",
+        "title": "Translate",
+        "level": 3
+      },
+      {
+        "id": "layers-rotate",
+        "title": "Rotate",
+        "level": 3
+      },
+      {
+        "id": "layers-scale",
+        "title": "Scale",
+        "level": 3
+      },
+      {
+        "id": "layers-reset",
+        "title": "Reset",
+        "level": 3
+      },
+      {
+        "id": "layers-read-access",
+        "title": "Read Access",
+        "level": 3
+      },
+      {
+        "id": "layers-default-context-no-layers",
+        "title": "Default Context (No Layers)",
+        "level": 3
+      },
+      {
+        "id": "layers-inside-apply-blocks",
+        "title": "Inside Apply Blocks",
+        "level": 3
+      },
+      {
+        "id": "layers-combined-transforms",
+        "title": "Combined Transforms",
+        "level": 3
+      },
+      {
+        "id": "layers-per-layer-isolation",
+        "title": "Per-Layer Isolation",
         "level": 3
       },
       {

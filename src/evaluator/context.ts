@@ -232,9 +232,13 @@ export function setLastTangent(ctx: PathContext, angle: number): void {
  * This is what users will access via ctx.position.x, etc.
  * Uses lazy conversion with caching to avoid O(n^2) behavior.
  */
-export function contextToObject(ctx: PathContext): Record<string, unknown> {
+export function contextToObject(ctx: PathContext, transformState?: TransformState): Record<string, unknown> {
   // Return cached object if context hasn't changed
   if (!ctx._dirty && ctx._cachedObject) {
+    // Always update transform state reference (it's mutable)
+    if (transformState) {
+      ctx._cachedObject._transformState = transformState;
+    }
     return ctx._cachedObject;
   }
 
@@ -254,9 +258,49 @@ export function contextToObject(ctx: PathContext): Record<string, unknown> {
     obj.lastTangent = ctx.lastTangent;
   }
 
+  // Attach transform state (accessed via .transform in evaluator)
+  if (transformState) {
+    obj._transformState = transformState;
+  }
+
   // Cache the result
   ctx._cachedObject = obj;
   ctx._dirty = false;
 
   return obj;
+}
+
+// --- Transform types ---
+
+export interface TransformState {
+  translate: { x: number; y: number } | null;
+  rotate: { angle: number; cx?: number; cy?: number } | null;
+  scale: { x: number; y: number; cx?: number; cy?: number } | null;
+}
+
+export function createTransformState(): TransformState {
+  return { translate: null, rotate: null, scale: null };
+}
+
+export function transformStateToSvg(t: TransformState): string | null {
+  const parts: string[] = [];
+  if (t.translate) parts.push(`translate(${t.translate.x}, ${t.translate.y})`);
+  if (t.rotate) {
+    const deg = t.rotate.angle * 180 / Math.PI;
+    if (t.rotate.cx != null && t.rotate.cy != null) {
+      parts.push(`rotate(${deg}, ${t.rotate.cx}, ${t.rotate.cy})`);
+    } else {
+      parts.push(`rotate(${deg})`);
+    }
+  }
+  if (t.scale) {
+    if (t.scale.cx != null && t.scale.cy != null) {
+      parts.push(`translate(${t.scale.cx}, ${t.scale.cy})`);
+      parts.push(`scale(${t.scale.x}, ${t.scale.y})`);
+      parts.push(`translate(${-t.scale.cx}, ${-t.scale.cy})`);
+    } else {
+      parts.push(`scale(${t.scale.x}, ${t.scale.y})`);
+    }
+  }
+  return parts.length > 0 ? parts.join(' ') : null;
 }

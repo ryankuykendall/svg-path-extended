@@ -29,14 +29,17 @@ import {
   type PathContext,
   type Point,
   type CommandHistoryEntry,
+  type TransformState,
   createPathContext,
+  createTransformState,
   updateContextForCommand,
   contextToObject,
   setLastTangent,
+  transformStateToSvg,
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 
-export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue;
+export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference;
 
 /**
  * Represents an array value (reference semantics)
@@ -135,6 +138,7 @@ export interface PathLayerState {
   styles: LayerStyle;
   pathContext: PathContext;
   accum: string[];
+  transformState: TransformState;
 }
 
 export interface TextLayerState {
@@ -152,6 +156,17 @@ export interface LayerReference {
   layer: LayerState;
 }
 
+export interface TransformReference {
+  type: 'TransformReference';
+  state: TransformState;
+}
+
+export interface TransformPropertyReference {
+  type: 'TransformPropertyReference';
+  state: TransformState;
+  property: 'translate' | 'rotate' | 'scale';
+}
+
 // --- Layer output types ---
 
 export interface LayerOutput {
@@ -161,6 +176,7 @@ export interface LayerOutput {
   textElements?: TextElement[];    // Only present when type === 'text'
   styles: Record<string, string>;  // SVG attribute name → value
   isDefault: boolean;
+  transform?: string;              // SVG transform attribute value
 }
 
 export interface CompileResult {
@@ -239,6 +255,7 @@ export interface EvaluationState {
   layerOrder: string[];                // Definition order for z-index
   activeLayerName: string | null;      // Currently inside layer().apply
   defaultLayerName: string | null;     // Default layer name
+  transformState: TransformState;      // Transform state for implicit default layer
 }
 
 export interface Scope {
@@ -517,6 +534,65 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
 function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
 
+  // TransformReference methods (ctx.transform.reset())
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'TransformReference') {
+    const transformRef = obj as TransformReference;
+    if (expr.method === 'reset') {
+      if (expr.args.length !== 0) throw new Error('transform.reset() expects 0 arguments');
+      transformRef.state.translate = null;
+      transformRef.state.rotate = null;
+      transformRef.state.scale = null;
+      return 0;
+    }
+    throw new Error(`Unknown transform method: ${expr.method}`);
+  }
+
+  // TransformPropertyReference methods (ctx.transform.translate.set(), .reset())
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'TransformPropertyReference') {
+    const propRef = obj as TransformPropertyReference;
+
+    if (expr.method === 'reset') {
+      if (expr.args.length !== 0) throw new Error(`transform.${propRef.property}.reset() expects 0 arguments`);
+      propRef.state[propRef.property] = null;
+      return 0;
+    }
+
+    if (expr.method === 'set') {
+      const args = expr.args.map(a => {
+        const v = evaluateExpression(a, scope);
+        if (typeof v !== 'number') throw new Error(`transform.${propRef.property}.set() arguments must be numbers`);
+        return v;
+      });
+
+      switch (propRef.property) {
+        case 'translate':
+          if (args.length !== 2) throw new Error('translate.set() expects 2 arguments (x, y)');
+          propRef.state.translate = { x: args[0], y: args[1] };
+          return 0;
+        case 'rotate':
+          if (args.length === 1) {
+            propRef.state.rotate = { angle: args[0] };
+          } else if (args.length === 3) {
+            propRef.state.rotate = { angle: args[0], cx: args[1], cy: args[2] };
+          } else {
+            throw new Error('rotate.set() expects 1 or 3 arguments (angle) or (angle, cx, cy)');
+          }
+          return 0;
+        case 'scale':
+          if (args.length === 2) {
+            propRef.state.scale = { x: args[0], y: args[1] };
+          } else if (args.length === 4) {
+            propRef.state.scale = { x: args[0], y: args[1], cx: args[2], cy: args[3] };
+          } else {
+            throw new Error('scale.set() expects 2 or 4 arguments (sx, sy) or (sx, sy, cx, cy)');
+          }
+          return 0;
+      }
+    }
+
+    throw new Error(`Unknown transform.${propRef.property} method: ${expr.method}`);
+  }
+
   // Point methods
   if (isPointValue(obj)) {
     switch (expr.method) {
@@ -693,9 +769,53 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     throw new Error(`Property '${expr.property}' does not exist on Point`);
   }
 
+  // Handle TransformReference property access
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'TransformReference') {
+    const transformRef = obj as TransformReference;
+    if (expr.property === 'translate' || expr.property === 'rotate' || expr.property === 'scale') {
+      return { type: 'TransformPropertyReference' as const, state: transformRef.state, property: expr.property };
+    }
+    throw new Error(`Property '${expr.property}' does not exist on transform`);
+  }
+
+  // Handle TransformPropertyReference property access (read)
+  if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'TransformPropertyReference') {
+    const propRef = obj as TransformPropertyReference;
+    switch (propRef.property) {
+      case 'translate': {
+        if (expr.property === 'x') return propRef.state.translate?.x ?? 0;
+        if (expr.property === 'y') return propRef.state.translate?.y ?? 0;
+        throw new Error(`Property '${expr.property}' does not exist on transform.translate`);
+      }
+      case 'rotate': {
+        if (expr.property === 'angle') return propRef.state.rotate?.angle ?? 0;
+        if (expr.property === 'cx') return propRef.state.rotate?.cx ?? 0;
+        if (expr.property === 'cy') return propRef.state.rotate?.cy ?? 0;
+        throw new Error(`Property '${expr.property}' does not exist on transform.rotate`);
+      }
+      case 'scale': {
+        if (expr.property === 'x') return propRef.state.scale?.x ?? 1;
+        if (expr.property === 'y') return propRef.state.scale?.y ?? 1;
+        if (expr.property === 'cx') return propRef.state.scale?.cx ?? 0;
+        if (expr.property === 'cy') return propRef.state.scale?.cy ?? 0;
+        throw new Error(`Property '${expr.property}' does not exist on transform.scale`);
+      }
+    }
+  }
+
   // Handle ContextObject property access
   if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ContextObject') {
     const contextObj = obj as ContextObject;
+
+    // Handle .transform access — returns TransformReference if transform state is attached
+    if (expr.property === 'transform') {
+      const transformState = contextObj.value._transformState as TransformState | undefined;
+      if (transformState) {
+        return { type: 'TransformReference' as const, state: transformState };
+      }
+      throw new Error(`Property 'transform' does not exist on context object`);
+    }
+
     const propValue = contextObj.value[expr.property];
 
     if (propValue === undefined) {
@@ -737,7 +857,8 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
       if (layerRef.layer.layerType !== 'PathLayer') {
         throw new Error(`Property 'ctx' is only available on PathLayer references`);
       }
-      return { type: 'ContextObject' as const, value: contextToObject((layerRef.layer as PathLayerState).pathContext) };
+      const pathLayer = layerRef.layer as PathLayerState;
+      return { type: 'ContextObject' as const, value: contextToObject(pathLayer.pathContext, pathLayer.transformState) };
     }
     if (expr.property === 'name') {
       return layerRef.layer.name;
@@ -1086,9 +1207,19 @@ function updateCtxVariable(scope: Scope): void {
     while (rootScope.parent) {
       rootScope = rootScope.parent;
     }
+
+    // Determine active transform state
+    let transformState = scope.evalState.transformState;
+    if (scope.evalState.activeLayerName) {
+      const layer = scope.evalState.layers.get(scope.evalState.activeLayerName);
+      if (layer && layer.layerType === 'PathLayer') {
+        transformState = (layer as PathLayerState).transformState;
+      }
+    }
+
     rootScope.variables.set('ctx', {
       type: 'ContextObject' as const,
-      value: contextToObject(scope.evalState.pathContext),
+      value: contextToObject(scope.evalState.pathContext, transformState),
     });
   }
 }
@@ -1682,6 +1813,7 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
         styles,
         pathContext: createPathContext(),
         accum: [],
+        transformState: createTransformState(),
       };
       scope.evalState.layers.set(nameValue, layerState);
       scope.evalState.layerOrder.push(nameValue);
@@ -1798,24 +1930,28 @@ function buildCompileResult(mainAccum: string[], evalState: EvaluationState): Co
 
   if (evalState.layerOrder.length === 0) {
     // No layers defined: single implicit default layer
+    const transform = transformStateToSvg(evalState.transformState) ?? undefined;
     layers.push({
       name: 'default',
       type: 'path',
       data: mainAccum.join(' '),
       styles: {},
       isDefault: true,
+      transform,
     });
   } else {
     // Check if main accum has content that wasn't routed to a default layer
     const mainContent = mainAccum.join(' ');
     if (mainContent && !evalState.defaultLayerName) {
       // Prepend implicit default layer for bare commands
+      const transform = transformStateToSvg(evalState.transformState) ?? undefined;
       layers.push({
         name: 'default',
         type: 'path',
         data: mainContent,
         styles: {},
         isDefault: true,
+        transform,
       });
     }
     // Add defined layers in definition order
@@ -1835,12 +1971,15 @@ function buildCompileResult(mainAccum: string[], evalState: EvaluationState): Co
           isDefault: layer.isDefault,
         });
       } else {
+        const pathLayer = layer as PathLayerState;
+        const transform = transformStateToSvg(pathLayer.transformState) ?? undefined;
         layers.push({
           name: layer.name,
           type: 'path',
-          data: (layer as PathLayerState).accum.join(' '),
+          data: pathLayer.accum.join(' '),
           styles: { ...layer.styles },
           isDefault: layer.isDefault,
+          transform,
         });
       }
     }
@@ -1858,6 +1997,7 @@ export function evaluate(program: Program, options?: { toFixed?: number }): Comp
   try {
     const pathContext = createPathContext();
     const logs: LogEntry[] = [];
+    const transformState = createTransformState();
     const evalState: EvaluationState = {
       pathContext,
       logs,
@@ -1866,6 +2006,7 @@ export function evaluate(program: Program, options?: { toFixed?: number }): Comp
       layerOrder: [],
       activeLayerName: null,
       defaultLayerName: null,
+      transformState,
     };
 
     const scope = createScope();
@@ -1874,7 +2015,7 @@ export function evaluate(program: Program, options?: { toFixed?: number }): Comp
     // Initialize ctx variable
     scope.variables.set('ctx', {
       type: 'ContextObject' as const,
-      value: contextToObject(pathContext),
+      value: contextToObject(pathContext, transformState),
     });
 
     const accum: string[] = [];
@@ -1917,6 +2058,7 @@ export function evaluateWithContext(program: Program, options: EvaluateWithConte
     const pathContext = createPathContext({ trackHistory: options.trackHistory ?? false });
     const logs: LogEntry[] = [];
     const calledStdlibFunctions = new Set<string>();
+    const transformState = createTransformState();
     const evalState: EvaluationState = {
       pathContext,
       logs,
@@ -1925,6 +2067,7 @@ export function evaluateWithContext(program: Program, options: EvaluateWithConte
       layerOrder: [],
       activeLayerName: null,
       defaultLayerName: null,
+      transformState,
     };
 
     const scope = createScope();
@@ -1933,7 +2076,7 @@ export function evaluateWithContext(program: Program, options: EvaluateWithConte
     // Initialize ctx variable
     scope.variables.set('ctx', {
       type: 'ContextObject' as const,
-      value: contextToObject(pathContext),
+      value: contextToObject(pathContext, transformState),
     });
 
     // Note: log() is handled specially in evaluateFunctionCall, not registered here
@@ -1956,7 +2099,7 @@ export function evaluateWithContext(program: Program, options: EvaluateWithConte
 }
 
 // Re-export types from context module
-export type { PathContext, Point, CommandHistoryEntry } from './context';
+export type { PathContext, Point, CommandHistoryEntry, TransformState } from './context';
 
 
 // Re-export annotated evaluator and formatter

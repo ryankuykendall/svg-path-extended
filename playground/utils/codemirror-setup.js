@@ -195,13 +195,91 @@ export const snippetTemplates = [
 
 // Completion source for svg-path-extended
 export function svgPathCompletions(context) {
-  // Check for nested property access (e.g., ctx.position.x, arc.point.x)
+  // Check for 4-level property access (e.g., ctx.transform.translate.x)
+  const deepProp = context.matchBefore(/(\w+)\.(\w+)\.(\w+)\.(\w*)$/);
+  if (deepProp) {
+    const match = deepProp.text.match(/(\w+)\.(\w+)\.(\w+)\.(\w*)$/);
+    if (match) {
+      const [, obj, prop1, prop2] = match;
+      const from = deepProp.from + obj.length + 1 + prop1.length + 1 + prop2.length + 1;
+
+      if (prop1 === 'transform' && prop2 === 'translate') {
+        return {
+          from,
+          options: [
+            { label: 'set()', type: 'function', info: 'translate.set(x, y) - Set translation', boost: 6,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'set()' }, selection: { anchor: from + 4 } });
+              },
+            },
+            { label: 'reset()', type: 'function', info: 'translate.reset() - Clear translation', boost: 5 },
+            { label: 'x', type: 'property', info: 'translate.x - X offset (0 if unset)', boost: 4 },
+            { label: 'y', type: 'property', info: 'translate.y - Y offset (0 if unset)', boost: 3 },
+          ],
+          validFor: /^\w*$/,
+        };
+      }
+
+      if (prop1 === 'transform' && prop2 === 'rotate') {
+        return {
+          from,
+          options: [
+            { label: 'set()', type: 'function', info: 'rotate.set(angle) or rotate.set(angle, cx, cy)', boost: 6,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'set()' }, selection: { anchor: from + 4 } });
+              },
+            },
+            { label: 'reset()', type: 'function', info: 'rotate.reset() - Clear rotation', boost: 5 },
+            { label: 'angle', type: 'property', info: 'rotate.angle - Rotation angle in radians (0 if unset)', boost: 4 },
+            { label: 'cx', type: 'property', info: 'rotate.cx - Origin X (0 if unset)', boost: 3 },
+            { label: 'cy', type: 'property', info: 'rotate.cy - Origin Y (0 if unset)', boost: 2 },
+          ],
+          validFor: /^\w*$/,
+        };
+      }
+
+      if (prop1 === 'transform' && prop2 === 'scale') {
+        return {
+          from,
+          options: [
+            { label: 'set()', type: 'function', info: 'scale.set(sx, sy) or scale.set(sx, sy, cx, cy)', boost: 6,
+              apply: (view, completion, from, to) => {
+                view.dispatch({ changes: { from, to, insert: 'set()' }, selection: { anchor: from + 4 } });
+              },
+            },
+            { label: 'reset()', type: 'function', info: 'scale.reset() - Clear scale', boost: 5 },
+            { label: 'x', type: 'property', info: 'scale.x - X scale factor (1 if unset)', boost: 4 },
+            { label: 'y', type: 'property', info: 'scale.y - Y scale factor (1 if unset)', boost: 3 },
+            { label: 'cx', type: 'property', info: 'scale.cx - Origin X (0 if unset)', boost: 2 },
+            { label: 'cy', type: 'property', info: 'scale.cy - Origin Y (0 if unset)', boost: 1 },
+          ],
+          validFor: /^\w*$/,
+        };
+      }
+    }
+  }
+
+  // Check for nested property access (e.g., ctx.position.x, ctx.transform.translate)
   const nestedProp = context.matchBefore(/(\w+)\.(\w+)\.(\w*)$/);
   if (nestedProp) {
     const match = nestedProp.text.match(/(\w+)\.(\w+)\.(\w*)$/);
     if (match) {
       const [, obj, prop] = match;
       const from = nestedProp.from + obj.length + 1 + prop.length + 1;
+
+      // ctx.transform.translate/rotate/scale/reset()
+      if (obj === 'ctx' && prop === 'transform') {
+        return {
+          from,
+          options: [
+            { label: 'translate', type: 'property', info: 'transform.translate - Translation transform', boost: 4 },
+            { label: 'rotate', type: 'property', info: 'transform.rotate - Rotation transform', boost: 3 },
+            { label: 'scale', type: 'property', info: 'transform.scale - Scale transform', boost: 2 },
+            { label: 'reset()', type: 'function', info: 'transform.reset() - Clear all transforms', boost: 1 },
+          ],
+          validFor: /^\w*$/,
+        };
+      }
 
       // ctx.position.x/y or ctx.start.x/y
       if (obj === 'ctx' && (prop === 'position' || prop === 'start')) {
@@ -244,8 +322,9 @@ export function svgPathCompletions(context) {
         return {
           from,
           options: [
-            { label: 'position', type: 'property', info: 'ctx.position - Current pen position {x, y}', boost: 4 },
-            { label: 'start', type: 'property', info: 'ctx.start - Subpath start position {x, y}', boost: 3 },
+            { label: 'position', type: 'property', info: 'ctx.position - Current pen position {x, y}', boost: 5 },
+            { label: 'start', type: 'property', info: 'ctx.start - Subpath start position {x, y}', boost: 4 },
+            { label: 'transform', type: 'property', info: 'ctx.transform - Layer transform (translate, rotate, scale)', boost: 3 },
             { label: 'tangentAngle', type: 'property', info: 'ctx.tangentAngle - Current tangent direction (radians)', boost: 2 },
             { label: 'commands', type: 'property', info: 'ctx.commands - Array of executed commands', boost: 1 },
           ],

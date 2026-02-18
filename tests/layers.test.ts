@@ -721,4 +721,257 @@ describe('Multi-Layer Support', () => {
       expect(result.logs[1].parts[0].value).toBe('none');
     });
   });
+
+  describe('Layer Transforms', () => {
+    describe('translate', () => {
+      it('sets translate transform on a layer', () => {
+        const result = compile(`
+          define PathLayer('main') \${ stroke: red; }
+          layer('main').ctx.transform.translate.set(50, 50)
+          layer('main').apply { M 0 0 L 100 0 }
+        `);
+        expect(result.layers[0].transform).toBe('translate(50, 50)');
+      });
+
+      it('reads translate values', () => {
+        const result = compileWithContext(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.translate.set(30, 40)
+          log(layer('main').ctx.transform.translate.x)
+          log(layer('main').ctx.transform.translate.y)
+        `);
+        expect(result.logs[0].parts[0].value).toBe('30');
+        expect(result.logs[1].parts[0].value).toBe('40');
+      });
+
+      it('returns 0 for unset translate', () => {
+        const result = compileWithContext(`
+          define PathLayer('main') \${}
+          log(layer('main').ctx.transform.translate.x)
+          log(layer('main').ctx.transform.translate.y)
+        `);
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[1].parts[0].value).toBe('0');
+      });
+
+      it('resets translate', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.translate.set(50, 50)
+          layer('main').ctx.transform.translate.reset()
+          layer('main').apply { M 0 0 }
+        `);
+        expect(result.layers[0].transform).toBeUndefined();
+      });
+    });
+
+    describe('rotate', () => {
+      it('sets rotate transform (angle only)', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.rotate.set(calc(PI() / 4))
+          layer('main').apply { M 0 0 L 100 0 }
+        `);
+        expect(result.layers[0].transform).toBe('rotate(45)');
+      });
+
+      it('sets rotate with origin', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.rotate.set(calc(PI() / 2), 50, 50)
+          layer('main').apply { M 0 0 }
+        `);
+        expect(result.layers[0].transform).toBe('rotate(90, 50, 50)');
+      });
+
+      it('reads rotate values', () => {
+        const result = compileWithContext(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.rotate.set(calc(PI() / 4), 10, 20)
+          log(layer('main').ctx.transform.rotate.angle)
+          log(layer('main').ctx.transform.rotate.cx)
+          log(layer('main').ctx.transform.rotate.cy)
+        `);
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(Math.PI / 4);
+        expect(result.logs[1].parts[0].value).toBe('10');
+        expect(result.logs[2].parts[0].value).toBe('20');
+      });
+
+      it('returns 0 for unset rotate angle', () => {
+        const result = compileWithContext(`
+          define PathLayer('main') \${}
+          log(layer('main').ctx.transform.rotate.angle)
+        `);
+        expect(result.logs[0].parts[0].value).toBe('0');
+      });
+    });
+
+    describe('scale', () => {
+      it('sets scale transform', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.scale.set(2, 3)
+          layer('main').apply { M 0 0 }
+        `);
+        expect(result.layers[0].transform).toBe('scale(2, 3)');
+      });
+
+      it('sets scale with origin', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.scale.set(2, 2, 50, 50)
+          layer('main').apply { M 0 0 }
+        `);
+        expect(result.layers[0].transform).toBe('translate(50, 50) scale(2, 2) translate(-50, -50)');
+      });
+
+      it('reads scale values', () => {
+        const result = compileWithContext(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.scale.set(2, 3)
+          log(layer('main').ctx.transform.scale.x)
+          log(layer('main').ctx.transform.scale.y)
+        `);
+        expect(result.logs[0].parts[0].value).toBe('2');
+        expect(result.logs[1].parts[0].value).toBe('3');
+      });
+
+      it('returns 1 for unset scale', () => {
+        const result = compileWithContext(`
+          define PathLayer('main') \${}
+          log(layer('main').ctx.transform.scale.x)
+          log(layer('main').ctx.transform.scale.y)
+        `);
+        expect(result.logs[0].parts[0].value).toBe('1');
+        expect(result.logs[1].parts[0].value).toBe('1');
+      });
+    });
+
+    describe('combined transforms', () => {
+      it('applies translate + rotate + scale in SVG order', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.translate.set(10, 20)
+          layer('main').ctx.transform.rotate.set(calc(PI() / 2))
+          layer('main').ctx.transform.scale.set(2, 2)
+          layer('main').apply { M 0 0 }
+        `);
+        expect(result.layers[0].transform).toBe('translate(10, 20) rotate(90) scale(2, 2)');
+      });
+    });
+
+    describe('reset all transforms', () => {
+      it('clears all transforms with transform.reset()', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.translate.set(50, 50)
+          layer('main').ctx.transform.rotate.set(1)
+          layer('main').ctx.transform.scale.set(2, 2)
+          layer('main').ctx.transform.reset()
+          layer('main').apply { M 0 0 }
+        `);
+        expect(result.layers[0].transform).toBeUndefined();
+      });
+    });
+
+    describe('default context (no layers)', () => {
+      it('sets transform on implicit default layer via ctx', () => {
+        const result = compile(`
+          ctx.transform.translate.set(25, 25)
+          M 0 0 L 100 0
+        `);
+        expect(result.layers[0].transform).toBe('translate(25, 25)');
+      });
+
+      it('reads transform from ctx without layers', () => {
+        const result = compileWithContext(`
+          ctx.transform.scale.set(3, 4)
+          log(ctx.transform.scale.x)
+          log(ctx.transform.scale.y)
+        `);
+        expect(result.logs[0].parts[0].value).toBe('3');
+        expect(result.logs[1].parts[0].value).toBe('4');
+      });
+    });
+
+    describe('inside apply block', () => {
+      it('ctx.transform inside apply block sets that layer transform', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').apply {
+            ctx.transform.translate.set(10, 20)
+            M 0 0 L 50 50
+          }
+        `);
+        expect(result.layers[0].transform).toBe('translate(10, 20)');
+      });
+    });
+
+    describe('per-layer isolation', () => {
+      it('each layer has independent transforms', () => {
+        const result = compile(`
+          define PathLayer('a') \${}
+          define PathLayer('b') \${}
+          layer('a').ctx.transform.translate.set(10, 10)
+          layer('b').ctx.transform.scale.set(2, 2)
+          layer('a').apply { M 0 0 }
+          layer('b').apply { M 0 0 }
+        `);
+        expect(result.layers[0].transform).toBe('translate(10, 10)');
+        expect(result.layers[1].transform).toBe('scale(2, 2)');
+      });
+    });
+
+    describe('no transform set', () => {
+      it('transform is undefined when not set', () => {
+        const result = compile(`
+          define PathLayer('main') \${}
+          layer('main').apply { M 0 0 L 100 0 }
+        `);
+        expect(result.layers[0].transform).toBeUndefined();
+      });
+
+      it('no transform on implicit default layer', () => {
+        const result = compile('M 0 0 L 100 0');
+        expect(result.layers[0].transform).toBeUndefined();
+      });
+    });
+
+    describe('error cases', () => {
+      it('throws on wrong number of translate.set args', () => {
+        expect(() => compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.translate.set(50)
+        `)).toThrow('translate.set() expects 2 arguments');
+      });
+
+      it('throws on wrong number of rotate.set args', () => {
+        expect(() => compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.rotate.set(1, 2)
+        `)).toThrow('rotate.set() expects 1 or 3 arguments');
+      });
+
+      it('throws on wrong number of scale.set args', () => {
+        expect(() => compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.scale.set(2)
+        `)).toThrow('scale.set() expects 2 or 4 arguments');
+      });
+
+      it('throws on non-numeric transform arguments', () => {
+        expect(() => compile(`
+          define PathLayer('main') \${}
+          layer('main').ctx.transform.translate.set("a", "b")
+        `)).toThrow('arguments must be numbers');
+      });
+
+      it('throws on invalid transform property', () => {
+        expect(() => compileWithContext(`
+          define PathLayer('main') \${}
+          log(layer('main').ctx.transform.skew)
+        `)).toThrow("does not exist on transform");
+      });
+    });
+  });
 });

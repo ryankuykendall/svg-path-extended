@@ -156,6 +156,11 @@ export class SvgPreviewPane extends HTMLElement {
         path.setAttribute('d', layer.data || '');
         path.setAttribute('fill', 'none');
 
+        // Apply transform if set
+        if (layer.transform) {
+          path.setAttribute('transform', layer.transform);
+        }
+
         // Apply per-layer styles, fall back to hardcoded defaults
         const hasCustomStroke = !!layer.styles['stroke'];
         const hasCustomStrokeWidth = !!layer.styles['stroke-width'];
@@ -389,7 +394,7 @@ export class SvgPreviewPane extends HTMLElement {
           navPath.setAttribute('stroke-width', Math.max(parseFloat(el.getAttribute('stroke-width')) || DEFAULT_STROKE_WIDTH, 1));
           navPath.setAttribute('fill', el.getAttribute('fill') || 'none');
           // Copy additional style attributes (dasharray scaled to screen pixels)
-          for (const attr of ['stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'opacity', 'fill-rule']) {
+          for (const attr of ['transform', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'stroke-opacity', 'fill-opacity', 'opacity', 'fill-rule']) {
             const val = el.getAttribute(attr);
             if (val) navPath.setAttribute(attr, val);
           }

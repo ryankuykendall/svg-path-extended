@@ -92,7 +92,8 @@ function generateSvg(result: CompileResult, options: CliOptions): string {
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ');
     const extra = extraAttrs ? ' ' + extraAttrs : '';
-    return `  <path d="${layer.data}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"${extra}/>`;
+    const transformAttr = layer.transform ? ` transform="${layer.transform}"` : '';
+    return `  <path d="${layer.data}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"${extra}${transformAttr}/>`;
   }).join('\n');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">

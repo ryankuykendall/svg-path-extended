@@ -651,26 +651,25 @@ const functionCallStatement: Parsimmon.Parser<PathCommand> = P.seqMap(
   })
 );
 
-// Method call statement: identifier.method(args); (e.g., list.push(42);)
-const methodCallStatement: Parsimmon.Parser<PathCommand> = P.seqMap(
-  P.index,
-  nonReservedIdentifier,
-  P.string('.'),
-  token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)),
-  P.string('(').skip(optWhitespace),
-  P.sepBy(P.lazy(() => expression), word(',')),
-  word(')'),
-  word(';').atMost(1),
-  (startIndex, obj, _dot, method, _open, args, _close) => ({
-    type: 'PathCommand' as const,
-    command: '',
-    args: [{
-      type: 'MethodCallExpression' as const,
-      object: obj as Expression,
-      method,
-      args,
-    } as MethodCallExpression],
-    loc: indexToLoc(startIndex),
+// Method call statement: any expression chain ending with .method(args)
+// e.g., list.push(42), ctx.transform.translate.set(50, 50),
+//       layer('main').ctx.transform.reset()
+const methodCallStatement: Parsimmon.Parser<PathCommand> = P.index.chain(startIndex =>
+  withPostfix(
+    P.alt(
+      functionCall as Parsimmon.Parser<Expression>,
+      nonReservedIdentifier as Parsimmon.Parser<Expression>
+    )
+  ).chain(expr => {
+    if (expr.type === 'MethodCallExpression') {
+      return word(';').atMost(1).map(() => ({
+        type: 'PathCommand' as const,
+        command: '' as const,
+        args: [expr as MethodCallExpression],
+        loc: indexToLoc(startIndex),
+      }));
+    }
+    return P.fail('expected method call') as Parsimmon.Parser<PathCommand>;
   })
 );
 
