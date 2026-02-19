@@ -167,7 +167,7 @@ export const snippetTemplates = [
     label: 'define',
     type: 'keyword',
     info: 'define a layer with styles',
-    template: "define PathLayer('name') { stroke: #000; stroke-width: 2; }",
+    template: "define PathLayer('name') ${ stroke: #000; stroke-width: 2; }",
     cursorOffset: 18,
   },
   {

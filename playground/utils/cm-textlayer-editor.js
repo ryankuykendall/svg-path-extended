@@ -18,7 +18,7 @@ function parseStyleBlock(content) {
 // Find all TextLayer define blocks
 function findTextLayerBlocks(docText) {
   const results = [];
-  const regex = /\bdefine\s+(TextLayer\s*\([^)]*\))\s*\{/g;
+  const regex = /\bdefine\s+(TextLayer\s*\([^)]*\))\s*\$\{/g;
   let match;
 
   while ((match = regex.exec(docText)) !== null) {
