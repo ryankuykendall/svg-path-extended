@@ -69,6 +69,7 @@ export interface LetDeclaration {
   type: 'LetDeclaration';
   name: string;
   value: Expression;
+  loc?: SourceLocation;
 }
 
 // x = 10;
@@ -76,6 +77,7 @@ export interface AssignmentStatement {
   type: 'AssignmentStatement';
   name: string;
   value: Expression;
+  loc?: SourceLocation;
 }
 
 // for (i in 0..10) { ... }
@@ -104,6 +106,7 @@ export interface IfStatement {
   condition: Expression;
   consequent: Statement[];
   alternate: Statement[] | null;
+  loc?: SourceLocation;
 }
 
 // fn name(a, b) { ... }
@@ -112,6 +115,7 @@ export interface FunctionDefinition {
   name: string;
   params: string[];
   body: Statement[];
+  loc?: SourceLocation;
 }
 
 // return expr;
@@ -170,6 +174,7 @@ export interface MemberExpression {
 export interface Identifier {
   type: 'Identifier';
   name: string;
+  loc?: SourceLocation;
 }
 
 // Numeric literal

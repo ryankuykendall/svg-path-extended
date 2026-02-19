@@ -124,6 +124,39 @@ describe('Runtime errors', () => {
       expect(() => compilePath('let s = circle(50, 50, 25); for (i in 0..s) { M i 0 }')).toThrow(/numeric/i);
     });
   });
+
+  describe('runtime error locations', () => {
+    it('undefined variable includes line and column', () => {
+      expect(() => compilePath('let x = 10;\nM undefinedVar 0')).toThrow(/^Line 2, col 3: Undefined variable: undefinedVar$/);
+    });
+
+    it('undeclared assignment includes line number', () => {
+      expect(() => compilePath('let x = 10;\ny = 5;')).toThrow(/^Line 2: Cannot assign to undeclared variable: y$/);
+    });
+
+    it('wrong function argument count includes line number', () => {
+      expect(() => compilePath('fn add(a, b) { M calc(a + b) 0 }\nadd(1)')).toThrow(/^Line 2, col 1: Function add expects 2 arguments, got 1$/);
+    });
+
+    it('for-loop type error includes line number', () => {
+      expect(() => compilePath('let s = circle(50, 50, 25);\nfor (i in s..10) { M i 0 }')).toThrow(/^Line 2: for loop range must be numeric$/);
+    });
+
+    it('undefined variable in calc includes line and column', () => {
+      expect(() => compilePath('let a = 1;\nlet b = 2;\nM calc(undefinedVar + 1) 0')).toThrow(/^Line 3, col 8: Undefined variable: undefinedVar$/);
+    });
+
+    it('no "Line undefined:" in output for graceful degradation', () => {
+      try {
+        compilePath('M undefinedVar 0');
+        expect.fail('Should have thrown');
+      } catch (e) {
+        const message = (e as Error).message;
+        expect(message).not.toContain('Line undefined:');
+        expect(message).toMatch(/Line 1, col 3: Undefined variable: undefinedVar/);
+      }
+    });
+  });
 });
 
 describe('Null errors', () => {

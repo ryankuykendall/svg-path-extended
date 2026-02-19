@@ -301,6 +301,14 @@ export class WorkspaceView extends HTMLElement {
   }
 
   setupEventListeners() {
+    // Re-apply compilation error when editor finishes loading
+    this.shadowRoot.addEventListener('editor-ready', () => {
+      const error = store.get('compilationError');
+      if (error) {
+        this.showError(error);
+      }
+    });
+
     // Code changes from editor
     this.shadowRoot.addEventListener('code-change', (e) => {
       this.debouncedUpdate();
@@ -615,10 +623,24 @@ export class WorkspaceView extends HTMLElement {
 
   showError(message) {
     this.errorPanel.show(message);
+    // Highlight error location in editor for parser errors
+    const parseMatch = message.match(/Parse error at line (\d+), column (\d+)/);
+    if (parseMatch) {
+      this.editorPane.highlightError(parseInt(parseMatch[1], 10), parseInt(parseMatch[2], 10));
+      return;
+    }
+    // Highlight error location for runtime errors (with or without column)
+    const runtimeMatch = message.match(/^Line (\d+)(?:, col (\d+))?: /);
+    if (runtimeMatch) {
+      const line = parseInt(runtimeMatch[1], 10);
+      const col = runtimeMatch[2] ? parseInt(runtimeMatch[2], 10) : 1;
+      this.editorPane.highlightError(line, col);
+    }
   }
 
   hideError() {
     this.errorPanel.hide();
+    this.editorPane.clearError();
   }
 
   // Export file (renamed from saveFile)

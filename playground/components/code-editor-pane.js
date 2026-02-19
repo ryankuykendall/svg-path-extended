@@ -5,6 +5,7 @@ import { svgPathCompletions } from '../utils/codemirror-setup.js';
 import { themeManager } from '../utils/theme.js';
 import { colorPickerExtension } from '../utils/cm-color-picker.js';
 import { textLayerEditorExtension } from '../utils/cm-textlayer-editor.js';
+import { errorHighlightExtension } from '../utils/cm-error-highlight.js';
 
 export class CodeEditorPane extends HTMLElement {
   constructor() {
@@ -15,6 +16,8 @@ export class CodeEditorPane extends HTMLElement {
     this._initialCode = '';
     this._themeCompartment = null;
     this._highlightCompartment = null;
+    this._errorHighlight = null;
+    this._pendingError = null;
     this._themeUnsubscribe = null;
   }
 
@@ -106,6 +109,9 @@ export class CodeEditorPane extends HTMLElement {
     // Create compartments for dynamic theme swapping
     this._themeCompartment = new state.Compartment();
 
+    // Error highlighting extension
+    this._errorHighlight = errorHighlightExtension(state, view);
+
     const updateExtension = view.EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         store.set('isModified', true);
@@ -145,6 +151,7 @@ export class CodeEditorPane extends HTMLElement {
         view.EditorView.lineWrapping,
         ...colorPickerExtension(view),
         ...textLayerEditorExtension(view),
+        ...this._errorHighlight.extension,
       ],
     });
 
@@ -161,6 +168,9 @@ export class CodeEditorPane extends HTMLElement {
     // Focus the editor
     this._editor.focus();
 
+    // Apply any error highlight that arrived before the editor was ready
+    this._applyPendingError();
+
     this.dispatchEvent(new CustomEvent('editor-ready', {
       bubbles: true,
       composed: true
@@ -173,6 +183,32 @@ export class CodeEditorPane extends HTMLElement {
     this._editor.dispatch({
       effects: this._themeCompartment.reconfigure(this._getThemeExtensions()),
     });
+  }
+
+  highlightError(line, column) {
+    this._pendingError = { line, column };
+    if (!this._editor || !this._errorHighlight) return;
+    this._applyPendingError();
+  }
+
+  clearError() {
+    this._pendingError = null;
+    if (!this._editor || !this._errorHighlight) return;
+    this._errorHighlight.clearError(this._editor);
+  }
+
+  _applyPendingError() {
+    if (!this._pendingError || !this._editor || !this._errorHighlight) return;
+    const { line, column } = this._pendingError;
+    this._errorHighlight.setError(this._editor, { line, column });
+    // Scroll error line into view
+    const doc = this._editor.state.doc;
+    if (line >= 1 && line <= doc.lines) {
+      const lineObj = doc.line(line);
+      this._editor.dispatch({
+        effects: this._cmModules.view.EditorView.scrollIntoView(lineObj.from, { y: 'center' }),
+      });
+    }
   }
 
   render() {
@@ -214,6 +250,19 @@ export class CodeEditorPane extends HTMLElement {
 
         #editor-container .cm-editor.cm-focused {
           outline: none;
+        }
+
+        #editor-container .cm-error-line {
+          background-color: rgba(255, 0, 0, 0.08);
+        }
+
+        #editor-container .cm-error-char {
+          text-decoration: underline wavy var(--error-text, #c00);
+          text-decoration-skip-ink: none;
+        }
+
+        :host-context([data-theme="dark"]) #editor-container .cm-error-line {
+          background-color: rgba(255, 80, 80, 0.12);
         }
       </style>
 

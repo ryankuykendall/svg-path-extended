@@ -294,12 +294,30 @@ function createScope(parent: Scope | null = null): Scope {
   };
 }
 
-function lookupVariable(scope: Scope, name: string): Value {
+function formatError(message: string, line?: number, column?: number): string {
+  if (line !== undefined && line > 0) {
+    if (column !== undefined && column > 0) {
+      return `Line ${line}, col ${column}: ${message}`;
+    }
+    return `Line ${line}: ${message}`;
+  }
+  return message;
+}
+
+function getLine(node: unknown): number | undefined {
+  return (node as { loc?: { line: number } })?.loc?.line;
+}
+
+function getCol(node: unknown): number | undefined {
+  return (node as { loc?: { column: number } })?.loc?.column;
+}
+
+function lookupVariable(scope: Scope, name: string, line?: number, column?: number): Value {
   if (scope.variables.has(name)) {
     return scope.variables.get(name)!;
   }
   if (scope.parent) {
-    return lookupVariable(scope.parent, name);
+    return lookupVariable(scope.parent, name, line, column);
   }
   // Object namespace
   if (name === 'Object') {
@@ -309,14 +327,14 @@ function lookupVariable(scope: Scope, name: string): Value {
   if (name in stdlib) {
     return stdlib[name as keyof typeof stdlib] as unknown as Value;
   }
-  throw new Error(`Undefined variable: ${name}`);
+  throw new Error(formatError(`Undefined variable: ${name}`, line, column));
 }
 
 function setVariable(scope: Scope, name: string, value: Value): void {
   scope.variables.set(name, value);
 }
 
-function updateVariable(scope: Scope, name: string, value: Value): void {
+function updateVariable(scope: Scope, name: string, value: Value, line?: number): void {
   let current: Scope | null = scope;
   while (current) {
     if (current.variables.has(name)) {
@@ -325,7 +343,7 @@ function updateVariable(scope: Scope, name: string, value: Value): void {
     }
     current = current.parent;
   }
-  throw new Error(`Cannot assign to undeclared variable: ${name}`);
+  throw new Error(formatError(`Cannot assign to undeclared variable: ${name}`, line));
 }
 
 /**
@@ -426,7 +444,7 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
       return null;
 
     case 'Identifier':
-      return lookupVariable(scope, expr.name);
+      return lookupVariable(scope, expr.name, getLine(expr), getCol(expr));
 
     case 'ArrayLiteral': {
       const elements = expr.elements.map((el) => evaluateExpression(el, scope));
@@ -459,7 +477,7 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
       // Style block merge: <<
       if (expr.operator === '<<') {
         if (!isStyleBlock(left) || !isStyleBlock(right)) {
-          throw new Error('Operator << requires style block operands');
+          throw new Error(formatError('Operator << requires style block operands', getLine(expr)));
         }
         return { type: 'StyleBlockValue', properties: { ...left.properties, ...right.properties } };
       }
@@ -481,11 +499,11 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
 
       // Null in arithmetic
       if (left === null || right === null) {
-        throw new Error('Cannot use null in arithmetic expression');
+        throw new Error(formatError('Cannot use null in arithmetic expression', getLine(expr)));
       }
 
       if (typeof left !== 'number' || typeof right !== 'number') {
-        throw new Error(`Binary operator ${expr.operator} requires numeric operands`);
+        throw new Error(formatError(`Binary operator ${expr.operator} requires numeric operands`, getLine(expr)));
       }
 
       switch (expr.operator) {
@@ -508,10 +526,10 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'UnaryExpression': {
       const arg = evaluateExpression(expr.argument, scope);
       if (arg === null) {
-        throw new Error('Cannot use null in arithmetic expression');
+        throw new Error(formatError('Cannot use null in arithmetic expression', getLine(expr)));
       }
       if (typeof arg !== 'number') {
-        throw new Error(`Unary operator ${expr.operator} requires numeric operand`);
+        throw new Error(formatError(`Unary operator ${expr.operator} requires numeric operand`, getLine(expr)));
       }
       switch (expr.operator) {
         case '-': return -arg;
@@ -1104,7 +1122,7 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
     return evaluateContextAwareFunction(call.name, args, scope);
   }
 
-  const fn = lookupVariable(scope, call.name);
+  const fn = lookupVariable(scope, call.name, getLine(call), getCol(call));
 
   // Check if it's a stdlib function
   if (typeof fn === 'function') {
@@ -1133,9 +1151,11 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
     const args = call.args.map((arg) => evaluateExpression(arg, scope));
 
     if (args.length !== userFn.params.length) {
-      throw new Error(
-        `Function ${call.name} expects ${userFn.params.length} arguments, got ${args.length}`
-      );
+      throw new Error(formatError(
+        `Function ${call.name} expects ${userFn.params.length} arguments, got ${args.length}`,
+        getLine(call),
+        getCol(call)
+      ));
     }
 
     const fnScope = createScope(scope);
@@ -1159,7 +1179,7 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
     }
   }
 
-  throw new Error(`${call.name} is not a function`);
+  throw new Error(formatError(`${call.name} is not a function`, getLine(call), getCol(call)));
 }
 
 function evaluatePathArg(arg: PathArg, scope: Scope): string {
@@ -1168,7 +1188,7 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
       return formatNum(convertAngleUnit(arg.value, arg.unit));
 
     case 'Identifier': {
-      const value = lookupVariable(scope, arg.name);
+      const value = lookupVariable(scope, arg.name, getLine(arg), getCol(arg));
       if (value === null) {
         throw new Error('Cannot use null as a path argument');
       }
@@ -1750,11 +1770,11 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       const value = evaluateExpression(stmt.value, scope);
       if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathWithResult') {
         const pwr = value as PathWithResult;
-        updateVariable(scope, stmt.name, pwr.result);
+        updateVariable(scope, stmt.name, pwr.result, getLine(stmt));
         if (pwr.path) accum.push(pwr.path);
         return;
       }
-      updateVariable(scope, stmt.name, value);
+      updateVariable(scope, stmt.name, value, getLine(stmt));
       return;
     }
 
@@ -1764,18 +1784,18 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       const value = evaluateExpression(stmt.value, scope);
 
       if (isObjectValue(obj)) {
-        if (typeof index !== 'string') throw new Error('Object key must be a string');
+        if (typeof index !== 'string') throw new Error(formatError('Object key must be a string', getLine(stmt)));
         obj.properties.set(index, value);
         return;
       }
       if (isArrayValue(obj)) {
-        if (typeof index !== 'number') throw new Error('Array index must be a number');
+        if (typeof index !== 'number') throw new Error(formatError('Array index must be a number', getLine(stmt)));
         if (!Number.isInteger(index) || index < 0 || index >= obj.elements.length)
-          throw new Error(`Array index ${index} out of bounds`);
+          throw new Error(formatError(`Array index ${index} out of bounds`, getLine(stmt)));
         obj.elements[index] = value;
         return;
       }
-      throw new Error('Indexed assignment requires an object or array');
+      throw new Error(formatError('Indexed assignment requires an object or array', getLine(stmt)));
     }
 
     case 'ForLoop': {
@@ -1783,12 +1803,12 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       const end = evaluateExpression(stmt.end, scope);
 
       if (typeof start !== 'number' || typeof end !== 'number') {
-        throw new Error('for loop range must be numeric');
+        throw new Error(formatError('for loop range must be numeric', getLine(stmt)));
       }
 
       // Guard against infinite loops
       if (!Number.isFinite(start) || !Number.isFinite(end)) {
-        throw new Error('for loop range must be finite (got Infinity or NaN)');
+        throw new Error(formatError('for loop range must be finite (got Infinity or NaN)', getLine(stmt)));
       }
 
       const MAX_ITERATIONS = 10000;
@@ -1796,7 +1816,7 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
       // Inclusive ranges: both start and end are included
       const iterations = ascending ? (end - start + 1) : (start - end + 1);
       if (iterations > MAX_ITERATIONS) {
-        throw new Error(`for loop would run ${iterations} iterations (max ${MAX_ITERATIONS})`);
+        throw new Error(formatError(`for loop would run ${iterations} iterations (max ${MAX_ITERATIONS})`, getLine(stmt)));
       }
 
       if (ascending) {
@@ -1851,7 +1871,7 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
 
       // Array iteration (with smart destructuring)
       if (!isArrayValue(iterable)) {
-        throw new Error('for-each requires an array or object');
+        throw new Error(formatError('for-each requires an array or object', getLine(stmt)));
       }
 
       for (let i = 0; i < iterable.elements.length; i++) {
@@ -1893,12 +1913,12 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
         if (scope.evalState.activeLayerName) {
           const activeLayer = scope.evalState.layers.get(scope.evalState.activeLayerName);
           if (activeLayer?.layerType === 'TextLayer') {
-            throw new Error('Path commands cannot be used inside a TextLayer apply block');
+            throw new Error(formatError('Path commands cannot be used inside a TextLayer apply block', getLine(stmt)));
           }
         } else if (scope.evalState.defaultLayerName) {
           const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName);
           if (defaultLayer?.layerType === 'TextLayer') {
-            throw new Error('Path commands cannot be routed to a TextLayer. Use a PathLayer as default or wrap in a layer().apply block');
+            throw new Error(formatError('Path commands cannot be routed to a TextLayer. Use a PathLayer as default or wrap in a layer().apply block', getLine(stmt)));
           }
         }
       }
@@ -1917,21 +1937,21 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
 
     case 'LayerDefinition': {
       if (!scope.evalState) {
-        throw new Error('Layer definitions require evaluation context');
+        throw new Error(formatError('Layer definitions require evaluation context', getLine(stmt)));
       }
       const nameValue = evaluateExpression(stmt.name, scope);
       if (typeof nameValue !== 'string') {
-        throw new Error('Layer name must be a string');
+        throw new Error(formatError('Layer name must be a string', getLine(stmt)));
       }
       if (scope.evalState.layers.has(nameValue)) {
-        throw new Error(`Duplicate layer name: '${nameValue}'`);
+        throw new Error(formatError(`Duplicate layer name: '${nameValue}'`, getLine(stmt)));
       }
       if (stmt.isDefault && scope.evalState.defaultLayerName !== null) {
-        throw new Error(`Cannot define multiple default layers. '${scope.evalState.defaultLayerName}' is already the default`);
+        throw new Error(formatError(`Cannot define multiple default layers. '${scope.evalState.defaultLayerName}' is already the default`, getLine(stmt)));
       }
       const styleValue = evaluateExpression(stmt.styleExpr, scope);
       if (!isStyleBlock(styleValue)) {
-        throw new Error('Layer style must be a style block');
+        throw new Error(formatError('Layer style must be a style block', getLine(stmt)));
       }
       const styles: LayerStyle = { ...styleValue.properties };
       if (stmt.layerType === 'TextLayer') {
@@ -1968,18 +1988,18 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
 
     case 'LayerApplyBlock': {
       if (!scope.evalState) {
-        throw new Error('Layer apply blocks require evaluation context');
+        throw new Error(formatError('Layer apply blocks require evaluation context', getLine(stmt)));
       }
       const nameValue = evaluateExpression(stmt.layerName, scope);
       if (typeof nameValue !== 'string') {
-        throw new Error('Layer name must be a string');
+        throw new Error(formatError('Layer name must be a string', getLine(stmt)));
       }
       const layer = scope.evalState.layers.get(nameValue);
       if (!layer) {
-        throw new Error(`Undefined layer: '${nameValue}'`);
+        throw new Error(formatError(`Undefined layer: '${nameValue}'`, getLine(stmt)));
       }
       if (scope.evalState.activeLayerName !== null) {
-        throw new Error(`Cannot nest layer apply blocks. Already inside layer '${scope.evalState.activeLayerName}'`);
+        throw new Error(formatError(`Cannot nest layer apply blocks. Already inside layer '${scope.evalState.activeLayerName}'`, getLine(stmt)));
       }
       if (layer.layerType === 'TextLayer') {
         // TextLayer apply: set activeLayerName so TextStatements write here
@@ -2005,10 +2025,10 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
     }
 
     case 'TextStatement': {
-      if (!scope.evalState) throw new Error('text() requires evaluation context');
+      if (!scope.evalState) throw new Error(formatError('text() requires evaluation context', getLine(stmt)));
       const activeTextLayer = getActiveTextLayer(scope);
       if (!activeTextLayer) {
-        throw new Error('text() can only be used inside a TextLayer apply block');
+        throw new Error(formatError('text() can only be used inside a TextLayer apply block', getLine(stmt)));
       }
 
       const x = requireNumber(evaluateExpression(stmt.x, scope), 'text() x');

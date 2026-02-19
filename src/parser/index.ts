@@ -99,12 +99,15 @@ const stringLiteral: Parsimmon.Parser<StringLiteral> = token(
 }));
 
 // Identifier: x, myVar, _private (for general use)
-const identifier: Parsimmon.Parser<Identifier> = token(
-  P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)
-).map((name) => ({
-  type: 'Identifier' as const,
-  name,
-}));
+const identifier: Parsimmon.Parser<Identifier> = P.seqMap(
+  P.index,
+  token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)),
+  (startIndex, name) => ({
+    type: 'Identifier' as const,
+    name,
+    loc: indexToLoc(startIndex),
+  })
+);
 
 // Reserved words that cannot be identifiers
 const reservedWords = ['let', 'for', 'in', 'if', 'else', 'fn', 'calc', 'log', 'return', 'define', 'default', 'layer', 'apply', 'text', 'tspan', 'null'];
@@ -128,16 +131,18 @@ const nonReservedIdentifier: Parsimmon.Parser<Identifier> = identifier.chain((id
 );
 
 // Identifier that is NOT a path command letter (for path arguments)
-const nonPathCommandIdentifier: Parsimmon.Parser<Identifier> = token(
-  P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)
-).chain((name) => {
+const nonPathCommandIdentifier: Parsimmon.Parser<Identifier> = P.seqMap(
+  P.index,
+  token(P.regexp(/[a-zA-Z_][a-zA-Z0-9_]*/)),
+  (startIndex, name) => ({ startIndex, name })
+).chain(({ startIndex, name }) => {
   if (name.length === 1 && PATH_COMMANDS.includes(name)) {
     return P.fail(`Path command letter cannot be used as identifier: ${name}`);
   }
   if (reservedWords.includes(name)) {
     return P.fail(`Reserved word: ${name}`);
   }
-  return P.succeed({ type: 'Identifier' as const, name });
+  return P.succeed({ type: 'Identifier' as const, name, loc: indexToLoc(startIndex) });
 });
 
 // Postfix operators: chains .method(args), .property, and [index] after a base expression
@@ -523,15 +528,17 @@ const pathCommand: Parsimmon.Parser<PathCommand> = P.seqMap(
 
 // let declaration: let x = 10;
 const letDeclaration: Parsimmon.Parser<LetDeclaration> = P.seqMap(
+  P.index,
   keyword('let'),
   nonReservedIdentifier,
   word('='),
   expression,
   word(';'),
-  (_let, id, _eq, value, _semi) => ({
+  (startIndex, _let, id, _eq, value, _semi) => ({
     type: 'LetDeclaration' as const,
     name: id.name,
     value,
+    loc: indexToLoc(startIndex),
   })
 );
 
@@ -601,6 +608,7 @@ const forEachLoop: Parsimmon.Parser<ForEachLoop> = P.seqMap(
 
 // if statement: if (condition) { ... } else { ... }
 const ifStatement: Parsimmon.Parser<IfStatement> = P.seqMap(
+  P.index,
   keyword('if'),
   word('('),
   expression,
@@ -610,27 +618,30 @@ const ifStatement: Parsimmon.Parser<IfStatement> = P.seqMap(
     P.lazy(() => ifStatement).map(stmt => [stmt]),
     block
   )).map(([, b]) => b).fallback(null),
-  (_if, _lp, condition, _rp, consequent, alternate) => ({
+  (startIndex, _if, _lp, condition, _rp, consequent, alternate) => ({
     type: 'IfStatement' as const,
     condition,
     consequent,
     alternate,
+    loc: indexToLoc(startIndex),
   })
 );
 
 // function definition: fn name(a, b) { ... }
 const functionDefinition: Parsimmon.Parser<FunctionDefinition> = P.seqMap(
+  P.index,
   keyword('fn'),
   nonReservedIdentifier,
   word('('),
   P.sepBy(nonReservedIdentifier, word(',')),
   word(')'),
   block,
-  (_fn, id, _lp, params, _rp, body) => ({
+  (startIndex, _fn, id, _lp, params, _rp, body) => ({
     type: 'FunctionDefinition' as const,
     name: id.name,
     params: params.map((p) => p.name),
     body,
+    loc: indexToLoc(startIndex),
   })
 );
 
@@ -678,14 +689,16 @@ const indexedAssignmentStatement: Parsimmon.Parser<IndexedAssignmentStatement> =
 
 // Assignment statement: x = expr;
 const assignmentStatement: Parsimmon.Parser<AssignmentStatement> = P.seqMap(
+  P.index,
   nonReservedIdentifier,
   token(P.regexp(/=(?!=)/)),  // '=' NOT followed by '=' (avoids matching '==')
   expression,
   word(';'),
-  (id, _eq, value, _semi) => ({
+  (startIndex, id, _eq, value, _semi) => ({
     type: 'AssignmentStatement' as const,
     name: id.name,
     value,
+    loc: indexToLoc(startIndex),
   })
 );
 
@@ -880,6 +893,7 @@ const textForEachLoop: Parsimmon.Parser<ForEachLoop> = P.seqMap(
 
 // If statement inside text blocks — branches contain text items instead of statements
 const textIfStatement: Parsimmon.Parser<IfStatement> = P.seqMap(
+  P.index,
   keyword('if'),
   word('('),
   expression,
@@ -889,11 +903,12 @@ const textIfStatement: Parsimmon.Parser<IfStatement> = P.seqMap(
     P.lazy(() => textIfStatement).map(stmt => [stmt]),
     textBlock
   )).map(([, b]) => b).fallback(null),
-  (_if, _lp, condition, _rp, consequent, alternate) => ({
+  (startIndex, _if, _lp, condition, _rp, consequent, alternate) => ({
     type: 'IfStatement' as const,
     condition,
     consequent: consequent as unknown as Statement[],
     alternate: alternate as unknown as Statement[] | null,
+    loc: indexToLoc(startIndex),
   })
 );
 

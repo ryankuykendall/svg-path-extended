@@ -133,12 +133,12 @@ function createScope(parent: Scope | null = null): Scope {
   };
 }
 
-function lookupVariable(scope: Scope, name: string): Value {
+function lookupVariable(scope: Scope, name: string, line?: number, column?: number): Value {
   if (scope.variables.has(name)) {
     return scope.variables.get(name)!;
   }
   if (scope.parent) {
-    return lookupVariable(scope.parent, name);
+    return lookupVariable(scope.parent, name, line, column);
   }
   if (name === 'Object') {
     return { type: 'ObjectNamespace' } as ObjectNamespace;
@@ -146,7 +146,7 @@ function lookupVariable(scope: Scope, name: string): Value {
   if (name in stdlib) {
     return stdlib[name as keyof typeof stdlib] as unknown as Value;
   }
-  throw new Error(`Undefined variable: ${name}`);
+  throw new Error(formatError(`Undefined variable: ${name}`, line, column));
 }
 
 function setVariable(scope: Scope, name: string, value: Value): void {
@@ -533,8 +533,11 @@ function emitCommentsUpTo(ctx: AnnotatedContext, targetOffset: number): void {
 }
 
 // Helper to format error messages with line numbers
-function formatError(message: string, line?: number): string {
+function formatError(message: string, line?: number, column?: number): string {
   if (line !== undefined && line > 0) {
+    if (column !== undefined && column > 0) {
+      return `Line ${line}, col ${column}: ${message}`;
+    }
     return `Line ${line}: ${message}`;
   }
   return message;
@@ -674,8 +677,10 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'NullLiteral':
       return null;
 
-    case 'Identifier':
-      return lookupVariable(scope, expr.name);
+    case 'Identifier': {
+      const idLoc = (expr as { loc?: { line: number; column: number } }).loc;
+      return lookupVariable(scope, expr.name, idLoc?.line, idLoc?.column);
+    }
 
     case 'ArrayLiteral': {
       const elements = expr.elements.map((el) => evaluateExpression(el, scope));
@@ -967,7 +972,8 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
       return String(convertAngleUnit(arg.value, arg.unit));
 
     case 'Identifier': {
-      const value = lookupVariable(scope, arg.name);
+      const argLoc = (arg as { loc?: { line: number; column: number } }).loc;
+      const value = lookupVariable(scope, arg.name, argLoc?.line, argLoc?.column);
       if (value === null) throw new Error('Cannot use null as a path argument');
       if (typeof value === 'number') {
         return String(value);
