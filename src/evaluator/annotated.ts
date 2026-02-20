@@ -28,6 +28,7 @@ import type {
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import { createPathContext, contextToObject, updateContextForCommand, setLastTangent, type PathContext } from './context';
 import { expression as expressionParser } from '../parser';
+import { samplePathAtFraction, partitionPath } from './sampling';
 
 // Types for annotated output
 export type AnnotatedLine =
@@ -624,6 +625,77 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
   return obj.elements[index];
 }
 
+interface SamplingCmd {
+  command: string;
+  args: number[];
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}
+
+function evaluateAnnotatedPathSampling(
+  commands: SamplingCmd[],
+  expr: MethodCallExpression,
+  scope: Scope
+): Value | null {
+  switch (expr.method) {
+    case 'get': {
+      if (expr.args.length !== 1) throw new Error('get() expects 1 argument (t)');
+      const t = evaluateExpression(expr.args[0], scope);
+      if (typeof t !== 'number') throw new Error('get() argument must be a number');
+      if (t < 0 || t > 1) throw new Error(`get() argument must be between 0 and 1, got ${t}`);
+      const result = samplePathAtFraction(commands, t);
+      return { type: 'ContextObject' as const, value: { x: result.point.x, y: result.point.y } };
+    }
+    case 'tangent': {
+      if (expr.args.length !== 1) throw new Error('tangent() expects 1 argument (t)');
+      const t = evaluateExpression(expr.args[0], scope);
+      if (typeof t !== 'number') throw new Error('tangent() argument must be a number');
+      if (t < 0 || t > 1) throw new Error(`tangent() argument must be between 0 and 1, got ${t}`);
+      const result = samplePathAtFraction(commands, t);
+      return {
+        type: 'ObjectValue' as const,
+        properties: new Map<string, Value>([
+          ['point', { type: 'ContextObject' as const, value: { x: result.point.x, y: result.point.y } } as unknown as Value],
+          ['angle', result.tangent],
+        ]),
+      };
+    }
+    case 'normal': {
+      if (expr.args.length !== 1) throw new Error('normal() expects 1 argument (t)');
+      const t = evaluateExpression(expr.args[0], scope);
+      if (typeof t !== 'number') throw new Error('normal() argument must be a number');
+      if (t < 0 || t > 1) throw new Error(`normal() argument must be between 0 and 1, got ${t}`);
+      const result = samplePathAtFraction(commands, t);
+      return {
+        type: 'ObjectValue' as const,
+        properties: new Map<string, Value>([
+          ['point', { type: 'ContextObject' as const, value: { x: result.point.x, y: result.point.y } } as unknown as Value],
+          ['angle', result.tangent - Math.PI / 2],
+        ]),
+      };
+    }
+    case 'partition': {
+      if (expr.args.length !== 1) throw new Error('partition() expects 1 argument (n)');
+      const n = evaluateExpression(expr.args[0], scope);
+      if (typeof n !== 'number') throw new Error('partition() argument must be a number');
+      if (!Number.isInteger(n) || n < 1) throw new Error('partition() argument must be a positive integer');
+      const points = partitionPath(commands, n);
+      return {
+        type: 'ArrayValue' as const,
+        elements: points.map(p => ({
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['point', { type: 'ContextObject' as const, value: { x: p.point.x, y: p.point.y } } as unknown as Value],
+            ['angle', p.tangent],
+          ]),
+        })),
+      };
+    }
+    default:
+      return null;
+  }
+}
+
 function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
 
@@ -676,7 +748,17 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
         endPoint: { x: obj.endPoint.x + x, y: obj.endPoint.y + y },
       };
     }
+    // Sampling methods: get, tangent, normal, partition
+    const pathSamplingResult = evaluateAnnotatedPathSampling(obj.commands, expr, scope);
+    if (pathSamplingResult !== null) return pathSamplingResult;
     throw new Error(`Unknown PathBlock method: ${expr.method}`);
+  }
+
+  // ProjectedPathValue methods: get(), tangent(), normal(), partition()
+  if (isProjectedPathValue(obj)) {
+    const pathSamplingResult = evaluateAnnotatedPathSampling(obj.commands, expr, scope);
+    if (pathSamplingResult !== null) return pathSamplingResult;
+    throw new Error(`Unknown ProjectedPath method: ${expr.method}`);
   }
 
   // ObjectNamespace methods

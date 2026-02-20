@@ -145,10 +145,74 @@ Path blocks enforce these rules at runtime:
 5. **No nesting** — Path blocks cannot contain other `@{ }` expressions
 6. **No draw/project inside blocks** — Calling `.draw()` or `.project()` inside a path block throws an error
 
+## Parametric Sampling
+
+Parametric sampling lets you query points, tangent directions, and normal directions at any position along a path. The parameter `t` is a fraction from 0 (start) to 1 (end) measured by arc length.
+
+These methods work on both PathBlock values and ProjectedPath values.
+
+### `get(t)` → Point
+
+Returns the point at arc-length fraction `t` along the path.
+
+```
+let p = @{ v 50 h 100 };
+let mid = p.get(0.5);       // Point roughly at distance 75 along path
+M mid.x mid.y               // position at midpoint
+```
+
+### `tangent(t)` → `{ point, angle }`
+
+Returns the point and tangent angle (radians) at fraction `t`. The angle is the direction of travel.
+
+```
+let p = @{ v 50 h 100 };
+let tan = p.tangent(0.0);
+log(tan.point);              // Point(0, 0)
+log(tan.angle);              // ~1.5708 (π/2, pointing down)
+```
+
+### `normal(t)` → `{ point, angle }`
+
+Returns the point and left-hand normal angle at fraction `t`. The normal angle equals the tangent angle minus π/2.
+
+```
+let p = @{ h 100 };
+let n = p.normal(0.5);
+log(n.point);                // Point(50, 0)
+log(n.angle);                // ~-1.5708 (pointing up — left-hand normal of rightward path)
+```
+
+### `partition(n)` → OrientedPoint[]
+
+Divides the path into `n` equal-length segments, returning `n + 1` oriented points (endpoints inclusive). Each oriented point has `point` and `angle` properties.
+
+```
+let p = @{ h 100 };
+let pts = p.partition(4);    // 5 points at x = 0, 25, 50, 75, 100
+for (op in pts) {
+  log(op.point.x, op.angle);
+}
+```
+
+### Sampling on ProjectedPath
+
+Projected paths return absolute coordinates:
+
+```
+let p = @{ h 100 };
+let proj = p.project(10, 20);
+let mid = proj.get(0.5);    // Point(60, 20) — offset by projection origin
+```
+
+### Curve Support
+
+Sampling works on all command types including cubic/quadratic Bézier curves and arcs. Curves use arc-length parameterization so that `t = 0.5` always represents the geometric midpoint, not the parametric midpoint.
+
 ## Implementation Phases
 
 Path Blocks are being implemented in phases:
 
-- **Phase 1** (current): Core definition, `draw()`, `project()`, basic properties
-- **Phase 2**: Parametric sampling — `get(t)`, `tangent(t)`, `normal(t)`, `partition(n)`
+- **Phase 1**: Core definition, `draw()`, `project()`, basic properties
+- **Phase 2** (current): Parametric sampling — `get(t)`, `tangent(t)`, `normal(t)`, `partition(n)`
 - **Phase 3**: Transforms — `reverse()`, `offset(distance)`, `boundingBox()`

@@ -40,6 +40,7 @@ import {
   transformStateToSvg,
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
+import { calculateCommandLength, calculatePathLength, samplePathAtFraction, partitionPath } from './sampling';
 
 export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference | ObjectValue | ObjectNamespace | PathBlockValue | ProjectedPathValue;
 
@@ -451,160 +452,6 @@ function camelToKebab(name: string): string {
 }
 
 // --- Path length calculation utilities ---
-
-/**
- * Calculate the length of a single path command segment
- */
-function calculateCommandLength(cmd: PathBlockCommand): number {
-  const dx = cmd.end.x - cmd.start.x;
-  const dy = cmd.end.y - cmd.start.y;
-  const upperCmd = cmd.command.toUpperCase();
-
-  switch (upperCmd) {
-    case 'M':
-      return 0; // MoveTo has no drawn length
-
-    case 'L':
-    case 'H':
-    case 'V':
-    case 'T':
-      return Math.sqrt(dx * dx + dy * dy);
-
-    case 'Z':
-      return Math.sqrt(dx * dx + dy * dy);
-
-    case 'C': {
-      // Cubic bezier: approximate with line segments
-      // args are: x1 y1 x2 y2 x y (relative to start)
-      const [x1, y1, x2, y2] = cmd.args;
-      return approximateCubicBezierLength(
-        cmd.start, { x: cmd.start.x + x1, y: cmd.start.y + y1 },
-        { x: cmd.start.x + x2, y: cmd.start.y + y2 }, cmd.end
-      );
-    }
-
-    case 'S': {
-      // Smooth cubic: args are x2 y2 x y (relative)
-      // Without previous control point info, approximate with straight line to control to end
-      const [x2, y2] = cmd.args;
-      // Use the start as reflected control point (approximation)
-      return approximateCubicBezierLength(
-        cmd.start, cmd.start,
-        { x: cmd.start.x + x2, y: cmd.start.y + y2 }, cmd.end
-      );
-    }
-
-    case 'Q': {
-      // Quadratic bezier: args are x1 y1 x y (relative)
-      const [x1, y1] = cmd.args;
-      return approximateQuadraticBezierLength(
-        cmd.start, { x: cmd.start.x + x1, y: cmd.start.y + y1 }, cmd.end
-      );
-    }
-
-    case 'A': {
-      // Arc: args are rx ry rotation large-arc sweep x y
-      const [rx, ry] = cmd.args;
-      return approximateArcLength(rx, ry, cmd.start, cmd.end);
-    }
-
-    default:
-      return Math.sqrt(dx * dx + dy * dy);
-  }
-}
-
-/**
- * Approximate cubic bezier length using recursive subdivision
- */
-function approximateCubicBezierLength(p0: Point, p1: Point, p2: Point, p3: Point): number {
-  const steps = 16;
-  let length = 0;
-  let prevX = p0.x, prevY = p0.y;
-
-  for (let i = 1; i <= steps; i++) {
-    const t = i / steps;
-    const t2 = t * t;
-    const t3 = t2 * t;
-    const mt = 1 - t;
-    const mt2 = mt * mt;
-    const mt3 = mt2 * mt;
-
-    const x = mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x;
-    const y = mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y;
-
-    const dx = x - prevX;
-    const dy = y - prevY;
-    length += Math.sqrt(dx * dx + dy * dy);
-    prevX = x;
-    prevY = y;
-  }
-
-  return length;
-}
-
-/**
- * Approximate quadratic bezier length using recursive subdivision
- */
-function approximateQuadraticBezierLength(p0: Point, p1: Point, p2: Point): number {
-  const steps = 16;
-  let length = 0;
-  let prevX = p0.x, prevY = p0.y;
-
-  for (let i = 1; i <= steps; i++) {
-    const t = i / steps;
-    const mt = 1 - t;
-
-    const x = mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x;
-    const y = mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y;
-
-    const dx = x - prevX;
-    const dy = y - prevY;
-    length += Math.sqrt(dx * dx + dy * dy);
-    prevX = x;
-    prevY = y;
-  }
-
-  return length;
-}
-
-/**
- * Approximate arc length (simplified — uses elliptical approximation)
- */
-function approximateArcLength(rx: number, ry: number, start: Point, end: Point): number {
-  // For circular arcs (rx == ry), use the chord length as minimum bound
-  // and estimate via average radius * angle
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const chordLength = Math.sqrt(dx * dx + dy * dy);
-
-  if (rx === ry && rx > 0) {
-    // Circular arc: use chord/radius to find angle
-    const r = rx;
-    const halfChord = chordLength / 2;
-    if (halfChord >= r) return chordLength; // degenerate
-    const halfAngle = Math.asin(Math.min(halfChord / r, 1));
-    return 2 * halfAngle * r;
-  }
-
-  // Elliptical arc: rough approximation using average radius
-  const avgR = (rx + ry) / 2;
-  if (avgR <= 0) return chordLength;
-  const halfChord = chordLength / 2;
-  if (halfChord >= avgR) return chordLength;
-  const halfAngle = Math.asin(Math.min(halfChord / avgR, 1));
-  return 2 * halfAngle * avgR;
-}
-
-/**
- * Calculate total path length from a list of PathBlockCommands
- */
-function calculatePathLength(commands: PathBlockCommand[]): number {
-  let total = 0;
-  for (const cmd of commands) {
-    total += calculateCommandLength(cmd);
-  }
-  return total;
-}
 
 /**
  * Extract vertices (start/end points of each segment) from commands
@@ -1055,8 +902,130 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
         };
       }
 
+      case 'get': {
+        if (expr.args.length !== 1) throw new Error('get() expects 1 argument (t)');
+        const t = evaluateExpression(expr.args[0], scope);
+        if (typeof t !== 'number') throw new Error('get() argument must be a number');
+        if (t < 0 || t > 1) throw new Error(`get() argument must be between 0 and 1, got ${t}`);
+        const result = samplePathAtFraction(obj.commands, t);
+        return { type: 'PointValue' as const, x: result.point.x, y: result.point.y };
+      }
+
+      case 'tangent': {
+        if (expr.args.length !== 1) throw new Error('tangent() expects 1 argument (t)');
+        const t = evaluateExpression(expr.args[0], scope);
+        if (typeof t !== 'number') throw new Error('tangent() argument must be a number');
+        if (t < 0 || t > 1) throw new Error(`tangent() argument must be between 0 and 1, got ${t}`);
+        const result = samplePathAtFraction(obj.commands, t);
+        return {
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['point', { type: 'PointValue' as const, x: result.point.x, y: result.point.y }],
+            ['angle', result.tangent],
+          ]),
+        };
+      }
+
+      case 'normal': {
+        if (expr.args.length !== 1) throw new Error('normal() expects 1 argument (t)');
+        const t = evaluateExpression(expr.args[0], scope);
+        if (typeof t !== 'number') throw new Error('normal() argument must be a number');
+        if (t < 0 || t > 1) throw new Error(`normal() argument must be between 0 and 1, got ${t}`);
+        const result = samplePathAtFraction(obj.commands, t);
+        return {
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['point', { type: 'PointValue' as const, x: result.point.x, y: result.point.y }],
+            ['angle', result.tangent - Math.PI / 2],
+          ]),
+        };
+      }
+
+      case 'partition': {
+        if (expr.args.length !== 1) throw new Error('partition() expects 1 argument (n)');
+        const n = evaluateExpression(expr.args[0], scope);
+        if (typeof n !== 'number') throw new Error('partition() argument must be a number');
+        if (!Number.isInteger(n) || n < 1) throw new Error('partition() argument must be a positive integer');
+        const points = partitionPath(obj.commands, n);
+        return {
+          type: 'ArrayValue' as const,
+          elements: points.map(p => ({
+            type: 'ObjectValue' as const,
+            properties: new Map<string, Value>([
+              ['point', { type: 'PointValue' as const, x: p.point.x, y: p.point.y }],
+              ['angle', p.tangent],
+            ]),
+          })),
+        };
+      }
+
       default:
         throw new Error(`Unknown PathBlock method: ${expr.method}`);
+    }
+  }
+
+  // ProjectedPathValue methods: get(), tangent(), normal(), partition()
+  if (isProjectedPathValue(obj)) {
+    switch (expr.method) {
+      case 'get': {
+        if (expr.args.length !== 1) throw new Error('get() expects 1 argument (t)');
+        const t = evaluateExpression(expr.args[0], scope);
+        if (typeof t !== 'number') throw new Error('get() argument must be a number');
+        if (t < 0 || t > 1) throw new Error(`get() argument must be between 0 and 1, got ${t}`);
+        const result = samplePathAtFraction(obj.commands, t);
+        return { type: 'PointValue' as const, x: result.point.x, y: result.point.y };
+      }
+
+      case 'tangent': {
+        if (expr.args.length !== 1) throw new Error('tangent() expects 1 argument (t)');
+        const t = evaluateExpression(expr.args[0], scope);
+        if (typeof t !== 'number') throw new Error('tangent() argument must be a number');
+        if (t < 0 || t > 1) throw new Error(`tangent() argument must be between 0 and 1, got ${t}`);
+        const result = samplePathAtFraction(obj.commands, t);
+        return {
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['point', { type: 'PointValue' as const, x: result.point.x, y: result.point.y }],
+            ['angle', result.tangent],
+          ]),
+        };
+      }
+
+      case 'normal': {
+        if (expr.args.length !== 1) throw new Error('normal() expects 1 argument (t)');
+        const t = evaluateExpression(expr.args[0], scope);
+        if (typeof t !== 'number') throw new Error('normal() argument must be a number');
+        if (t < 0 || t > 1) throw new Error(`normal() argument must be between 0 and 1, got ${t}`);
+        const result = samplePathAtFraction(obj.commands, t);
+        return {
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['point', { type: 'PointValue' as const, x: result.point.x, y: result.point.y }],
+            ['angle', result.tangent - Math.PI / 2],
+          ]),
+        };
+      }
+
+      case 'partition': {
+        if (expr.args.length !== 1) throw new Error('partition() expects 1 argument (n)');
+        const n = evaluateExpression(expr.args[0], scope);
+        if (typeof n !== 'number') throw new Error('partition() argument must be a number');
+        if (!Number.isInteger(n) || n < 1) throw new Error('partition() argument must be a positive integer');
+        const points = partitionPath(obj.commands, n);
+        return {
+          type: 'ArrayValue' as const,
+          elements: points.map(p => ({
+            type: 'ObjectValue' as const,
+            properties: new Map<string, Value>([
+              ['point', { type: 'PointValue' as const, x: p.point.x, y: p.point.y }],
+              ['angle', p.tangent],
+            ]),
+          })),
+        };
+      }
+
+      default:
+        throw new Error(`Unknown ProjectedPath method: ${expr.method}`);
     }
   }
 

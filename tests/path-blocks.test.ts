@@ -396,4 +396,338 @@ describe('Path Blocks', () => {
       expect(output).toContain('v 20');
     });
   });
+
+  describe('parametric sampling', () => {
+    describe('get(t)', () => {
+      it('get(0) returns startPoint', () => {
+        const result = compile('let p = @{ v 20 h 30 }; let pt = p.get(0); log(pt);');
+        expect(result.logs[0].parts[0].value).toBe('Point(0, 0)');
+      });
+
+      it('get(1) returns endPoint', () => {
+        const result = compile('let p = @{ v 20 h 30 }; let pt = p.get(1); log(pt);');
+        expect(result.logs[0].parts[0].value).toBe('Point(30, 20)');
+      });
+
+      it('get(0.5) on a straight line returns midpoint', () => {
+        const result = compile('let p = @{ h 100 }; let pt = p.get(0.5); log(pt.x, pt.y);');
+        expect(result.logs[0].parts[0].value).toBe('50');
+        expect(result.logs[0].parts[1].value).toBe('0');
+      });
+
+      it('get() on multi-segment path', () => {
+        // v 20 (length 20) then h 30 (length 30) → total 50
+        // t = 0.4 → distance 20 → end of first segment
+        const result = compile('let p = @{ v 20 h 30 }; let pt = p.get(0.4); log(pt.x, pt.y);');
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[0].parts[1].value).toBe('20');
+      });
+
+      it('get() midpoint of multi-segment path', () => {
+        // v 50 h 50 → total 100, t=0.5 → distance 50 → exactly at the corner
+        const result = compile('let p = @{ v 50 h 50 }; let pt = p.get(0.5); log(pt.x, pt.y);');
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[0].parts[1].value).toBe('50');
+      });
+
+      it('get() within second segment of multi-segment path', () => {
+        // v 20 h 30 → total 50, t=0.6 → distance 30 → 10 into h 30 segment
+        const result = compile('let p = @{ v 20 h 30 }; let pt = p.get(0.6); log(pt.x, pt.y);');
+        expect(result.logs[0].parts[0].value).toBe('10');
+        expect(result.logs[0].parts[1].value).toBe('20');
+      });
+
+      it('returns PointValue with accessible x and y', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let pt = p.get(0.25);
+          log(pt.x, pt.y);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('25');
+        expect(result.logs[0].parts[1].value).toBe('0');
+      });
+    });
+
+    describe('tangent(t)', () => {
+      it('tangent on horizontal line points right', () => {
+        const result = compile('let p = @{ h 100 }; let t = p.tangent(0.5); log(t.angle);');
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(0, 5);
+      });
+
+      it('tangent on vertical line (downward) points down', () => {
+        const result = compile('let p = @{ v 100 }; let t = p.tangent(0.5); log(t.angle);');
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(Math.PI / 2, 5);
+      });
+
+      it('tangent on leftward horizontal line', () => {
+        const result = compile('let p = @{ h -100 }; let t = p.tangent(0.5); log(t.angle);');
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(Math.PI, 4);
+      });
+
+      it('tangent on upward vertical line', () => {
+        const result = compile('let p = @{ v -100 }; let t = p.tangent(0.5); log(t.angle);');
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(-Math.PI / 2, 5);
+      });
+
+      it('tangent returns point and angle', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let t = p.tangent(0.5);
+          log(t.point.x, t.point.y, t.angle);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('50');
+        expect(result.logs[0].parts[1].value).toBe('0');
+        expect(Number(result.logs[0].parts[2].value)).toBeCloseTo(0, 5);
+      });
+
+      it('tangent on quadratic bezier curve', () => {
+        // q 50 0 50 50 — starts going right, ends going down
+        const result = compile(`
+          let p = @{ q 50 0 50 50 };
+          let t0 = p.tangent(0);
+          let t1 = p.tangent(1);
+          log(t0.angle, t1.angle);
+        `);
+        // At t=0, tangent points right (angle ~ 0)
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(0, 1);
+        // At t=1, tangent points down (angle ~ π/2)
+        expect(Number(result.logs[0].parts[1].value)).toBeCloseTo(Math.PI / 2, 1);
+      });
+    });
+
+    describe('normal(t)', () => {
+      it('normal is tangent minus π/2', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let n = p.normal(0.5);
+          log(n.angle);
+        `);
+        // Tangent is 0 (rightward), normal should be -π/2 (upward)
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(-Math.PI / 2, 5);
+      });
+
+      it('normal on downward vertical line', () => {
+        const result = compile(`
+          let p = @{ v 100 };
+          let n = p.normal(0.5);
+          log(n.angle);
+        `);
+        // Tangent is π/2, normal = π/2 - π/2 = 0 (rightward)
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(0, 5);
+      });
+
+      it('normal returns point and angle', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let n = p.normal(0.25);
+          log(n.point.x, n.point.y);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('25');
+        expect(result.logs[0].parts[1].value).toBe('0');
+      });
+    });
+
+    describe('partition(n)', () => {
+      it('partition(1) returns start and end', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let pts = p.partition(1);
+          log(pts.length, pts[0].point, pts[1].point);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('2');
+        expect(result.logs[0].parts[1].value).toBe('Point(0, 0)');
+        expect(result.logs[0].parts[2].value).toBe('Point(100, 0)');
+      });
+
+      it('partition(4) returns 5 evenly spaced points', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let pts = p.partition(4);
+          log(pts.length);
+          log(pts[0].point.x, pts[1].point.x, pts[2].point.x, pts[3].point.x, pts[4].point.x);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('5');
+        expect(result.logs[1].parts[0].value).toBe('0');
+        expect(result.logs[1].parts[1].value).toBe('25');
+        expect(result.logs[1].parts[2].value).toBe('50');
+        expect(result.logs[1].parts[3].value).toBe('75');
+        expect(result.logs[1].parts[4].value).toBe('100');
+      });
+
+      it('partition points have angle property', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let pts = p.partition(2);
+          log(pts[0].angle);
+        `);
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(0, 5);
+      });
+
+      it('partition on multi-segment path', () => {
+        const result = compile(`
+          let p = @{ v 50 h 50 };
+          let pts = p.partition(2);
+          log(pts[0].point, pts[1].point, pts[2].point);
+        `);
+        // total length 100, partition(2): t=0, t=0.5, t=1
+        // t=0 → (0,0), t=0.5 → (0,50) [end of v 50], t=1 → (50,50)
+        expect(result.logs[0].parts[0].value).toBe('Point(0, 0)');
+        expect(result.logs[0].parts[1].value).toBe('Point(0, 50)');
+        expect(result.logs[0].parts[2].value).toBe('Point(50, 50)');
+      });
+
+      it('partition can be iterated with for-in', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let pts = p.partition(2);
+          for (pt in pts) {
+            log(pt.point.x);
+          }
+        `);
+        expect(result.logs).toHaveLength(3);
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[1].parts[0].value).toBe('50');
+        expect(result.logs[2].parts[0].value).toBe('100');
+      });
+    });
+
+    describe('on ProjectedPathValue', () => {
+      it('get() on projected path uses absolute coordinates', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let proj = p.project(10, 20);
+          let pt = proj.get(0.5);
+          log(pt.x, pt.y);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('60');
+        expect(result.logs[0].parts[1].value).toBe('20');
+      });
+
+      it('tangent() on projected path', () => {
+        const result = compile(`
+          let p = @{ v 100 };
+          let proj = p.project(10, 20);
+          let t = proj.tangent(0.5);
+          log(t.point.x, t.point.y, t.angle);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('10');
+        expect(result.logs[0].parts[1].value).toBe('70');
+        expect(Number(result.logs[0].parts[2].value)).toBeCloseTo(Math.PI / 2, 5);
+      });
+
+      it('normal() on projected path', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let proj = p.project(5, 5);
+          let n = proj.normal(0);
+          log(n.angle);
+        `);
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(-Math.PI / 2, 5);
+      });
+
+      it('partition() on projected path', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let proj = p.project(10, 10);
+          let pts = proj.partition(2);
+          log(pts[0].point, pts[1].point, pts[2].point);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(10, 10)');
+        expect(result.logs[0].parts[1].value).toBe('Point(60, 10)');
+        expect(result.logs[0].parts[2].value).toBe('Point(110, 10)');
+      });
+
+      it('sampling on draw() result', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          M 10 20
+          let proj = p.draw();
+          let mid = proj.get(0.5);
+          log(mid.x, mid.y);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('60');
+        expect(result.logs[0].parts[1].value).toBe('20');
+      });
+    });
+
+    describe('errors', () => {
+      it('get() with t < 0 throws', () => {
+        expect(() => compile('let p = @{ h 100 }; p.get(-0.1);'))
+          .toThrow(/between 0 and 1/);
+      });
+
+      it('get() with t > 1 throws', () => {
+        expect(() => compile('let p = @{ h 100 }; p.get(1.5);'))
+          .toThrow(/between 0 and 1/);
+      });
+
+      it('tangent() with out-of-range t throws', () => {
+        expect(() => compile('let p = @{ h 100 }; p.tangent(-0.1);'))
+          .toThrow(/between 0 and 1/);
+      });
+
+      it('normal() with out-of-range t throws', () => {
+        expect(() => compile('let p = @{ h 100 }; p.normal(2);'))
+          .toThrow(/between 0 and 1/);
+      });
+
+      it('partition() with 0 throws', () => {
+        expect(() => compile('let p = @{ h 100 }; p.partition(0);'))
+          .toThrow(/positive integer/);
+      });
+
+      it('partition() with negative throws', () => {
+        expect(() => compile('let p = @{ h 100 }; p.partition(-1);'))
+          .toThrow(/positive integer/);
+      });
+
+      it('partition() with non-integer throws', () => {
+        expect(() => compile('let p = @{ h 100 }; p.partition(2.5);'))
+          .toThrow(/positive integer/);
+      });
+    });
+
+    describe('edge cases', () => {
+      it('single-command path', () => {
+        const result = compile(`
+          let p = @{ h 50 };
+          let pt = p.get(0.5);
+          log(pt.x, pt.y);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('25');
+        expect(result.logs[0].parts[1].value).toBe('0');
+      });
+
+      it('zero-length path returns start point', () => {
+        // m 0 0 creates a zero-length path
+        const result = compile(`
+          let p = @{ m 0 0 };
+          let pt = p.get(0);
+          log(pt.x, pt.y);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[0].parts[1].value).toBe('0');
+      });
+
+      it('diagonal line midpoint', () => {
+        const result = compile(`
+          let p = @{ l 30 40 };
+          let pt = p.get(0.5);
+          log(pt.x, pt.y);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('15');
+        expect(result.logs[0].parts[1].value).toBe('20');
+      });
+
+      it('path with closePath (z)', () => {
+        const result = compile(`
+          let p = @{ h 30 v 40 z };
+          let pt = p.get(0);
+          log(pt.x, pt.y);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[0].parts[1].value).toBe('0');
+      });
+    });
+  });
 });
