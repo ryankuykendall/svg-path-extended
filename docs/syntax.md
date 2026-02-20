@@ -1,6 +1,6 @@
 # Syntax Reference
 
-svg-path-extended is a superset of SVG path syntax that adds variables, expressions, control flow, and functions.
+svg-path-extended is a superset of SVG path syntax that adds variables, expressions, control flow, functions, and [path blocks](path-blocks.md).
 
 ## Path Commands
 

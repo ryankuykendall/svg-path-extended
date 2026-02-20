@@ -74,7 +74,7 @@ L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</
 `;
 
 export const syntax = `<h1 id="syntax-syntax-reference">Syntax Reference</h1>
-<p>svg-path-extended is a superset of SVG path syntax that adds variables, expressions, control flow, and functions.</p>
+<p>svg-path-extended is a superset of SVG path syntax that adds variables, expressions, control flow, functions, and <a href="path-blocks.md">path blocks</a>.</p>
 <h2 id="syntax-path-commands">Path Commands</h2>
 <p>All standard SVG path commands are supported:</p>
 <table>

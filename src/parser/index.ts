@@ -36,6 +36,7 @@ import type {
   TextStatement,
   TspanStatement,
   TextBodyItem,
+  PathBlockExpression,
 } from './ast';
 
 const P = Parsimmon;
@@ -444,10 +445,24 @@ const objectLiteral: Parsimmon.Parser<ObjectLiteral> = P.seq(
   properties,
 }));
 
-// Primary expression: style block, number, string, template literal, calc, null, array, object, identifier (with optional postfix), function call (with optional postfix), or parenthesized expression
+// Path block expression: @{ relative path commands }
+const pathBlockExpression: Parsimmon.Parser<PathBlockExpression> = P.seqMap(
+  P.index,
+  token(P.string('@{')),
+  P.lazy(() => statement).many(),
+  word('}'),
+  (startIndex, _at, body, _close) => ({
+    type: 'PathBlockExpression' as const,
+    body,
+    loc: indexToLoc(startIndex),
+  })
+);
+
+// Primary expression: style block, path block, number, string, template literal, calc, null, array, object, identifier (with optional postfix), function call (with optional postfix), or parenthesized expression
 const primaryExpression: Parsimmon.Parser<Expression> = P.lazy(() =>
   P.alt(
     withPostfix(styleBlockLiteral),
+    withPostfix(pathBlockExpression as Parsimmon.Parser<Expression>),
     nullLiteral,
     withPostfix(arrayLiteral as Parsimmon.Parser<Expression>),
     numberLiteral,

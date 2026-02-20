@@ -23,6 +23,7 @@ import type {
   TextStatement,
   TspanStatement,
   StyleBlockLiteral,
+  PathBlockExpression,
 } from '../parser/ast';
 import { stdlib, contextAwareFunctions } from '../stdlib';
 import { createPathContext, contextToObject, updateContextForCommand, setLastTangent, type PathContext } from './context';
@@ -45,7 +46,7 @@ export interface AnnotatedOutput {
 }
 
 // Value types (same as main evaluator)
-export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | AnnotatedLayerRef | StyleBlockValue | ArrayValue | ObjectValue | ObjectNamespace;
+export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | AnnotatedLayerRef | StyleBlockValue | ArrayValue | ObjectValue | ObjectNamespace | PathBlockValue | ProjectedPathValue;
 
 export interface ArrayValue {
   type: 'ArrayValue';
@@ -67,6 +68,41 @@ function isObjectValue(value: Value): value is ObjectValue {
 
 export interface ObjectNamespace {
   type: 'ObjectNamespace';
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+export interface PathBlockCommand {
+  command: string;
+  args: number[];
+  start: Point;
+  end: Point;
+}
+
+export interface PathBlockValue {
+  type: 'PathBlockValue';
+  commands: PathBlockCommand[];
+  pathStrings: string[];
+  startPoint: Point;
+  endPoint: Point;
+}
+
+function isPathBlockValue(value: Value): value is PathBlockValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathBlockValue';
+}
+
+export interface ProjectedPathValue {
+  type: 'ProjectedPathValue';
+  commands: PathBlockCommand[];
+  startPoint: Point;
+  endPoint: Point;
+}
+
+function isProjectedPathValue(value: Value): value is ProjectedPathValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'ProjectedPathValue';
 }
 
 export interface StyleBlockValue {
@@ -591,6 +627,58 @@ function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
 function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
   const obj = evaluateExpression(expr.object, scope);
 
+  // PathBlockValue methods: draw(), project()
+  if (isPathBlockValue(obj)) {
+    if (expr.method === 'draw') {
+      // In annotated mode, draw() emits relative commands and returns a ProjectedPath
+      const ctx = scope.evalState?.pathContext;
+      const originX = ctx?.position.x ?? 0;
+      const originY = ctx?.position.y ?? 0;
+
+      // Track context updates
+      for (const pathStr of obj.pathStrings) {
+        if (scope.evalState) {
+          parseAndTrackPathString(pathStr, scope);
+        }
+      }
+
+      const projected: ProjectedPathValue = {
+        type: 'ProjectedPathValue',
+        commands: obj.commands.map(cmd => ({
+          command: cmd.command,
+          args: [...cmd.args],
+          start: { x: cmd.start.x + originX, y: cmd.start.y + originY },
+          end: { x: cmd.end.x + originX, y: cmd.end.y + originY },
+        })),
+        startPoint: { x: obj.startPoint.x + originX, y: obj.startPoint.y + originY },
+        endPoint: { x: obj.endPoint.x + originX, y: obj.endPoint.y + originY },
+      };
+
+      return {
+        type: 'PathWithResult' as const,
+        path: obj.pathStrings.join(' '),
+        result: projected as unknown as ContextObject,
+      };
+    }
+    if (expr.method === 'project') {
+      const args = expr.args.map(a => evaluateExpression(a, scope));
+      const x = typeof args[0] === 'number' ? args[0] : 0;
+      const y = typeof args[1] === 'number' ? args[1] : 0;
+      return {
+        type: 'ProjectedPathValue' as const,
+        commands: obj.commands.map(cmd => ({
+          command: cmd.command,
+          args: [...cmd.args],
+          start: { x: cmd.start.x + x, y: cmd.start.y + y },
+          end: { x: cmd.end.x + x, y: cmd.end.y + y },
+        })),
+        startPoint: { x: obj.startPoint.x + x, y: obj.startPoint.y + y },
+        endPoint: { x: obj.endPoint.x + x, y: obj.endPoint.y + y },
+      };
+    }
+    throw new Error(`Unknown PathBlock method: ${expr.method}`);
+  }
+
   // ObjectNamespace methods
   if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ObjectNamespace') {
     const args = expr.args.map(a => evaluateExpression(a, scope));
@@ -804,14 +892,119 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'StyleBlockLiteral':
       return evaluateStyleBlockLiteral(expr, scope);
 
+    case 'PathBlockExpression':
+      return evaluatePathBlockExpression(expr as PathBlockExpression, scope);
+
     default:
       throw new Error(formatError(`Unknown expression type: ${(expr as Expression).type}`, line));
   }
 }
 
+/**
+ * Evaluate a PathBlockExpression in annotated mode
+ */
+function evaluatePathBlockExpression(expr: PathBlockExpression, scope: Scope): PathBlockValue {
+  // Create an isolated PathContext at origin (0, 0) with history tracking
+  const blockContext = createPathContext({ trackHistory: true });
+
+  // Create a child scope for the block body
+  const blockScope = createScope(scope);
+  const blockEvalState: EvaluationState & { _insidePathBlock: boolean } = {
+    pathContext: blockContext,
+    _insidePathBlock: true,
+  };
+  blockScope.evalState = blockEvalState;
+
+  blockScope.variables.set('ctx', {
+    type: 'ContextObject' as const,
+    value: contextToObject(blockContext),
+  });
+
+  const accum: string[] = [];
+  for (const stmt of expr.body) {
+    if (stmt.type === 'LayerDefinition' || stmt.type === 'LayerApplyBlock' || stmt.type === 'TextStatement') {
+      continue; // silently skip in annotated mode
+    }
+    if (stmt.type === 'PathCommand' && stmt.command !== '' && stmt.command !== stmt.command.toLowerCase()) {
+      continue; // skip absolute commands in annotated mode
+    }
+    const result = evaluateStatementPlain(stmt, blockScope);
+    if (result) accum.push(result);
+  }
+
+  const commands: PathBlockCommand[] = blockContext.commands.map(entry => ({
+    command: entry.command,
+    args: [...entry.args],
+    start: { x: entry.start.x, y: entry.start.y },
+    end: { x: entry.end.x, y: entry.end.y },
+  }));
+
+  return {
+    type: 'PathBlockValue',
+    commands,
+    pathStrings: accum.filter(s => s.length > 0),
+    startPoint: { x: 0, y: 0 },
+    endPoint: { x: blockContext.position.x, y: blockContext.position.y },
+  };
+}
+
 function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
   const line = (expr as { loc?: { line: number } }).loc?.line;
   const obj = evaluateExpression(expr.object, scope);
+
+  // Handle PathBlockValue property access
+  if (isPathBlockValue(obj)) {
+    switch (expr.property) {
+      case 'length': {
+        let total = 0;
+        for (const cmd of obj.commands) {
+          const dx = cmd.end.x - cmd.start.x;
+          const dy = cmd.end.y - cmd.start.y;
+          if (cmd.command.toUpperCase() !== 'M') {
+            total += Math.sqrt(dx * dx + dy * dy);
+          }
+        }
+        return total;
+      }
+      case 'startPoint': return { type: 'ContextObject' as const, value: { x: obj.startPoint.x, y: obj.startPoint.y } };
+      case 'endPoint': return { type: 'ContextObject' as const, value: { x: obj.endPoint.x, y: obj.endPoint.y } };
+      case 'subPathCount': {
+        if (obj.commands.length === 0) return 0;
+        let count = 1;
+        for (let i = 1; i < obj.commands.length; i++) {
+          if (obj.commands[i].command === 'm') count++;
+        }
+        return count;
+      }
+      case 'vertices': return { type: 'ArrayValue' as const, elements: [] };
+      case 'subPathCommands': return { type: 'ArrayValue' as const, elements: [] };
+      default:
+        throw new Error(formatError(`Property '${expr.property}' does not exist on PathBlock`, line));
+    }
+  }
+
+  // Handle ProjectedPathValue property access
+  if (isProjectedPathValue(obj)) {
+    switch (expr.property) {
+      case 'startPoint': return { type: 'ContextObject' as const, value: { x: obj.startPoint.x, y: obj.startPoint.y } };
+      case 'endPoint': return { type: 'ContextObject' as const, value: { x: obj.endPoint.x, y: obj.endPoint.y } };
+      case 'length': {
+        let total = 0;
+        for (const cmd of obj.commands) {
+          const dx = cmd.end.x - cmd.start.x;
+          const dy = cmd.end.y - cmd.start.y;
+          if (cmd.command.toUpperCase() !== 'M') {
+            total += Math.sqrt(dx * dx + dy * dy);
+          }
+        }
+        return total;
+      }
+      case 'vertices': return { type: 'ArrayValue' as const, elements: [] };
+      case 'subPathCommands': return { type: 'ArrayValue' as const, elements: [] };
+      default:
+        throw new Error(formatError(`Property '${expr.property}' does not exist on ProjectedPath`, line));
+    }
+  }
 
   // Handle StyleBlockValue property access (camelCase → kebab-case)
   if (isStyleBlock(obj)) {
@@ -1030,6 +1223,10 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
       const value = evaluateMethodCall(arg, scope);
       if (value === null) throw new Error('Cannot use null as a path argument');
       if (typeof value === 'number') return String(value);
+      if (typeof value === 'object' && value !== null && 'type' in value) {
+        if (value.type === 'PathSegment') return (value as PathSegment).value;
+        if (value.type === 'PathWithResult') return (value as PathWithResult).path;
+      }
       throw new Error('Method call did not return a valid path value');
     }
 
@@ -1192,9 +1389,12 @@ function evaluateStatementPlain(stmt: Statement, scope: Scope): string {
     }
 
     case 'PathCommand': {
-      // Method call statements: evaluate for side effects, don't emit return value
+      // Method call statements: evaluate for side effects, emit path if PathWithResult
       if (stmt.command === '' && stmt.args.length === 1 && stmt.args[0].type === 'MethodCallExpression') {
-        evaluateMethodCall(stmt.args[0] as MethodCallExpression, scope);
+        const methodResult = evaluateMethodCall(stmt.args[0] as MethodCallExpression, scope);
+        if (typeof methodResult === 'object' && methodResult !== null && 'type' in methodResult && methodResult.type === 'PathWithResult') {
+          return (methodResult as PathWithResult).path;
+        }
         return '';
       }
 
@@ -1261,8 +1461,25 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
       if (typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathWithResult') {
         const pwr = value as PathWithResult;
         setVariable(scope, stmt.name, pwr.result);
-        // Emit the path commands
-        emitPathString(pwr.path, ctx);
+        // Emit annotated draw() call if the value came from a method call
+        if (stmt.value.type === 'MethodCallExpression') {
+          const methodExpr = stmt.value as MethodCallExpression;
+          const callName = `${exprSourceName(methodExpr.object)}.${methodExpr.method}`;
+          const argsStr = methodExpr.args.map(a => String(evaluateExpression(a, scope))).join(', ');
+          const methodLine = (methodExpr.object as { loc?: { line: number } }).loc?.line ?? stmt.loc?.line ?? 0;
+          ctx.output.push({
+            type: 'function_call',
+            name: callName,
+            args: argsStr,
+            line: methodLine,
+          });
+          ctx.indentLevel++;
+          emitPathString(pwr.path, ctx);
+          ctx.indentLevel--;
+          ctx.output.push({ type: 'function_call_end' });
+        } else {
+          emitPathString(pwr.path, ctx);
+        }
       } else {
         setVariable(scope, stmt.name, value);
       }
@@ -1484,9 +1701,28 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
     }
 
     case 'PathCommand': {
-      // Method call statements: evaluate for side effects, don't emit return value
+      // Method call statements: evaluate for side effects, emit path if PathWithResult
       if (stmt.command === '' && stmt.args.length === 1 && stmt.args[0].type === 'MethodCallExpression') {
-        evaluateMethodCall(stmt.args[0] as MethodCallExpression, scope);
+        const methodExpr = stmt.args[0] as MethodCallExpression;
+        const methodResult = evaluateMethodCall(methodExpr, scope);
+        if (typeof methodResult === 'object' && methodResult !== null && 'type' in methodResult && methodResult.type === 'PathWithResult') {
+          const pwr = methodResult as PathWithResult;
+          if (pwr.path) {
+            const callName = `${exprSourceName(methodExpr.object)}.${methodExpr.method}`;
+            const argsStr = methodExpr.args.map(a => String(evaluateExpression(a, scope))).join(', ');
+            const methodLine = (methodExpr.object as { loc?: { line: number } }).loc?.line ?? stmt.loc?.line ?? 0;
+            ctx.output.push({
+              type: 'function_call',
+              name: callName,
+              args: argsStr,
+              line: methodLine,
+            });
+            ctx.indentLevel++;
+            emitPathString(pwr.path, ctx);
+            ctx.indentLevel--;
+            ctx.output.push({ type: 'function_call_end' });
+          }
+        }
         break;
       }
 
@@ -1565,14 +1801,73 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
           evaluateFunctionCall(funcCall, scope, ctx);
         }
       } else {
-        // Regular path command
-        const args = stmt.args.map((arg) => evaluatePathArg(arg, scope));
-        ctx.output.push({
-          type: 'path_command',
-          command: stmt.command,
-          args: args.join(' '),
-          line: stmt.loc?.line,
-        });
+        // Regular path command — check for draw() method call args that need annotation
+        const leadingArgs: string[] = [];
+        let drawMethodFound = false;
+
+        for (const arg of stmt.args) {
+          if (arg.type === 'MethodCallExpression') {
+            const methodExpr = arg as MethodCallExpression;
+            const methodResult = evaluateMethodCall(methodExpr, scope);
+            if (typeof methodResult === 'object' && methodResult !== null && 'type' in methodResult && methodResult.type === 'PathWithResult') {
+              const pwr = methodResult as PathWithResult;
+              // Emit leading path command with its args first
+              if (stmt.command && leadingArgs.length > 0) {
+                ctx.output.push({
+                  type: 'path_command',
+                  command: stmt.command,
+                  args: leadingArgs.join(' '),
+                  line: stmt.loc?.line,
+                });
+              } else if (stmt.command && leadingArgs.length === 0) {
+                ctx.output.push({
+                  type: 'path_command',
+                  command: stmt.command,
+                  args: '',
+                  line: stmt.loc?.line,
+                });
+              }
+              // Emit annotated draw() call
+              if (pwr.path) {
+                const callName = `${exprSourceName(methodExpr.object)}.${methodExpr.method}`;
+                const argsStr = methodExpr.args.map(a => String(evaluateExpression(a, scope))).join(', ');
+                const methodLine = (methodExpr.object as { loc?: { line: number } }).loc?.line ?? stmt.loc?.line ?? 0;
+                ctx.output.push({
+                  type: 'function_call',
+                  name: callName,
+                  args: argsStr,
+                  line: methodLine,
+                });
+                ctx.indentLevel++;
+                emitPathString(pwr.path, ctx);
+                ctx.indentLevel--;
+                ctx.output.push({ type: 'function_call_end' });
+              }
+              drawMethodFound = true;
+              // Clear leading args since we already emitted the command
+              leadingArgs.length = 0;
+            } else {
+              // Non-draw method call, just get string value
+              if (typeof methodResult === 'number') {
+                leadingArgs.push(String(methodResult));
+              } else if (typeof methodResult === 'object' && methodResult !== null && 'type' in methodResult) {
+                if ((methodResult as PathSegment).type === 'PathSegment') leadingArgs.push((methodResult as PathSegment).value);
+              }
+            }
+          } else {
+            leadingArgs.push(evaluatePathArg(arg, scope));
+          }
+        }
+
+        // Emit any remaining args if no draw method was found
+        if (!drawMethodFound) {
+          ctx.output.push({
+            type: 'path_command',
+            command: stmt.command,
+            args: leadingArgs.join(' '),
+            line: stmt.loc?.line,
+          });
+        }
 
         // Update path context if tracking is enabled
         if (scope.evalState && stmt.command !== '') {
@@ -1611,6 +1906,13 @@ function evaluateStatementAnnotated(stmt: Statement, scope: Scope, ctx: Annotate
 }
 
 // Helper to emit a path string as individual commands
+function exprSourceName(expr: Expression): string {
+  if (expr.type === 'Identifier') return expr.name;
+  if (expr.type === 'MemberExpression') return `${exprSourceName(expr.object)}.${expr.property}`;
+  if (expr.type === 'MethodCallExpression') return `${exprSourceName(expr.object)}.${expr.method}`;
+  return '?';
+}
+
 function emitPathString(pathStr: string, ctx: AnnotatedContext): void {
   // Simple parsing: split on command letters
   const commandRegex = /([MLHVCSQTAZmlhvcsqtaz])([^MLHVCSQTAZmlhvcsqtaz]*)/g;

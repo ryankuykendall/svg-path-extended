@@ -23,6 +23,7 @@ import type {
   TspanStatement,
   TextBodyItem,
   StyleBlockLiteral,
+  PathBlockExpression,
 } from '../parser/ast';
 import { expression as expressionParser } from '../parser';
 import { stdlib, contextAwareFunctions } from '../stdlib';
@@ -40,7 +41,7 @@ import {
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 
-export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference | ObjectValue | ObjectNamespace;
+export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference | ObjectValue | ObjectNamespace | PathBlockValue | ProjectedPathValue;
 
 /**
  * Represents an array value (reference semantics)
@@ -87,6 +88,45 @@ export interface ObjectNamespace {
 }
 
 /**
+ * Structured command within a PathBlock — stores command letter, numeric args, and start/end points
+ */
+export interface PathBlockCommand {
+  command: string;     // lowercase letter (m, l, h, v, c, s, q, t, a, z)
+  args: number[];      // evaluated numeric arguments
+  start: Point;        // cursor position before command
+  end: Point;          // cursor position after command
+}
+
+/**
+ * Represents a path block value — a reusable, introspectable path definition in relative coordinates
+ */
+export interface PathBlockValue {
+  type: 'PathBlockValue';
+  commands: PathBlockCommand[];  // structured command list
+  pathStrings: string[];         // raw path command strings (for emit)
+  startPoint: Point;             // origin (always 0,0 unless path begins with m)
+  endPoint: Point;               // final cursor position (relative)
+}
+
+export function isPathBlockValue(value: Value): value is PathBlockValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'PathBlockValue';
+}
+
+/**
+ * Represents a projected path — a PathBlock projected into absolute coordinate space
+ */
+export interface ProjectedPathValue {
+  type: 'ProjectedPathValue';
+  commands: PathBlockCommand[];  // commands with absolute coordinates
+  startPoint: Point;
+  endPoint: Point;
+}
+
+export function isProjectedPathValue(value: Value): value is ProjectedPathValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'ProjectedPathValue';
+}
+
+/**
  * Represents an object value that supports property access (like ctx)
  */
 export interface ContextObject {
@@ -101,7 +141,7 @@ export interface ContextObject {
 export interface PathWithResult {
   type: 'PathWithResult';
   path: string;      // The path string to emit
-  result: ContextObject;  // The result value (for assignments)
+  result: Value;     // The result value (for assignments)
 }
 
 /**
@@ -242,6 +282,8 @@ function expressionToSource(expr: Expression): string {
       return `${expressionToSource(expr.object)}.${expr.method}(${expr.args.map(expressionToSource).join(', ')})`;
     case 'ObjectLiteral':
       return '{' + expr.properties.map(p => `${p.key}: ${expressionToSource(p.value)}`).join(', ') + '}';
+    case 'PathBlockExpression':
+      return '@{ ... }';
     default:
       return '?';
   }
@@ -408,6 +450,211 @@ function camelToKebab(name: string): string {
   return name.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
 }
 
+// --- Path length calculation utilities ---
+
+/**
+ * Calculate the length of a single path command segment
+ */
+function calculateCommandLength(cmd: PathBlockCommand): number {
+  const dx = cmd.end.x - cmd.start.x;
+  const dy = cmd.end.y - cmd.start.y;
+  const upperCmd = cmd.command.toUpperCase();
+
+  switch (upperCmd) {
+    case 'M':
+      return 0; // MoveTo has no drawn length
+
+    case 'L':
+    case 'H':
+    case 'V':
+    case 'T':
+      return Math.sqrt(dx * dx + dy * dy);
+
+    case 'Z':
+      return Math.sqrt(dx * dx + dy * dy);
+
+    case 'C': {
+      // Cubic bezier: approximate with line segments
+      // args are: x1 y1 x2 y2 x y (relative to start)
+      const [x1, y1, x2, y2] = cmd.args;
+      return approximateCubicBezierLength(
+        cmd.start, { x: cmd.start.x + x1, y: cmd.start.y + y1 },
+        { x: cmd.start.x + x2, y: cmd.start.y + y2 }, cmd.end
+      );
+    }
+
+    case 'S': {
+      // Smooth cubic: args are x2 y2 x y (relative)
+      // Without previous control point info, approximate with straight line to control to end
+      const [x2, y2] = cmd.args;
+      // Use the start as reflected control point (approximation)
+      return approximateCubicBezierLength(
+        cmd.start, cmd.start,
+        { x: cmd.start.x + x2, y: cmd.start.y + y2 }, cmd.end
+      );
+    }
+
+    case 'Q': {
+      // Quadratic bezier: args are x1 y1 x y (relative)
+      const [x1, y1] = cmd.args;
+      return approximateQuadraticBezierLength(
+        cmd.start, { x: cmd.start.x + x1, y: cmd.start.y + y1 }, cmd.end
+      );
+    }
+
+    case 'A': {
+      // Arc: args are rx ry rotation large-arc sweep x y
+      const [rx, ry] = cmd.args;
+      return approximateArcLength(rx, ry, cmd.start, cmd.end);
+    }
+
+    default:
+      return Math.sqrt(dx * dx + dy * dy);
+  }
+}
+
+/**
+ * Approximate cubic bezier length using recursive subdivision
+ */
+function approximateCubicBezierLength(p0: Point, p1: Point, p2: Point, p3: Point): number {
+  const steps = 16;
+  let length = 0;
+  let prevX = p0.x, prevY = p0.y;
+
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    const mt = 1 - t;
+    const mt2 = mt * mt;
+    const mt3 = mt2 * mt;
+
+    const x = mt3 * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t3 * p3.x;
+    const y = mt3 * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t3 * p3.y;
+
+    const dx = x - prevX;
+    const dy = y - prevY;
+    length += Math.sqrt(dx * dx + dy * dy);
+    prevX = x;
+    prevY = y;
+  }
+
+  return length;
+}
+
+/**
+ * Approximate quadratic bezier length using recursive subdivision
+ */
+function approximateQuadraticBezierLength(p0: Point, p1: Point, p2: Point): number {
+  const steps = 16;
+  let length = 0;
+  let prevX = p0.x, prevY = p0.y;
+
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const mt = 1 - t;
+
+    const x = mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x;
+    const y = mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y;
+
+    const dx = x - prevX;
+    const dy = y - prevY;
+    length += Math.sqrt(dx * dx + dy * dy);
+    prevX = x;
+    prevY = y;
+  }
+
+  return length;
+}
+
+/**
+ * Approximate arc length (simplified — uses elliptical approximation)
+ */
+function approximateArcLength(rx: number, ry: number, start: Point, end: Point): number {
+  // For circular arcs (rx == ry), use the chord length as minimum bound
+  // and estimate via average radius * angle
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const chordLength = Math.sqrt(dx * dx + dy * dy);
+
+  if (rx === ry && rx > 0) {
+    // Circular arc: use chord/radius to find angle
+    const r = rx;
+    const halfChord = chordLength / 2;
+    if (halfChord >= r) return chordLength; // degenerate
+    const halfAngle = Math.asin(Math.min(halfChord / r, 1));
+    return 2 * halfAngle * r;
+  }
+
+  // Elliptical arc: rough approximation using average radius
+  const avgR = (rx + ry) / 2;
+  if (avgR <= 0) return chordLength;
+  const halfChord = chordLength / 2;
+  if (halfChord >= avgR) return chordLength;
+  const halfAngle = Math.asin(Math.min(halfChord / avgR, 1));
+  return 2 * halfAngle * avgR;
+}
+
+/**
+ * Calculate total path length from a list of PathBlockCommands
+ */
+function calculatePathLength(commands: PathBlockCommand[]): number {
+  let total = 0;
+  for (const cmd of commands) {
+    total += calculateCommandLength(cmd);
+  }
+  return total;
+}
+
+/**
+ * Extract vertices (start/end points of each segment) from commands
+ */
+function extractVertices(commands: PathBlockCommand[]): PointValue[] {
+  if (commands.length === 0) return [];
+
+  const vertices: PointValue[] = [];
+  const seen = new Set<string>();
+
+  for (const cmd of commands) {
+    const startKey = `${cmd.start.x},${cmd.start.y}`;
+    if (!seen.has(startKey)) {
+      seen.add(startKey);
+      vertices.push({ type: 'PointValue', x: cmd.start.x, y: cmd.start.y });
+    }
+    const endKey = `${cmd.end.x},${cmd.end.y}`;
+    if (!seen.has(endKey)) {
+      seen.add(endKey);
+      vertices.push({ type: 'PointValue', x: cmd.end.x, y: cmd.end.y });
+    }
+  }
+
+  return vertices;
+}
+
+/**
+ * Count subpaths (separated by m commands after the first command)
+ */
+function countSubPaths(commands: PathBlockCommand[]): number {
+  if (commands.length === 0) return 0;
+  let count = 1;
+  for (let i = 1; i < commands.length; i++) {
+    if (commands[i].command === 'm') count++;
+  }
+  return count;
+}
+
+/**
+ * Project a PathBlockValue's commands to absolute coordinates from a given origin
+ */
+function projectCommands(commands: PathBlockCommand[], originX: number, originY: number): PathBlockCommand[] {
+  return commands.map(cmd => ({
+    command: cmd.command,
+    args: [...cmd.args],
+    start: { x: cmd.start.x + originX, y: cmd.start.y + originY },
+    end: { x: cmd.end.x + originX, y: cmd.end.y + originY },
+  }));
+}
+
 function evaluateStyleBlockLiteral(expr: StyleBlockLiteral, scope: Scope): StyleBlockValue {
   const properties: Record<string, string> = {};
   for (const prop of expr.properties) {
@@ -552,9 +799,98 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
     case 'StyleBlockLiteral':
       return evaluateStyleBlockLiteral(expr, scope);
 
+    case 'PathBlockExpression':
+      return evaluatePathBlockExpression(expr as PathBlockExpression, scope);
+
     default:
       throw new Error(`Unknown expression type: ${(expr as Expression).type}`);
   }
+}
+
+/**
+ * Evaluate a PathBlockExpression — captures relative path commands into a PathBlockValue
+ */
+function evaluatePathBlockExpression(expr: PathBlockExpression, scope: Scope): PathBlockValue {
+  // Runtime restriction: no nesting path blocks
+  if (scope.evalState && (scope.evalState as EvaluationState & { _insidePathBlock?: boolean })._insidePathBlock) {
+    throw new Error(formatError('Cannot nest path blocks', getLine(expr)));
+  }
+
+  // Create an isolated PathContext at origin (0, 0) with history tracking
+  const blockContext = createPathContext({ trackHistory: true });
+
+  // Create a child scope for the block body
+  const blockScope = createScope(scope);
+
+  // Create an isolated evaluation state for the block
+  const blockEvalState: EvaluationState & { _insidePathBlock: boolean } = {
+    pathContext: blockContext,
+    logs: scope.evalState?.logs ?? [],
+    calledStdlibFunctions: scope.evalState?.calledStdlibFunctions ?? new Set(),
+    layers: new Map(), // Empty — layer definitions not allowed
+    layerOrder: [],
+    activeLayerName: null,
+    defaultLayerName: null,
+    transformState: createTransformState(),
+    _insidePathBlock: true,
+  };
+  blockScope.evalState = blockEvalState;
+
+  // Set ctx variable for the block's context
+  blockScope.variables.set('ctx', {
+    type: 'ContextObject' as const,
+    value: contextToObject(blockContext),
+  });
+
+  // Evaluate body, accumulating path command strings
+  const accum: string[] = [];
+  for (const stmt of expr.body) {
+    // Runtime restrictions
+    if (stmt.type === 'LayerDefinition') {
+      throw new Error(formatError('Layer definitions are not allowed inside path blocks', getLine(stmt)));
+    }
+    if (stmt.type === 'LayerApplyBlock') {
+      throw new Error(formatError('Layer apply blocks are not allowed inside path blocks', getLine(stmt)));
+    }
+    if (stmt.type === 'TextStatement') {
+      throw new Error(formatError('Text statements are not allowed inside path blocks', getLine(stmt)));
+    }
+
+    // Evaluate with a wrapper that enforces relative-only commands
+    evaluatePathBlockStatement(stmt, blockScope, accum);
+  }
+
+  // Build the PathBlockValue from accumulated commands
+  const commands: PathBlockCommand[] = blockContext.commands.map(entry => ({
+    command: entry.command,
+    args: [...entry.args],
+    start: { x: entry.start.x, y: entry.start.y },
+    end: { x: entry.end.x, y: entry.end.y },
+  }));
+
+  return {
+    type: 'PathBlockValue',
+    commands,
+    pathStrings: accum.filter(s => s.length > 0),
+    startPoint: { x: 0, y: 0 },
+    endPoint: { x: blockContext.position.x, y: blockContext.position.y },
+  };
+}
+
+/**
+ * Evaluate a statement inside a path block, enforcing relative-only constraint
+ */
+function evaluatePathBlockStatement(stmt: Statement, scope: Scope, accum: string[]): void {
+  if (stmt.type === 'PathCommand' && stmt.command !== '') {
+    // Enforce relative-only (lowercase) commands
+    if (stmt.command !== stmt.command.toLowerCase()) {
+      throw new Error(formatError(
+        `Absolute path command '${stmt.command}' is not allowed inside path blocks. Use lowercase '${stmt.command.toLowerCase()}' for relative commands`,
+        getLine(stmt)
+      ));
+    }
+  }
+  evaluateStatementToAccum(stmt, scope, accum);
 }
 
 function evaluateIndexExpression(expr: IndexExpression, scope: Scope): Value {
@@ -650,6 +986,78 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
     }
 
     throw new Error(`Unknown transform.${propRef.property} method: ${expr.method}`);
+  }
+
+  // PathBlockValue methods: draw(), project()
+  if (isPathBlockValue(obj)) {
+    // Check if we're inside a path block — draw/project not allowed there
+    if (scope.evalState && (scope.evalState as EvaluationState & { _insidePathBlock?: boolean })._insidePathBlock) {
+      throw new Error(`Cannot call .${expr.method}() inside a path block`);
+    }
+
+    switch (expr.method) {
+      case 'draw': {
+        if (expr.args.length !== 0) throw new Error('draw() expects 0 arguments');
+        if (!scope.evalState) throw new Error('draw() requires evaluation context');
+
+        // Get the current cursor position as the draw origin
+        const ctx = scope.evalState.pathContext;
+        // If there's a default layer active, use its context
+        let activeCtx = ctx;
+        if (scope.evalState.defaultLayerName && !scope.evalState.activeLayerName) {
+          const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName);
+          if (defaultLayer?.layerType === 'PathLayer') {
+            activeCtx = (defaultLayer as PathLayerState).pathContext;
+          }
+        }
+
+        const originX = activeCtx.position.x;
+        const originY = activeCtx.position.y;
+
+        // Emit relative path commands to the active accumulator
+        // The path strings are already relative, so we emit them directly
+        // The context tracking will handle position updates
+        const emittedCommands: string[] = [];
+        for (const pathStr of obj.pathStrings) {
+          emittedCommands.push(pathStr);
+          // Parse and track context for each command string
+          parseAndTrackPathString(pathStr, scope);
+        }
+
+        // Build the ProjectedPathValue with absolute coordinates
+        const projected: ProjectedPathValue = {
+          type: 'ProjectedPathValue',
+          commands: projectCommands(obj.commands, originX, originY),
+          startPoint: { x: obj.startPoint.x + originX, y: obj.startPoint.y + originY },
+          endPoint: { x: obj.endPoint.x + originX, y: obj.endPoint.y + originY },
+        };
+
+        // Return as PathWithResult — emits path AND returns ProjectedPath
+        return {
+          type: 'PathWithResult' as const,
+          path: emittedCommands.join(' '),
+          result: projected,
+        };
+      }
+
+      case 'project': {
+        if (expr.args.length !== 2) throw new Error('project() expects 2 arguments (x, y)');
+        const x = evaluateExpression(expr.args[0], scope);
+        const y = evaluateExpression(expr.args[1], scope);
+        if (typeof x !== 'number') throw new Error('project() x must be a number');
+        if (typeof y !== 'number') throw new Error('project() y must be a number');
+
+        return {
+          type: 'ProjectedPathValue' as const,
+          commands: projectCommands(obj.commands, x, y),
+          startPoint: { x: obj.startPoint.x + x, y: obj.startPoint.y + y },
+          endPoint: { x: obj.endPoint.x + x, y: obj.endPoint.y + y },
+        };
+      }
+
+      default:
+        throw new Error(`Unknown PathBlock method: ${expr.method}`);
+    }
   }
 
   // Point methods
@@ -847,6 +1255,12 @@ function formatValueForDisplay(val: Value): string {
   if (isPointValue(val)) {
     return `Point(${formatNum(val.x)}, ${formatNum(val.y)})`;
   }
+  if (isPathBlockValue(val)) {
+    return `PathBlock(${val.commands.length} commands)`;
+  }
+  if (isProjectedPathValue(val)) {
+    return `ProjectedPath(${formatNum(val.startPoint.x)}, ${formatNum(val.startPoint.y)} → ${formatNum(val.endPoint.x)}, ${formatNum(val.endPoint.y)})`;
+  }
   if (isObjectValue(val)) {
     const entries = Array.from(val.properties.entries())
       .map(([k, v]) => `${k}: ${formatValueForDisplay(v)}`);
@@ -874,6 +1288,56 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     if (expr.property === 'x') return obj.x;
     if (expr.property === 'y') return obj.y;
     throw new Error(`Property '${expr.property}' does not exist on Point`);
+  }
+
+  // Handle PathBlockValue property access
+  if (isPathBlockValue(obj)) {
+    switch (expr.property) {
+      case 'length': return calculatePathLength(obj.commands);
+      case 'vertices': return { type: 'ArrayValue' as const, elements: extractVertices(obj.commands) };
+      case 'subPathCount': return countSubPaths(obj.commands);
+      case 'subPathCommands': return {
+        type: 'ArrayValue' as const,
+        elements: obj.commands.map(cmd => ({
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['command', cmd.command],
+            ['args', { type: 'ArrayValue' as const, elements: cmd.args as Value[] }],
+            ['start', { type: 'PointValue' as const, x: cmd.start.x, y: cmd.start.y }],
+            ['end', { type: 'PointValue' as const, x: cmd.end.x, y: cmd.end.y }],
+          ]),
+        })),
+      };
+      case 'startPoint': return { type: 'PointValue' as const, x: obj.startPoint.x, y: obj.startPoint.y };
+      case 'endPoint': return { type: 'PointValue' as const, x: obj.endPoint.x, y: obj.endPoint.y };
+      default:
+        throw new Error(`Property '${expr.property}' does not exist on PathBlock`);
+    }
+  }
+
+  // Handle ProjectedPathValue property access
+  if (isProjectedPathValue(obj)) {
+    switch (expr.property) {
+      case 'length': return calculatePathLength(obj.commands);
+      case 'vertices': return { type: 'ArrayValue' as const, elements: extractVertices(obj.commands) };
+      case 'subPathCount': return countSubPaths(obj.commands);
+      case 'subPathCommands': return {
+        type: 'ArrayValue' as const,
+        elements: obj.commands.map(cmd => ({
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['command', cmd.command],
+            ['args', { type: 'ArrayValue' as const, elements: cmd.args as Value[] }],
+            ['start', { type: 'PointValue' as const, x: cmd.start.x, y: cmd.start.y }],
+            ['end', { type: 'PointValue' as const, x: cmd.end.x, y: cmd.end.y }],
+          ]),
+        })),
+      };
+      case 'startPoint': return { type: 'PointValue' as const, x: obj.startPoint.x, y: obj.startPoint.y };
+      case 'endPoint': return { type: 'PointValue' as const, x: obj.endPoint.x, y: obj.endPoint.y };
+      default:
+        throw new Error(`Property '${expr.property}' does not exist on ProjectedPath`);
+    }
   }
 
   // Handle TransformReference property access
@@ -1055,6 +1519,10 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
         } else if (isObjectValue(value)) {
           stringValue = formatValueForDisplay(value);
         } else if (isArrayValue(value)) {
+          stringValue = formatValueForDisplay(value);
+        } else if (isPathBlockValue(value)) {
+          stringValue = formatValueForDisplay(value);
+        } else if (isProjectedPathValue(value)) {
           stringValue = formatValueForDisplay(value);
         } else if (typeof value === 'object' && value !== null && 'type' in value) {
           const typed = value as { type: string; value?: unknown };
@@ -1261,6 +1729,14 @@ function evaluatePathArg(arg: PathArg, scope: Scope): string {
       }
       if (typeof value === 'number') {
         return formatNum(value);
+      }
+      if (typeof value === 'object' && value !== null && 'type' in value) {
+        if (value.type === 'PathSegment') {
+          return (value as PathSegment).value;
+        }
+        if (value.type === 'PathWithResult') {
+          return (value as PathWithResult).path;
+        }
       }
       throw new Error(`Method call did not return a valid path value`);
     }
@@ -1902,9 +2378,21 @@ function evaluateStatementToAccum(stmt: Statement, scope: Scope, accum: string[]
     }
 
     case 'PathCommand': {
-      // Method call statements: evaluate for side effects, don't emit return value
+      // Method call statements: evaluate for side effects, emit path if PathWithResult
       if (stmt.command === '' && stmt.args.length === 1 && stmt.args[0].type === 'MethodCallExpression') {
-        evaluateMethodCall(stmt.args[0] as MethodCallExpression, scope);
+        const methodResult = evaluateMethodCall(stmt.args[0] as MethodCallExpression, scope);
+        // If the method returns a PathWithResult (e.g., draw()), emit its path
+        if (typeof methodResult === 'object' && methodResult !== null && 'type' in methodResult && methodResult.type === 'PathWithResult') {
+          const pwr = methodResult as PathWithResult;
+          if (pwr.path) {
+            if (scope.evalState && scope.evalState.defaultLayerName && !scope.evalState.activeLayerName) {
+              const defaultLayer = scope.evalState.layers.get(scope.evalState.defaultLayerName)! as PathLayerState;
+              defaultLayer.accum.push(pwr.path);
+            } else {
+              accum.push(pwr.path);
+            }
+          }
+        }
         return;
       }
 

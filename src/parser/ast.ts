@@ -42,7 +42,8 @@ export type Node =
   | NumberLiteral
   | StringLiteral
   | TemplateLiteral
-  | StyleBlockLiteral;
+  | StyleBlockLiteral
+  | PathBlockExpression;
 
 export interface Program {
   type: 'Program';
@@ -293,6 +294,13 @@ export interface LayerApplyBlock {
   loc?: SourceLocation;
 }
 
+// Path block expression: @{ relative path commands }
+export interface PathBlockExpression {
+  type: 'PathBlockExpression';
+  body: Statement[];
+  loc?: SourceLocation;
+}
+
 export type Expression =
   | BinaryExpression
   | UnaryExpression
@@ -308,4 +316,5 @@ export type Expression =
   | NumberLiteral
   | StringLiteral
   | TemplateLiteral
-  | StyleBlockLiteral;
+  | StyleBlockLiteral
+  | PathBlockExpression;
