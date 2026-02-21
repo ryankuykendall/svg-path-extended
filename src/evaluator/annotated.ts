@@ -29,7 +29,7 @@ import { stdlib, contextAwareFunctions } from '../stdlib';
 import { createPathContext, contextToObject, updateContextForCommand, setLastTangent, type PathContext } from './context';
 import { expression as expressionParser } from '../parser';
 import { samplePathAtFraction, partitionPath } from './sampling';
-import { reverseCommands, computeBoundingBox, offsetCommands, commandToPathString } from './path-transforms';
+import { reverseCommands, computeBoundingBox, offsetCommands, commandToPathString, mirrorCommands, rotateAtVertexCommands } from './path-transforms';
 
 // Types for annotated output
 export type AnnotatedLine =
@@ -782,6 +782,83 @@ function evaluateAnnotatedPathTransforms(
           commands: offsetResult,
           startPoint: { x: oStart.x, y: oStart.y },
           endPoint: { x: oEnd.x, y: oEnd.y },
+        };
+      }
+    }
+
+    case 'mirror': {
+      if (expr.args.length !== 1) throw new Error('mirror() expects 1 argument (angle)');
+      const mAngle = evaluateExpression(expr.args[0], scope);
+      if (typeof mAngle !== 'number') throw new Error('mirror() argument must be a number');
+      if (isBlock) {
+        const mirrored = mirrorCommands(obj.commands, mAngle, { x: 0, y: 0 });
+        if (mirrored.length === 0) {
+          return { type: 'PathBlockValue' as const, commands: [], pathStrings: [], startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 } };
+        }
+        const mOriginX = mirrored[0].start.x;
+        const mOriginY = mirrored[0].start.y;
+        const mNormalized = mirrored.map(cmd => ({
+          command: cmd.command, args: [...cmd.args],
+          start: { x: cmd.start.x - mOriginX, y: cmd.start.y - mOriginY },
+          end: { x: cmd.end.x - mOriginX, y: cmd.end.y - mOriginY },
+        }));
+        const mLast = mNormalized[mNormalized.length - 1];
+        return {
+          type: 'PathBlockValue' as const,
+          commands: mNormalized,
+          pathStrings: mNormalized.map(c => commandToPathString(c)),
+          startPoint: { x: 0, y: 0 },
+          endPoint: { x: mLast.end.x, y: mLast.end.y },
+        };
+      } else {
+        const mirrored = mirrorCommands(obj.commands, mAngle, obj.startPoint);
+        const mStart = mirrored.length > 0 ? mirrored[0].start : obj.startPoint;
+        const mEnd = mirrored.length > 0 ? mirrored[mirrored.length - 1].end : obj.endPoint;
+        return {
+          type: 'ProjectedPathValue' as const,
+          commands: mirrored,
+          startPoint: { x: mStart.x, y: mStart.y },
+          endPoint: { x: mEnd.x, y: mEnd.y },
+        };
+      }
+    }
+
+    case 'rotateAtVertexIndex': {
+      if (expr.args.length !== 2) throw new Error('rotateAtVertexIndex() expects 2 arguments (index, angle)');
+      const rIdx = evaluateExpression(expr.args[0], scope);
+      const rAngle = evaluateExpression(expr.args[1], scope);
+      if (typeof rIdx !== 'number') throw new Error('rotateAtVertexIndex() index must be a number');
+      if (typeof rAngle !== 'number') throw new Error('rotateAtVertexIndex() angle must be a number');
+      if (!Number.isInteger(rIdx)) throw new Error('rotateAtVertexIndex() index must be an integer');
+      if (isBlock) {
+        const rotated = rotateAtVertexCommands(obj.commands, rIdx, rAngle);
+        if (rotated.length === 0) {
+          return { type: 'PathBlockValue' as const, commands: [], pathStrings: [], startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 } };
+        }
+        const rOriginX = rotated[0].start.x;
+        const rOriginY = rotated[0].start.y;
+        const rNormalized = rotated.map(cmd => ({
+          command: cmd.command, args: [...cmd.args],
+          start: { x: cmd.start.x - rOriginX, y: cmd.start.y - rOriginY },
+          end: { x: cmd.end.x - rOriginX, y: cmd.end.y - rOriginY },
+        }));
+        const rLast = rNormalized[rNormalized.length - 1];
+        return {
+          type: 'PathBlockValue' as const,
+          commands: rNormalized,
+          pathStrings: rNormalized.map(c => commandToPathString(c)),
+          startPoint: { x: 0, y: 0 },
+          endPoint: { x: rLast.end.x, y: rLast.end.y },
+        };
+      } else {
+        const rotated = rotateAtVertexCommands(obj.commands, rIdx, rAngle);
+        const rStart = rotated.length > 0 ? rotated[0].start : obj.startPoint;
+        const rEnd = rotated.length > 0 ? rotated[rotated.length - 1].end : obj.endPoint;
+        return {
+          type: 'ProjectedPathValue' as const,
+          commands: rotated,
+          startPoint: { x: rStart.x, y: rStart.y },
+          endPoint: { x: rEnd.x, y: rEnd.y },
         };
       }
     }

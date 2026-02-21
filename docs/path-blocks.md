@@ -272,6 +272,58 @@ M 0 50
 parallel.draw()              // parallel curve 3 units to the left
 ```
 
+### `mirror(angle)` → PathBlock / ProjectedPath
+
+Reflects the path across a line through the start point at the given angle. The angle uses standard language units (radians).
+
+```
+let p = @{ h 60 v 40 };
+let m = p.mirror(0.5pi);       // reflect across vertical axis → goes left
+M 100 100
+m.draw()
+```
+
+Common angles:
+- `mirror(0)` — horizontal axis (y → -y)
+- `mirror(0.5pi)` — vertical axis (x → -x)
+- `mirror(0.25pi)` — diagonal (swaps x and y)
+
+Mirror preserves path length and curve types. Arc commands have their sweep flag flipped (reflection reverses chirality) and their rotation parameter adjusted.
+
+```
+let curve = @{ c 0 -40 50 -40 50 0 };
+let flipped = curve.mirror(0);
+M 0 50
+curve.draw()
+M 0 50
+flipped.draw()               // curve reflected below the axis
+```
+
+### `rotateAtVertexIndex(index, angle)` → PathBlock / ProjectedPath
+
+Rotates the path around the vertex at `index` (from the `.vertices` array) by `angle` radians. PathBlockValue results are normalized to `(0, 0)` start.
+
+```
+let p = @{ h 50 v 50 };
+// p.vertices = [Point(0,0), Point(50,0), Point(50,50)]
+let r = p.rotateAtVertexIndex(1, 0.5pi);  // rotate around corner
+M 10 10
+r.draw()
+```
+
+The index must be a non-negative integer within range. The rotation preserves path length and curve types. Arc commands have their rotation parameter adjusted.
+
+```
+// Create a radial pattern by rotating around the first vertex
+let arm = @{ h 50 v 10 };
+for (i in 0..5) {
+  let angle = calc(i * 2 * 3.14159265358979 / 6);
+  let r = arm.rotateAtVertexIndex(0, angle);
+  M 100 100
+  r.draw()
+}
+```
+
 ### Transforms on ProjectedPath
 
 Projected paths return results in absolute coordinates:
@@ -286,10 +338,21 @@ let rev = proj.reverse();
 log(rev.startPoint);         // Point(110, 20) — starts at original end
 ```
 
+For `mirror()` on a ProjectedPath, the mirror line passes through the projection's start point. For `rotateAtVertexIndex()`, the rotation center is the absolute vertex position.
+
+```
+let p = @{ h 50 };
+let proj = p.project(100, 100);
+let m = proj.mirror(0.5pi);
+// Mirrors across vertical line through (100, 100)
+// startPoint stays at (100, 100), endPoint moves to (50, 100)
+```
+
 ## Implementation Phases
 
 Path Blocks are being implemented in phases:
 
 - **Phase 1**: Core definition, `draw()`, `project()`, basic properties
 - **Phase 2**: Parametric sampling — `get(t)`, `tangent(t)`, `normal(t)`, `partition(n)`
-- **Phase 3** (current): Transforms — `reverse()`, `offset(distance)`, `boundingBox()`
+- **Phase 3**: Transforms — `reverse()`, `offset(distance)`, `boundingBox()`
+- **Phase 4** (current): Affine transforms — `mirror(angle)`, `rotateAtVertexIndex(index, angle)`

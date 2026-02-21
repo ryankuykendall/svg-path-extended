@@ -1003,5 +1003,221 @@ describe('Path Blocks', () => {
           .toThrow(/must be a number/);
       });
     });
+
+    describe('mirror()', () => {
+      it('horizontal line mirrored across vertical axis', () => {
+        const result = compile(`
+          let p = @{ h 50 };
+          let m = p.mirror(calc(90 * 3.14159265358979 / 180));
+          log(m.endPoint);
+        `);
+        const ep = result.logs[0].parts[0].value;
+        // mirror(90deg) across vertical: x → -x, y → y
+        expect(ep).toMatch(/Point\(-50/);
+      });
+
+      it('L-shaped path mirrored across 45deg swaps x and y', () => {
+        const result = compile(`
+          let p = @{ h 30 v 0 };
+          let m = p.mirror(calc(45 * 3.14159265358979 / 180));
+          log(m.endPoint.x, m.endPoint.y);
+        `);
+        // mirror(45deg): swaps x and y → (30, 0) → (0, 30)
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(0, 5);
+        expect(Number(result.logs[0].parts[1].value)).toBeCloseTo(30, 5);
+      });
+
+      it('preserves total length', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          log(p.length, p.mirror(calc(90 * 3.14159265358979 / 180)).length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const mirLen = Number(result.logs[0].parts[1].value);
+        expect(mirLen).toBeCloseTo(origLen, 5);
+      });
+
+      it('startPoint always (0,0) for PathBlockValue', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let m = p.mirror(calc(90 * 3.14159265358979 / 180));
+          log(m.startPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(0, 0)');
+      });
+
+      it('mirrors cubic bezier (length preserved)', () => {
+        const result = compile(`
+          let p = @{ c 0 -40 50 -40 50 0 };
+          let m = p.mirror(calc(90 * 3.14159265358979 / 180));
+          log(p.length, m.length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const mirLen = Number(result.logs[0].parts[1].value);
+        expect(mirLen).toBeCloseTo(origLen, 0);
+      });
+
+      it('arc sweep flag flips', () => {
+        // a 25 25 0 0 1 50 0 → after mirror, sweep should be 0
+        const result = compile(`
+          let p = @{ a 25 25 0 0 1 50 0 };
+          let m = p.mirror(calc(90 * 3.14159265358979 / 180));
+          log(m.length);
+        `);
+        // Should not throw and length should be positive
+        expect(Number(result.logs[0].parts[0].value)).toBeGreaterThan(0);
+      });
+
+      it('can draw result', () => {
+        const path = compilePath(`
+          let p = @{ h 50 v 30 };
+          let m = p.mirror(calc(90 * 3.14159265358979 / 180));
+          M 100 100
+          m.draw()
+        `);
+        expect(path).toContain('M 100 100');
+        expect(path.length).toBeGreaterThan('M 100 100'.length);
+      });
+
+      it('works on ProjectedPathValue (mirror line through startPoint)', () => {
+        const result = compile(`
+          let p = @{ h 50 };
+          let proj = p.project(100, 100);
+          let m = proj.mirror(calc(90 * 3.14159265358979 / 180));
+          log(m.startPoint.x, m.startPoint.y, m.endPoint.x, m.endPoint.y);
+        `);
+        // Mirror across vertical through (100,100): startPoint stays, endPoint.x reflects
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(100, 5);
+        expect(Number(result.logs[0].parts[1].value)).toBeCloseTo(100, 5);
+        expect(Number(result.logs[0].parts[2].value)).toBeCloseTo(50, 5);
+        expect(Number(result.logs[0].parts[3].value)).toBeCloseTo(100, 5);
+      });
+
+      it('throws error with 0 arguments', () => {
+        expect(() => compile('let p = @{ h 50 }; p.mirror();'))
+          .toThrow(/1 argument/);
+      });
+
+      it('throws error with non-number argument', () => {
+        expect(() => compile('let p = @{ h 50 }; p.mirror("abc");'))
+          .toThrow(/must be a number/);
+      });
+    });
+
+    describe('rotateAtVertexIndex()', () => {
+      it('rotate L-shape around vertex 0 (origin) by 90deg', () => {
+        const result = compile(`
+          let p = @{ h 50 v 50 };
+          let r = p.rotateAtVertexIndex(0, calc(90 * 3.14159265358979 / 180));
+          log(r.endPoint.x, r.endPoint.y);
+        `);
+        // Original vertices: (0,0), (50,0), (50,50)
+        // Rotated around (0,0): (0,0), (0,50), (-50,50) → endPoint = (-50, 50)
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(-50, 5);
+        expect(Number(result.logs[0].parts[1].value)).toBeCloseTo(50, 5);
+      });
+
+      it('rotate around vertex 1 (corner) by 90deg', () => {
+        const result = compile(`
+          let p = @{ h 50 v 50 };
+          let r = p.rotateAtVertexIndex(1, calc(90 * 3.14159265358979 / 180));
+          log(r.endPoint.x, r.endPoint.y);
+        `);
+        // Vertices: (0,0)→idx0, (50,0)→idx1, (50,50)→idx2
+        // Rotate around (50,0): (0,0)→(50,-50), (50,0)→(50,0), (50,50)→(0,0)
+        // Normalized: origin at first cmd start (50,-50), endPoint = (0,0)-(50,-50) = (-50,50)
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(-50, 5);
+        expect(Number(result.logs[0].parts[1].value)).toBeCloseTo(50, 5);
+      });
+
+      it('rotate around last vertex by 180deg', () => {
+        const result = compile(`
+          let p = @{ h 50 v 50 };
+          let r = p.rotateAtVertexIndex(2, calc(180 * 3.14159265358979 / 180));
+          log(r.endPoint.x, r.endPoint.y);
+        `);
+        // Vertices: (0,0), (50,0), (50,50)
+        // Rotate around (50,50) by 180: (0,0)→(100,100), (50,0)→(50,100), (50,50)→(50,50)
+        // Normalized: origin at (100,100), endPoint = (50,50)-(100,100) = (-50,-50)
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(-50, 5);
+        expect(Number(result.logs[0].parts[1].value)).toBeCloseTo(-50, 5);
+      });
+
+      it('preserves total length', () => {
+        const result = compile(`
+          let p = @{ h 50 v 50 };
+          log(p.length, p.rotateAtVertexIndex(0, calc(45 * 3.14159265358979 / 180)).length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const rotLen = Number(result.logs[0].parts[1].value);
+        expect(rotLen).toBeCloseTo(origLen, 5);
+      });
+
+      it('arc rotation parameter adjusts', () => {
+        // Arc with 0 rotation, rotated by 45deg should have rotation ~45
+        const result = compile(`
+          let p = @{ a 25 25 0 0 1 50 0 };
+          let r = p.rotateAtVertexIndex(0, calc(45 * 3.14159265358979 / 180));
+          log(r.length);
+        `);
+        expect(Number(result.logs[0].parts[0].value)).toBeGreaterThan(0);
+      });
+
+      it('startPoint always (0,0) for PathBlockValue', () => {
+        const result = compile(`
+          let p = @{ h 50 v 50 };
+          let r = p.rotateAtVertexIndex(1, calc(90 * 3.14159265358979 / 180));
+          log(r.startPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(0, 0)');
+      });
+
+      it('can draw result', () => {
+        const path = compilePath(`
+          let p = @{ h 50 v 50 };
+          let r = p.rotateAtVertexIndex(0, calc(45 * 3.14159265358979 / 180));
+          M 100 100
+          r.draw()
+        `);
+        expect(path).toContain('M 100 100');
+        expect(path.length).toBeGreaterThan('M 100 100'.length);
+      });
+
+      it('works on ProjectedPathValue', () => {
+        const result = compile(`
+          let p = @{ h 50 v 50 };
+          let proj = p.project(100, 100);
+          let r = proj.rotateAtVertexIndex(0, calc(90 * 3.14159265358979 / 180));
+          log(r.startPoint);
+        `);
+        // Vertex 0 for projected is (100,100), rotation around it keeps it fixed
+        expect(result.logs[0].parts[0].value).toBe('Point(100, 100)');
+      });
+
+      it('throws error with negative index', () => {
+        expect(() => compile('let p = @{ h 50 }; p.rotateAtVertexIndex(-1, 0);'))
+          .toThrow(/out of range/);
+      });
+
+      it('throws error with out-of-range index', () => {
+        expect(() => compile('let p = @{ h 50 }; p.rotateAtVertexIndex(5, 0);'))
+          .toThrow(/out of range/);
+      });
+
+      it('throws error with non-integer index', () => {
+        expect(() => compile('let p = @{ h 50 }; p.rotateAtVertexIndex(1.5, 0);'))
+          .toThrow(/must be an integer/);
+      });
+
+      it('throws error with wrong arg count', () => {
+        expect(() => compile('let p = @{ h 50 }; p.rotateAtVertexIndex(0);'))
+          .toThrow(/2 arguments/);
+      });
+
+      it('throws error with non-number angle', () => {
+        expect(() => compile('let p = @{ h 50 }; p.rotateAtVertexIndex(0, "abc");'))
+          .toThrow(/must be a number/);
+      });
+    });
   });
 });

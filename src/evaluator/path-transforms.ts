@@ -826,3 +826,246 @@ function getStartTangent(cmd: TransformCmd): Point {
   if (len < 1e-12) return { x: 1, y: 0 };
   return { x: dx / len, y: dy / len };
 }
+
+// ---- Shared affine transform helper ----
+
+/**
+ * Apply a point transform to every coordinate in the path, then recompute relative args.
+ * Does NOT touch arc rotation or sweep — those are handled by callers.
+ */
+function transformPathPoints(
+  commands: TransformCmd[],
+  transformPoint: (p: Point) => Point
+): TransformCmd[] {
+  const result: TransformCmd[] = [];
+
+  for (const cmd of commands) {
+    const upper = cmd.command.toUpperCase();
+    const newStart = transformPoint(cmd.start);
+    const newEnd = transformPoint(cmd.end);
+
+    switch (upper) {
+      case 'L':
+      case 'H':
+      case 'V': {
+        // Always emit as 'l' since transform can rotate axes, breaking H/V constraint
+        result.push({
+          command: 'l',
+          args: [newEnd.x - newStart.x, newEnd.y - newStart.y],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+      case 'C': {
+        // Transform start, CP1 (start+x1,y1), CP2 (start+x2,y2), end
+        const [x1, y1, x2, y2] = cmd.args;
+        const cp1Abs = { x: cmd.start.x + x1, y: cmd.start.y + y1 };
+        const cp2Abs = { x: cmd.start.x + x2, y: cmd.start.y + y2 };
+        const newCp1 = transformPoint(cp1Abs);
+        const newCp2 = transformPoint(cp2Abs);
+        result.push({
+          command: 'c',
+          args: [
+            newCp1.x - newStart.x, newCp1.y - newStart.y,
+            newCp2.x - newStart.x, newCp2.y - newStart.y,
+            newEnd.x - newStart.x, newEnd.y - newStart.y,
+          ],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+      case 'Q': {
+        // Transform start, CP (start+x1,y1), end
+        const [x1, y1] = cmd.args;
+        const cpAbs = { x: cmd.start.x + x1, y: cmd.start.y + y1 };
+        const newCp = transformPoint(cpAbs);
+        result.push({
+          command: 'q',
+          args: [
+            newCp.x - newStart.x, newCp.y - newStart.y,
+            newEnd.x - newStart.x, newEnd.y - newStart.y,
+          ],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+      case 'S': {
+        // Transform start, CP2 (start+x2,y2), end — smooth relationship preserved by linearity
+        const [x2, y2] = cmd.args;
+        const cp2Abs = { x: cmd.start.x + x2, y: cmd.start.y + y2 };
+        const newCp2 = transformPoint(cp2Abs);
+        result.push({
+          command: 's',
+          args: [
+            newCp2.x - newStart.x, newCp2.y - newStart.y,
+            newEnd.x - newStart.x, newEnd.y - newStart.y,
+          ],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+      case 'T': {
+        // Transform start, end — smooth relationship preserved by linearity
+        result.push({
+          command: 't',
+          args: [newEnd.x - newStart.x, newEnd.y - newStart.y],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+      case 'A': {
+        // Transform start, end. Recompute dx/dy. rx, ry, largeArc preserved.
+        // Rotation and sweep handled by caller (mirrorCommands / rotateAtVertexCommands).
+        const [rx, ry, rotation, largeArc, sweep] = cmd.args;
+        result.push({
+          command: 'a',
+          args: [rx, ry, rotation, largeArc, sweep, newEnd.x - newStart.x, newEnd.y - newStart.y],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+      case 'Z': {
+        result.push({
+          command: 'z',
+          args: [],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+      case 'M': {
+        result.push({
+          command: 'm',
+          args: [newEnd.x - newStart.x, newEnd.y - newStart.y],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+      default: {
+        result.push({
+          command: cmd.command,
+          args: [newEnd.x - newStart.x, newEnd.y - newStart.y],
+          start: newStart,
+          end: newEnd,
+        });
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+// ---- extractVerticesFromCommands ----
+
+/**
+ * Extract unique vertices (start/end points of each segment) as plain Points.
+ */
+export function extractVerticesFromCommands(commands: TransformCmd[]): Point[] {
+  if (commands.length === 0) return [];
+
+  const vertices: Point[] = [];
+  const seen = new Set<string>();
+
+  for (const cmd of commands) {
+    const startKey = `${cmd.start.x},${cmd.start.y}`;
+    if (!seen.has(startKey)) {
+      seen.add(startKey);
+      vertices.push({ x: cmd.start.x, y: cmd.start.y });
+    }
+    const endKey = `${cmd.end.x},${cmd.end.y}`;
+    if (!seen.has(endKey)) {
+      seen.add(endKey);
+      vertices.push({ x: cmd.end.x, y: cmd.end.y });
+    }
+  }
+
+  return vertices;
+}
+
+// ---- mirror ----
+
+/**
+ * Reflect path across a line through `center` at angle `angle` (radians).
+ * Reflection formula: P' = C + (dx·cos2θ + dy·sin2θ, dx·sin2θ - dy·cos2θ)
+ */
+export function mirrorCommands(
+  commands: TransformCmd[],
+  angle: number,
+  center: Point
+): TransformCmd[] {
+  const cos2a = Math.cos(2 * angle);
+  const sin2a = Math.sin(2 * angle);
+
+  const transformPoint = (p: Point): Point => {
+    const dx = p.x - center.x;
+    const dy = p.y - center.y;
+    return {
+      x: center.x + dx * cos2a + dy * sin2a,
+      y: center.y + dx * sin2a - dy * cos2a,
+    };
+  };
+
+  const result = transformPathPoints(commands, transformPoint);
+
+  // Post-process arc commands: flip sweep, adjust rotation
+  const angleDeg = angle * 180 / Math.PI;
+  for (const cmd of result) {
+    if (cmd.command.toUpperCase() === 'A') {
+      cmd.args[4] = 1 - cmd.args[4];              // flip sweep flag
+      cmd.args[2] = 2 * angleDeg - cmd.args[2];   // adjust rotation
+    }
+  }
+
+  return result;
+}
+
+// ---- rotateAtVertexIndex ----
+
+/**
+ * Rotate path around the vertex at `vertexIndex` by `angle` (radians).
+ * Rotation formula: P' = V + (dx·cosθ - dy·sinθ, dx·sinθ + dy·cosθ)
+ */
+export function rotateAtVertexCommands(
+  commands: TransformCmd[],
+  vertexIndex: number,
+  angle: number
+): TransformCmd[] {
+  const vertices = extractVerticesFromCommands(commands);
+
+  if (vertexIndex < 0 || vertexIndex >= vertices.length) {
+    throw new Error(`rotateAtVertexIndex() vertex index ${vertexIndex} out of range [0, ${vertices.length - 1}]`);
+  }
+
+  const center = vertices[vertexIndex];
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+
+  const transformPoint = (p: Point): Point => {
+    const dx = p.x - center.x;
+    const dy = p.y - center.y;
+    return {
+      x: center.x + dx * cosA - dy * sinA,
+      y: center.y + dx * sinA + dy * cosA,
+    };
+  };
+
+  const result = transformPathPoints(commands, transformPoint);
+
+  // Post-process arc commands: adjust rotation (sweep unchanged)
+  const angleDeg = angle * 180 / Math.PI;
+  for (const cmd of result) {
+    if (cmd.command.toUpperCase() === 'A') {
+      cmd.args[2] = cmd.args[2] + angleDeg;   // adjust rotation
+    }
+  }
+
+  return result;
+}
