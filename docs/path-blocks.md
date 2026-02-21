@@ -209,10 +209,87 @@ let mid = proj.get(0.5);    // Point(60, 20) — offset by projection origin
 
 Sampling works on all command types including cubic/quadratic Bézier curves and arcs. Curves use arc-length parameterization so that `t = 0.5` always represents the geometric midpoint, not the parametric midpoint.
 
+## Transforms
+
+Transforms create new paths from existing ones — reversing direction, computing bounding boxes, and constructing parallel paths. These methods work on both PathBlock values and ProjectedPath values.
+
+### `reverse()` → PathBlock / ProjectedPath
+
+Returns a new path with reversed direction of travel. The reversed path starts where the original ended and ends where the original started.
+
+```
+let p = @{ h 50 v 30 };
+let r = p.reverse();
+log(r.endPoint);             // Point(-50, -30) — reversed from original
+M 100 100
+r.draw()                     // draws the path in reverse
+```
+
+Smooth commands (S/T) are automatically converted to their explicit forms (C/Q) before reversal. Closed paths (ending with `z`) preserve closure.
+
+```
+let closed = @{ h 30 v 30 h -30 z };
+let rev = closed.reverse();  // reversed, still ends with z
+```
+
+### `boundingBox()` → `{ x, y, width, height }`
+
+Returns the axis-aligned bounding box of the path. Accounts for Bézier curve extrema and arc extrema — not just endpoints.
+
+```
+let p = @{ c 0 -40 50 -40 50 0 };
+let bb = p.boundingBox();
+log(bb.y);                    // negative — curve extends above endpoints
+log(bb.width, bb.height);    // full extent of the curve
+```
+
+For a straight-line path the bounding box matches the endpoint coordinates:
+
+```
+let line = @{ h 100 };
+let bb = line.boundingBox();
+// bb = { x: 0, y: 0, width: 100, height: 0 }
+```
+
+### `offset(distance)` → PathBlock / ProjectedPath
+
+Creates a parallel path offset by `distance` units. Positive values offset to the left of the travel direction, negative to the right.
+
+```
+let p = @{ h 60 v 40 };
+let outer = p.offset(5);     // 5 units left of travel
+let inner = p.offset(-5);    // 5 units right of travel
+```
+
+Offset preserves curve types — cubic Béziers produce offset cubics, arcs produce offset arcs with adjusted radii. Segment joins use miter joins with a limit of 4× the offset distance.
+
+```
+let curve = @{ c 0 -40 50 -40 50 0 };
+let parallel = curve.offset(3);
+M 0 50
+curve.draw()
+M 0 50
+parallel.draw()              // parallel curve 3 units to the left
+```
+
+### Transforms on ProjectedPath
+
+Projected paths return results in absolute coordinates:
+
+```
+let p = @{ h 100 };
+let proj = p.project(10, 20);
+let bb = proj.boundingBox();
+// bb.x = 10, bb.y = 20 — absolute coordinates
+
+let rev = proj.reverse();
+log(rev.startPoint);         // Point(110, 20) — starts at original end
+```
+
 ## Implementation Phases
 
 Path Blocks are being implemented in phases:
 
 - **Phase 1**: Core definition, `draw()`, `project()`, basic properties
-- **Phase 2** (current): Parametric sampling — `get(t)`, `tangent(t)`, `normal(t)`, `partition(n)`
-- **Phase 3**: Transforms — `reverse()`, `offset(distance)`, `boundingBox()`
+- **Phase 2**: Parametric sampling — `get(t)`, `tangent(t)`, `normal(t)`, `partition(n)`
+- **Phase 3** (current): Transforms — `reverse()`, `offset(distance)`, `boundingBox()`

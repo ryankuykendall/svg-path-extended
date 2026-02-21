@@ -730,4 +730,278 @@ describe('Path Blocks', () => {
       });
     });
   });
+
+  describe('transforms', () => {
+    describe('reverse()', () => {
+      it('reverses a horizontal line', () => {
+        const result = compile(`
+          let p = @{ h 50 };
+          let r = p.reverse();
+          log(r.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(-50, 0)');
+      });
+
+      it('reverses a multi-segment path', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let r = p.reverse();
+          log(r.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(-50, -30)');
+      });
+
+      it('preserves total length', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          log(p.length, p.reverse().length);
+        `);
+        expect(result.logs[0].parts[0].value).toBe(result.logs[0].parts[1].value);
+      });
+
+      it('startPoint of reversed PathBlock is always (0, 0)', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let r = p.reverse();
+          log(r.startPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(0, 0)');
+      });
+
+      it('preserves z on closed path', () => {
+        const result = compile(`
+          let p = @{ h 30 v 30 h -30 z };
+          let r = p.reverse();
+          M 10 10
+          r.draw()
+        `);
+        const path = compilePath(`
+          let p = @{ h 30 v 30 h -30 z };
+          let r = p.reverse();
+          M 10 10
+          r.draw()
+        `);
+        expect(path).toContain('z');
+      });
+
+      it('reverses cubic bezier', () => {
+        const result = compile(`
+          let p = @{ c 0 -40 50 -40 50 0 };
+          log(p.length, p.reverse().length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const revLen = Number(result.logs[0].parts[1].value);
+        expect(revLen).toBeCloseTo(origLen, 0);
+      });
+
+      it('reverses quadratic bezier', () => {
+        const result = compile(`
+          let p = @{ q 25 -40 50 0 };
+          log(p.length, p.reverse().length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const revLen = Number(result.logs[0].parts[1].value);
+        expect(revLen).toBeCloseTo(origLen, 0);
+      });
+
+      it('reverses arc', () => {
+        const result = compile(`
+          let p = @{ a 25 25 0 0 1 50 0 };
+          log(p.length, p.reverse().length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const revLen = Number(result.logs[0].parts[1].value);
+        expect(revLen).toBeCloseTo(origLen, 0);
+      });
+
+      it('converts S to C before reversal', () => {
+        const result = compile(`
+          let p = @{ c 10 -20 30 -20 40 0 s 30 20 40 0 };
+          let r = p.reverse();
+          log(r.endPoint);
+          log(r.length);
+        `);
+        // Reversed endpoint should be (-80, 0) — the negation of original endpoint
+        expect(result.logs[0].parts[0].value).toBe('Point(-80, 0)');
+        // Reversed path should have positive length
+        expect(Number(result.logs[1].parts[0].value)).toBeGreaterThan(0);
+      });
+
+      it('can draw reversed path', () => {
+        const path = compilePath(`
+          let p = @{ h 50 v 30 };
+          let r = p.reverse();
+          M 100 100
+          r.draw()
+        `);
+        expect(path).toContain('M 100 100');
+        expect(path.length).toBeGreaterThan('M 100 100'.length);
+      });
+
+      it('works on ProjectedPathValue', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let proj = p.project(10, 20);
+          let r = proj.reverse();
+          log(r.startPoint, r.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(60, 50)');
+        expect(result.logs[0].parts[1].value).toBe('Point(10, 20)');
+      });
+
+      it('throws error with arguments', () => {
+        expect(() => compile('let p = @{ h 50 }; p.reverse(1);'))
+          .toThrow(/0 arguments/);
+      });
+    });
+
+    describe('boundingBox()', () => {
+      it('bounding box of horizontal line', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let bb = p.boundingBox();
+          log(bb.x, bb.y, bb.width, bb.height);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[0].parts[1].value).toBe('0');
+        expect(result.logs[0].parts[2].value).toBe('100');
+        expect(result.logs[0].parts[3].value).toBe('0');
+      });
+
+      it('bounding box of L-shaped path', () => {
+        const result = compile(`
+          let p = @{ v 30 h 50 };
+          let bb = p.boundingBox();
+          log(bb.x, bb.y, bb.width, bb.height);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[0].parts[1].value).toBe('0');
+        expect(result.logs[0].parts[2].value).toBe('50');
+        expect(result.logs[0].parts[3].value).toBe('30');
+      });
+
+      it('bounding box with negative coords', () => {
+        const result = compile(`
+          let p = @{ h -50 v -30 };
+          let bb = p.boundingBox();
+          log(bb.x, bb.y, bb.width, bb.height);
+        `);
+        expect(Number(result.logs[0].parts[0].value)).toBe(-50);
+        expect(Number(result.logs[0].parts[1].value)).toBe(-30);
+        expect(result.logs[0].parts[2].value).toBe('50');
+        expect(result.logs[0].parts[3].value).toBe('30');
+      });
+
+      it('cubic bezier extrema extend beyond endpoints', () => {
+        const result = compile(`
+          let p = @{ c 0 -40 50 -40 50 0 };
+          let bb = p.boundingBox();
+          log(bb.y);
+        `);
+        // Curve extends above (negative y) beyond the endpoints
+        expect(Number(result.logs[0].parts[0].value)).toBeLessThan(0);
+      });
+
+      it('bounding box of closed path', () => {
+        const result = compile(`
+          let p = @{ h 40 v 20 h -40 z };
+          let bb = p.boundingBox();
+          log(bb.x, bb.y, bb.width, bb.height);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('0');
+        expect(result.logs[0].parts[1].value).toBe('0');
+        expect(result.logs[0].parts[2].value).toBe('40');
+        expect(result.logs[0].parts[3].value).toBe('20');
+      });
+
+      it('bounding box on ProjectedPath has absolute coords', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let proj = p.project(10, 20);
+          let bb = proj.boundingBox();
+          log(bb.x, bb.y, bb.width, bb.height);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('10');
+        expect(result.logs[0].parts[1].value).toBe('20');
+        expect(result.logs[0].parts[2].value).toBe('100');
+        expect(result.logs[0].parts[3].value).toBe('0');
+      });
+
+      it('throws error with arguments', () => {
+        expect(() => compile('let p = @{ h 50 }; p.boundingBox(1);'))
+          .toThrow(/0 arguments/);
+      });
+    });
+
+    describe('offset()', () => {
+      it('horizontal line offset preserves length', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let o = p.offset(5);
+          log(p.length, o.length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const offLen = Number(result.logs[0].parts[1].value);
+        expect(offLen).toBeCloseTo(origLen, 0);
+      });
+
+      it('L-shaped path offset has positive length', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let o = p.offset(5);
+          log(o.length);
+        `);
+        expect(Number(result.logs[0].parts[0].value)).toBeGreaterThan(0);
+      });
+
+      it('negative offset goes to the right', () => {
+        // For a rightward horizontal line projected at (0, 50):
+        // positive offset = above (left-hand), negative = below (right-hand)
+        const result = compile(`
+          let p = @{ h 100 };
+          let proj = p.project(0, 50);
+          let pos = proj.offset(5);
+          let neg = proj.offset(-5);
+          log(pos.startPoint.y, neg.startPoint.y);
+        `);
+        // Positive offset: y should be less than 50 (above for rightward path)
+        expect(Number(result.logs[0].parts[0].value)).toBeLessThan(50);
+        // Negative offset: y should be greater than 50 (below)
+        expect(Number(result.logs[0].parts[1].value)).toBeGreaterThan(50);
+      });
+
+      it('can draw offset path', () => {
+        const path = compilePath(`
+          let p = @{ h 60 v 40 };
+          let o = p.offset(5);
+          M 10 10
+          o.draw()
+        `);
+        expect(path).toContain('M 10 10');
+        expect(path.length).toBeGreaterThan('M 10 10'.length);
+      });
+
+      it('works on ProjectedPathValue', () => {
+        const result = compile(`
+          let p = @{ h 100 };
+          let proj = p.project(10, 20);
+          let o = proj.offset(5);
+          log(o.startPoint.x, o.startPoint.y);
+        `);
+        // Offset of rightward line by +5 moves start up (y - 5)
+        expect(Number(result.logs[0].parts[0].value)).toBe(10);
+        expect(Number(result.logs[0].parts[1].value)).toBe(15);
+      });
+
+      it('throws error with 0 arguments', () => {
+        expect(() => compile('let p = @{ h 50 }; p.offset();'))
+          .toThrow(/1 argument/);
+      });
+
+      it('throws error with non-number argument', () => {
+        expect(() => compile('let p = @{ h 50 }; p.offset("abc");'))
+          .toThrow(/must be a number/);
+      });
+    });
+  });
 });

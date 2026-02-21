@@ -41,6 +41,7 @@ import {
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 import { calculateCommandLength, calculatePathLength, samplePathAtFraction, partitionPath } from './sampling';
+import { reverseCommands, computeBoundingBox, offsetCommands, commandToPathString } from './path-transforms';
 
 export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference | ObjectValue | ObjectNamespace | PathBlockValue | ProjectedPathValue;
 
@@ -959,6 +960,69 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
         };
       }
 
+      case 'reverse': {
+        if (expr.args.length !== 0) throw new Error('reverse() expects 0 arguments');
+        const reversed = reverseCommands(obj.commands);
+        // Normalize to (0,0) origin for PathBlockValue
+        if (reversed.length === 0) {
+          return { type: 'PathBlockValue' as const, commands: [], pathStrings: [], startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 } };
+        }
+        const originX = reversed[0].start.x;
+        const originY = reversed[0].start.y;
+        const normalizedCmds = reversed.map(cmd => ({
+          command: cmd.command,
+          args: [...cmd.args],
+          start: { x: cmd.start.x - originX, y: cmd.start.y - originY },
+          end: { x: cmd.end.x - originX, y: cmd.end.y - originY },
+        }));
+        const lastCmd = normalizedCmds[normalizedCmds.length - 1];
+        return {
+          type: 'PathBlockValue' as const,
+          commands: normalizedCmds,
+          pathStrings: normalizedCmds.map(c => commandToPathString(c)),
+          startPoint: { x: 0, y: 0 },
+          endPoint: { x: lastCmd.end.x, y: lastCmd.end.y },
+        };
+      }
+
+      case 'boundingBox': {
+        if (expr.args.length !== 0) throw new Error('boundingBox() expects 0 arguments');
+        const bb = computeBoundingBox(obj.commands);
+        return {
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['x', bb.x], ['y', bb.y], ['width', bb.width], ['height', bb.height],
+          ]),
+        };
+      }
+
+      case 'offset': {
+        if (expr.args.length !== 1) throw new Error('offset() expects 1 argument (distance)');
+        const dist = evaluateExpression(expr.args[0], scope);
+        if (typeof dist !== 'number') throw new Error('offset() argument must be a number');
+        const offsetResult = offsetCommands(obj.commands, dist);
+        // Normalize to (0,0) origin for PathBlockValue
+        if (offsetResult.length === 0) {
+          return { type: 'PathBlockValue' as const, commands: [], pathStrings: [], startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 } };
+        }
+        const oOriginX = offsetResult[0].start.x;
+        const oOriginY = offsetResult[0].start.y;
+        const oNormalized = offsetResult.map(cmd => ({
+          command: cmd.command,
+          args: [...cmd.args],
+          start: { x: cmd.start.x - oOriginX, y: cmd.start.y - oOriginY },
+          end: { x: cmd.end.x - oOriginX, y: cmd.end.y - oOriginY },
+        }));
+        const oLast = oNormalized[oNormalized.length - 1];
+        return {
+          type: 'PathBlockValue' as const,
+          commands: oNormalized,
+          pathStrings: oNormalized.map(c => commandToPathString(c)),
+          startPoint: { x: 0, y: 0 },
+          endPoint: { x: oLast.end.x, y: oLast.end.y },
+        };
+      }
+
       default:
         throw new Error(`Unknown PathBlock method: ${expr.method}`);
     }
@@ -1021,6 +1085,46 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
               ['angle', p.tangent],
             ]),
           })),
+        };
+      }
+
+      case 'reverse': {
+        if (expr.args.length !== 0) throw new Error('reverse() expects 0 arguments');
+        const reversed = reverseCommands(obj.commands);
+        // ProjectedPathValue: starts at original endPoint, keeps absolute coords
+        const projStartPoint = obj.endPoint;
+        const projEndPoint = reversed.length > 0 ? reversed[reversed.length - 1].end : obj.startPoint;
+        return {
+          type: 'ProjectedPathValue' as const,
+          commands: reversed,
+          startPoint: { x: projStartPoint.x, y: projStartPoint.y },
+          endPoint: { x: projEndPoint.x, y: projEndPoint.y },
+        };
+      }
+
+      case 'boundingBox': {
+        if (expr.args.length !== 0) throw new Error('boundingBox() expects 0 arguments');
+        const bb = computeBoundingBox(obj.commands);
+        return {
+          type: 'ObjectValue' as const,
+          properties: new Map<string, Value>([
+            ['x', bb.x], ['y', bb.y], ['width', bb.width], ['height', bb.height],
+          ]),
+        };
+      }
+
+      case 'offset': {
+        if (expr.args.length !== 1) throw new Error('offset() expects 1 argument (distance)');
+        const dist = evaluateExpression(expr.args[0], scope);
+        if (typeof dist !== 'number') throw new Error('offset() argument must be a number');
+        const offsetResult = offsetCommands(obj.commands, dist);
+        const oStart = offsetResult.length > 0 ? offsetResult[0].start : obj.startPoint;
+        const oEnd = offsetResult.length > 0 ? offsetResult[offsetResult.length - 1].end : obj.endPoint;
+        return {
+          type: 'ProjectedPathValue' as const,
+          commands: offsetResult,
+          startPoint: { x: oStart.x, y: oStart.y },
+          endPoint: { x: oEnd.x, y: oEnd.y },
         };
       }
 

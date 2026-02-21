@@ -180,7 +180,7 @@ function quadBezierDerivativeAt(p0: Point, p1: Point, p2: Point, t: number): Poi
 
 // ---- Arc endpoint-to-center conversion (SVG spec F.6.5) ----
 
-interface ArcCenterParams {
+export interface ArcCenterParams {
   cx: number;
   cy: number;
   rx: number;
@@ -190,7 +190,7 @@ interface ArcCenterParams {
   deltaAngle: number;
 }
 
-function arcEndpointToCenter(
+export function arcEndpointToCenter(
   x1: number, y1: number,
   rx: number, ry: number,
   phi: number,
@@ -256,7 +256,7 @@ function arcEndpointToCenter(
   return { cx, cy, rx, ry, phi, startAngle, deltaAngle };
 }
 
-function arcPointFromCenter(p: ArcCenterParams, t: number): Point {
+export function arcPointFromCenter(p: ArcCenterParams, t: number): Point {
   const angle = p.startAngle + t * p.deltaAngle;
   const cosPhi = Math.cos(p.phi);
   const sinPhi = Math.sin(p.phi);
