@@ -41,7 +41,7 @@ import {
 } from './context';
 import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 import { calculateCommandLength, calculatePathLength, samplePathAtFraction, partitionPath } from './sampling';
-import { reverseCommands, computeBoundingBox, offsetCommands, commandToPathString, mirrorCommands, rotateAtVertexCommands } from './path-transforms';
+import { reverseCommands, computeBoundingBox, offsetCommands, commandToPathString, mirrorCommands, rotateAtVertexCommands, scaleCommands, concatenateCommands } from './path-transforms';
 
 export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference | ObjectValue | ObjectNamespace | PathBlockValue | ProjectedPathValue;
 
@@ -569,12 +569,26 @@ function evaluateExpression(expr: Expression, scope: Scope): Value {
       const left = evaluateExpression(expr.left, scope);
       const right = evaluateExpression(expr.right, scope);
 
-      // Style block merge: <<
+      // << operator: PathBlock concatenation or style block merge
       if (expr.operator === '<<') {
-        if (!isStyleBlock(left) || !isStyleBlock(right)) {
-          throw new Error(formatError('Operator << requires style block operands', getLine(expr)));
+        if (isPathBlockValue(left) && isPathBlockValue(right)) {
+          const concatCmds = concatenateCommands(left.commands, left.endPoint, right.commands);
+          if (concatCmds.length === 0) {
+            return { type: 'PathBlockValue' as const, commands: [], pathStrings: [], startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 } };
+          }
+          const lastCmd = concatCmds[concatCmds.length - 1];
+          return {
+            type: 'PathBlockValue' as const,
+            commands: concatCmds,
+            pathStrings: concatCmds.map(c => commandToPathString(c)),
+            startPoint: { x: 0, y: 0 },
+            endPoint: { x: lastCmd.end.x, y: lastCmd.end.y },
+          };
         }
-        return { type: 'StyleBlockValue', properties: { ...left.properties, ...right.properties } };
+        if (isStyleBlock(left) && isStyleBlock(right)) {
+          return { type: 'StyleBlockValue', properties: { ...left.properties, ...right.properties } };
+        }
+        throw new Error(formatError('Operator << requires matching operand types (both style blocks or both path blocks)', getLine(expr)));
       }
 
       // Null equality checks
@@ -1078,6 +1092,26 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
         };
       }
 
+      case 'scale': {
+        if (expr.args.length !== 2) throw new Error('scale() expects 2 arguments (sx, sy)');
+        const sSx = evaluateExpression(expr.args[0], scope);
+        const sSy = evaluateExpression(expr.args[1], scope);
+        if (typeof sSx !== 'number') throw new Error('scale() sx must be a number');
+        if (typeof sSy !== 'number') throw new Error('scale() sy must be a number');
+        const scaled = scaleCommands(obj.commands, sSx, sSy, { x: 0, y: 0 });
+        if (scaled.length === 0) {
+          return { type: 'PathBlockValue' as const, commands: [], pathStrings: [], startPoint: { x: 0, y: 0 }, endPoint: { x: 0, y: 0 } };
+        }
+        const sLast = scaled[scaled.length - 1];
+        return {
+          type: 'PathBlockValue' as const,
+          commands: scaled,
+          pathStrings: scaled.map(c => commandToPathString(c)),
+          startPoint: { x: 0, y: 0 },
+          endPoint: { x: sLast.end.x, y: sLast.end.y },
+        };
+      }
+
       default:
         throw new Error(`Unknown PathBlock method: ${expr.method}`);
     }
@@ -1213,6 +1247,23 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
           commands: rotated,
           startPoint: { x: rStart.x, y: rStart.y },
           endPoint: { x: rEnd.x, y: rEnd.y },
+        };
+      }
+
+      case 'scale': {
+        if (expr.args.length !== 2) throw new Error('scale() expects 2 arguments (sx, sy)');
+        const sSx = evaluateExpression(expr.args[0], scope);
+        const sSy = evaluateExpression(expr.args[1], scope);
+        if (typeof sSx !== 'number') throw new Error('scale() sx must be a number');
+        if (typeof sSy !== 'number') throw new Error('scale() sy must be a number');
+        const scaled = scaleCommands(obj.commands, sSx, sSy, obj.startPoint);
+        const sStart = scaled.length > 0 ? scaled[0].start : obj.startPoint;
+        const sEnd = scaled.length > 0 ? scaled[scaled.length - 1].end : obj.endPoint;
+        return {
+          type: 'ProjectedPathValue' as const,
+          commands: scaled,
+          startPoint: { x: sStart.x, y: sStart.y },
+          endPoint: { x: sEnd.x, y: sEnd.y },
         };
       }
 

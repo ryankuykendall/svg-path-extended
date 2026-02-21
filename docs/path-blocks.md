@@ -324,6 +324,25 @@ for (i in 0..5) {
 }
 ```
 
+### `scale(sx, sy)` → PathBlock / ProjectedPath
+
+Scales the path from its start point. `sx` scales x-coordinates, `sy` scales y-coordinates.
+
+```
+let p = @{ h 50 v 30 };
+let doubled = p.scale(2, 2);      // endPoint (100, 60)
+let wide = p.scale(3, 1);         // endPoint (150, 30)
+let flipped = p.scale(-1, 1);     // mirror across y-axis
+```
+
+Uniform scaling (`sx == sy`) preserves shape and scales arc radii proportionally. Non-uniform scaling (`sx != sy`) performs full ellipse eigendecomposition to compute new arc radii and rotation. Negative scale values flip the arc sweep flag (reflection reverses chirality).
+
+```
+let arc = @{ a 25 25 0 0 1 50 0 };
+let wide = arc.scale(2, 1);       // stretched elliptical arc
+let big = arc.scale(3, 3);        // uniform: radii tripled
+```
+
 ### Transforms on ProjectedPath
 
 Projected paths return results in absolute coordinates:
@@ -347,3 +366,49 @@ let m = proj.mirror(0.5pi);
 // Mirrors across vertical line through (100, 100)
 // startPoint stays at (100, 100), endPoint moves to (50, 100)
 ```
+
+For `scale()` on a ProjectedPath, the scale center is the projection's start point:
+
+```
+let p = @{ h 50 v 30 };
+let proj = p.project(10, 20);
+let s = proj.scale(2, 2);
+// startPoint stays at (10, 20), endPoint moves to (110, 80)
+```
+
+## Concatenation (`<<`)
+
+The `<<` operator joins two PathBlocks end-to-end. The right path's relative commands continue from where the left path ends.
+
+```
+let a = @{ h 50 };
+let b = @{ v 30 };
+let c = calc(a << b);               // endPoint (50, 30)
+M 10 10
+c.draw()                             // draws "h 50 v 30"
+```
+
+Chaining works naturally since `<<` is left-associative and the result is a PathBlock:
+
+```
+let a = @{ h 50 };
+let b = @{ v 30 };
+let d = calc(a << b << a);          // endPoint (100, 30)
+```
+
+Self-concatenation repeats the path:
+
+```
+let p = @{ h 50 };
+let doubled = calc(p << p);         // endPoint (100, 0)
+```
+
+Concatenated paths support all PathBlock methods — draw, project, sampling, and transforms:
+
+```
+let combined = calc(a << b);
+let rev = combined.reverse();
+let mid = combined.get(0.5);
+```
+
+The `<<` operator also works for [style block merging](syntax.md#style-blocks). The operand types must match — mixing PathBlocks and style blocks throws an error.

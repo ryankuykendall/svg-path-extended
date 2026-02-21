@@ -1033,6 +1033,139 @@ export function mirrorCommands(
  * Rotate path around the vertex at `vertexIndex` by `angle` (radians).
  * Rotation formula: P' = V + (dx·cosθ - dy·sinθ, dx·sinθ + dy·cosθ)
  */
+// ---- scale ----
+
+/**
+ * Recompute arc parameters after non-uniform scaling.
+ * Uses eigendecomposition of the transformed ellipse shape matrix.
+ */
+export function scaleArcParams(
+  rx: number, ry: number, rotation: number, sweep: number,
+  sx: number, sy: number
+): { rx: number; ry: number; rotation: number; sweep: number } {
+  const absSx = Math.abs(sx);
+  const absSy = Math.abs(sy);
+
+  // Flip sweep when exactly one of sx, sy is negative (reflection reverses chirality)
+  let newSweep = sweep;
+  if ((sx < 0) !== (sy < 0)) {
+    newSweep = 1 - sweep;
+  }
+
+  // Uniform scaling: just scale the radii
+  if (Math.abs(absSx - absSy) < 1e-12) {
+    return { rx: rx * absSx, ry: ry * absSx, rotation, sweep: newSweep };
+  }
+
+  // Non-uniform: eigendecompose the transformed ellipse shape matrix
+  const theta = rotation * Math.PI / 180;
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
+  const rx2 = rx * rx;
+  const ry2 = ry * ry;
+
+  // Ellipse shape matrix M = R(θ) · diag(rx², ry²) · R(θ)^T
+  const a = rx2 * cosT * cosT + ry2 * sinT * sinT;
+  const b = (rx2 - ry2) * cosT * sinT;
+  const d = rx2 * sinT * sinT + ry2 * cosT * cosT;
+
+  // Apply scale: M' = S · M · S^T where S = diag(|sx|, |sy|)
+  const sx2 = absSx * absSx;
+  const sy2 = absSy * absSy;
+  const ap = sx2 * a;
+  const bp = absSx * absSy * b;
+  const dp = sy2 * d;
+
+  // Eigendecompose M' to get new radii and rotation
+  const trace = ap + dp;
+  const det = ap * dp - bp * bp;
+  const disc = Math.sqrt(Math.max(0, trace * trace / 4 - det));
+  const lambda1 = trace / 2 + disc;
+  const lambda2 = trace / 2 - disc;
+
+  const newRx = Math.sqrt(Math.max(0, lambda1));
+  const newRy = Math.sqrt(Math.max(0, lambda2));
+  const newRotation = Math.abs(bp) < 1e-12 && Math.abs(ap - dp) < 1e-12
+    ? rotation  // symmetric case — rotation unchanged
+    : Math.atan2(2 * bp, ap - dp) / 2 * (180 / Math.PI);
+
+  return { rx: newRx, ry: newRy, rotation: newRotation, sweep: newSweep };
+}
+
+/**
+ * Scale path commands from a center point by (sx, sy).
+ * Uses transformPathPoints for point coordinates, then post-processes arcs.
+ */
+export function scaleCommands(
+  commands: TransformCmd[],
+  sx: number, sy: number,
+  center: Point
+): TransformCmd[] {
+  const transformPoint = (p: Point): Point => ({
+    x: center.x + (p.x - center.x) * sx,
+    y: center.y + (p.y - center.y) * sy,
+  });
+
+  const result = transformPathPoints(commands, transformPoint);
+
+  // Post-process arc commands for non-uniform scaling
+  for (const cmd of result) {
+    if (cmd.command.toUpperCase() === 'A') {
+      const scaled = scaleArcParams(cmd.args[0], cmd.args[1], cmd.args[2], cmd.args[4], sx, sy);
+      cmd.args[0] = scaled.rx;
+      cmd.args[1] = scaled.ry;
+      cmd.args[2] = scaled.rotation;
+      cmd.args[4] = scaled.sweep;
+    }
+  }
+
+  return result;
+}
+
+// ---- concatenate ----
+
+/**
+ * Concatenate two path command arrays end-to-end.
+ * Right path's relative commands continue from where the left path ends.
+ */
+export function concatenateCommands(
+  leftCmds: TransformCmd[],
+  leftEndPoint: Point,
+  rightCmds: TransformCmd[]
+): TransformCmd[] {
+  if (leftCmds.length === 0 && rightCmds.length === 0) return [];
+  if (leftCmds.length === 0) {
+    return rightCmds.map(cmd => ({
+      command: cmd.command, args: [...cmd.args],
+      start: { ...cmd.start }, end: { ...cmd.end },
+    }));
+  }
+  if (rightCmds.length === 0) {
+    return leftCmds.map(cmd => ({
+      command: cmd.command, args: [...cmd.args],
+      start: { ...cmd.start }, end: { ...cmd.end },
+    }));
+  }
+
+  // Deep-copy left commands (unchanged)
+  const result: TransformCmd[] = leftCmds.map(cmd => ({
+    command: cmd.command, args: [...cmd.args],
+    start: { ...cmd.start }, end: { ...cmd.end },
+  }));
+
+  // Deep-copy right commands, offset start/end by leftEndPoint
+  for (const cmd of rightCmds) {
+    result.push({
+      command: cmd.command,
+      args: [...cmd.args],
+      start: { x: cmd.start.x + leftEndPoint.x, y: cmd.start.y + leftEndPoint.y },
+      end: { x: cmd.end.x + leftEndPoint.x, y: cmd.end.y + leftEndPoint.y },
+    });
+  }
+
+  return result;
+}
+
 export function rotateAtVertexCommands(
   commands: TransformCmd[],
   vertexIndex: number,

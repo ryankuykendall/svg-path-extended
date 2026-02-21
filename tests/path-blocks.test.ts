@@ -1219,5 +1219,276 @@ describe('Path Blocks', () => {
           .toThrow(/must be a number/);
       });
     });
+
+    describe('scale()', () => {
+      it('uniform scale doubles horizontal line endpoint', () => {
+        const result = compile(`
+          let p = @{ h 50 };
+          let s = p.scale(2, 2);
+          log(s.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(100, 0)');
+      });
+
+      it('non-uniform scale stretches one axis', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let s = p.scale(3, 1);
+          log(s.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(150, 30)');
+      });
+
+      it('scale(1, 1) returns identical path', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let s = p.scale(1, 1);
+          log(s.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(50, 30)');
+      });
+
+      it('negative sx mirrors horizontally', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let s = p.scale(-1, 1);
+          log(s.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(-50, 30)');
+      });
+
+      it('length scales proportionally under uniform scale', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let s = p.scale(2, 2);
+          log(p.length, s.length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const scaledLen = Number(result.logs[0].parts[1].value);
+        expect(scaledLen).toBeCloseTo(origLen * 2, 5);
+      });
+
+      it('startPoint always (0,0) for PathBlockValue', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let s = p.scale(2, 3);
+          log(s.startPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(0, 0)');
+      });
+
+      it('scales cubic bezier endpoint', () => {
+        const result = compile(`
+          let p = @{ c 0 -40 50 -40 50 0 };
+          let s = p.scale(2, 2);
+          log(s.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(100, 0)');
+      });
+
+      it('scales arc with uniform factor (length check)', () => {
+        const result = compile(`
+          let p = @{ a 25 25 0 0 1 50 0 };
+          let s = p.scale(2, 2);
+          log(p.length, s.length);
+        `);
+        const origLen = Number(result.logs[0].parts[0].value);
+        const scaledLen = Number(result.logs[0].parts[1].value);
+        expect(scaledLen).toBeCloseTo(origLen * 2, 0);
+      });
+
+      it('non-uniform scale on arc (endpoint check)', () => {
+        const result = compile(`
+          let p = @{ a 25 25 0 0 1 50 0 };
+          let s = p.scale(2, 1);
+          log(s.endPoint.x, s.endPoint.y);
+        `);
+        expect(Number(result.logs[0].parts[0].value)).toBeCloseTo(100, 5);
+        expect(Number(result.logs[0].parts[1].value)).toBeCloseTo(0, 5);
+      });
+
+      it('negative scale flips arc sweep', () => {
+        // scale(-1, 1) is a reflection → sweep should flip
+        const result = compile(`
+          let p = @{ a 25 25 0 0 1 50 0 };
+          let s = p.scale(-1, 1);
+          log(s.length);
+        `);
+        // Should not throw and length should be positive
+        expect(Number(result.logs[0].parts[0].value)).toBeGreaterThan(0);
+      });
+
+      it('can draw scaled path', () => {
+        const path = compilePath(`
+          let p = @{ h 50 v 30 };
+          let s = p.scale(2, 2);
+          M 10 10
+          s.draw()
+        `);
+        expect(path).toContain('M 10 10');
+        expect(path.length).toBeGreaterThan('M 10 10'.length);
+      });
+
+      it('works on ProjectedPathValue (startPoint preserved, endPoint scaled)', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let proj = p.project(10, 20);
+          let s = proj.scale(2, 2);
+          log(s.startPoint, s.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(10, 20)');
+        expect(result.logs[0].parts[1].value).toBe('Point(110, 80)');
+      });
+
+      it('scale(0, 1) collapses x-axis', () => {
+        const result = compile(`
+          let p = @{ h 50 v 30 };
+          let s = p.scale(0, 1);
+          log(s.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(0, 30)');
+      });
+
+      it('throws error with 0 args', () => {
+        expect(() => compile('let p = @{ h 50 }; p.scale();'))
+          .toThrow(/2 arguments/);
+      });
+
+      it('throws error with 1 arg', () => {
+        expect(() => compile('let p = @{ h 50 }; p.scale(2);'))
+          .toThrow(/2 arguments/);
+      });
+
+      it('throws error with non-number arg', () => {
+        expect(() => compile('let p = @{ h 50 }; p.scale("a", 1);'))
+          .toThrow(/must be a number/);
+      });
+    });
+
+    describe('<< concatenation', () => {
+      it('concatenates two simple paths (endpoint check)', () => {
+        const result = compile(`
+          let a = @{ h 50 };
+          let b = @{ v 30 };
+          let c = calc(a << b);
+          log(c.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(50, 30)');
+      });
+
+      it('combined length equals sum', () => {
+        const result = compile(`
+          let a = @{ h 50 };
+          let b = @{ v 30 };
+          let c = calc(a << b);
+          log(a.length, b.length, c.length);
+        `);
+        const aLen = Number(result.logs[0].parts[0].value);
+        const bLen = Number(result.logs[0].parts[1].value);
+        const cLen = Number(result.logs[0].parts[2].value);
+        expect(cLen).toBeCloseTo(aLen + bLen, 5);
+      });
+
+      it('can draw concatenated path', () => {
+        const path = compilePath(`
+          let a = @{ h 50 };
+          let b = @{ v 30 };
+          let c = calc(a << b);
+          M 10 10
+          c.draw()
+        `);
+        expect(path).toContain('M 10 10');
+        expect(path).toContain('h 50');
+        expect(path).toContain('v 30');
+      });
+
+      it('startPoint always (0,0)', () => {
+        const result = compile(`
+          let a = @{ h 50 };
+          let b = @{ v 30 };
+          let c = calc(a << b);
+          log(c.startPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(0, 0)');
+      });
+
+      it('chaining a << b << c', () => {
+        const result = compile(`
+          let a = @{ h 50 };
+          let b = @{ v 30 };
+          let c = calc(a << b << a);
+          log(c.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(100, 30)');
+      });
+
+      it('self-concatenation p << p', () => {
+        const result = compile(`
+          let p = @{ h 50 };
+          let c = calc(p << p);
+          log(c.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(100, 0)');
+      });
+
+      it('empty left returns right', () => {
+        const result = compile(`
+          let empty = @{ };
+          let b = @{ h 50 };
+          let c = calc(empty << b);
+          log(c.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(50, 0)');
+      });
+
+      it('empty right returns left', () => {
+        const result = compile(`
+          let a = @{ h 50 };
+          let empty = @{ };
+          let c = calc(a << empty);
+          log(c.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(50, 0)');
+      });
+
+      it('preserves curve commands', () => {
+        const result = compile(`
+          let a = @{ c 0 -40 50 -40 50 0 };
+          let b = @{ q 25 40 50 0 };
+          let c = calc(a << b);
+          log(c.length);
+        `);
+        expect(Number(result.logs[0].parts[0].value)).toBeGreaterThan(0);
+      });
+
+      it('concatenation then transform', () => {
+        const result = compile(`
+          let a = @{ h 50 };
+          let b = @{ v 30 };
+          let c = calc(a << b);
+          let r = c.reverse();
+          log(r.endPoint);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('Point(-50, -30)');
+      });
+
+      it('style block merge still works (regression)', () => {
+        const result = compile(`
+          let base = \${ stroke: red; stroke-width: 2; };
+          let extra = \${ fill: blue; };
+          let merged = calc(base << extra);
+          log(merged.fill);
+        `);
+        expect(result.logs[0].parts[0].value).toBe('blue');
+      });
+
+      it('throws error for mixed PathBlock/StyleBlock types', () => {
+        expect(() => compile(`
+          let p = @{ h 50 };
+          let s = \${ stroke: red; };
+          let x = calc(p << s);
+        `)).toThrow(/matching operand types/);
+      });
+    });
   });
 });

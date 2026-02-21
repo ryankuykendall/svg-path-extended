@@ -182,7 +182,7 @@ L calc(100 + r) 100
 | `\|\|` | Logical OR |
 | `!` | Logical NOT (unary) |
 | `-` | Negation (unary) |
-| `<<` | Style block merge |
+| `<<` | Style block merge / PathBlock concatenation |
 
 Operator precedence follows standard mathematical conventions.
 
