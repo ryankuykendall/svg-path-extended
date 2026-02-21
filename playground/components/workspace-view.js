@@ -411,10 +411,10 @@ export class WorkspaceView extends HTMLElement {
       if (e.key === 'Escape' && this.docsPanel.classList.contains('open')) {
         this.docsPanel.close();
       }
-      // Ctrl/Cmd+S now exports
+      // Ctrl/Cmd+S saves immediately
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        this.exportFile();
+        autosave.saveNow();
       }
     };
     document.addEventListener('keydown', this._handleKeydown);
