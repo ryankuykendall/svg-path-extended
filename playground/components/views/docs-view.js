@@ -1,9 +1,9 @@
 // Docs View - Full-page documentation with sidebar navigation
 // Route: /docs
 
-import { gettingStarted, syntax, stdlib, layers, debug, cli, examples, tocData, hljsThemeDark } from '../../utils/docs-content.js';
+import { gettingStarted, syntax, stdlib, layers, pathBlocks, debug, cli, examples, tocData, hljsThemeDark } from '../../utils/docs-content.js';
 
-const contentMap = { gettingStarted, syntax, stdlib, layers, debug, cli, examples };
+const contentMap = { gettingStarted, syntax, stdlib, layers, pathBlocks, debug, cli, examples };
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

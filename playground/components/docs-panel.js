@@ -1,5 +1,5 @@
 // Documentation slide-out panel component
-import { syntax, stdlib, layers, debug, cli, hljsThemeDark } from '../utils/docs-content.js';
+import { syntax, stdlib, layers, pathBlocks, debug, cli, hljsThemeDark } from '../utils/docs-content.js';
 
 export class DocsPanel extends HTMLElement {
   constructor() {
@@ -271,6 +271,7 @@ export class DocsPanel extends HTMLElement {
         <button class="tab active" data-tab="syntax">Syntax</button>
         <button class="tab" data-tab="stdlib">Stdlib</button>
         <button class="tab" data-tab="layers">Layers</button>
+        <button class="tab" data-tab="pathBlocks">Path Blocks</button>
         <button class="tab" data-tab="debug">Debug</button>
         <button class="tab" data-tab="cli">CLI</button>
       </div>
@@ -279,6 +280,7 @@ export class DocsPanel extends HTMLElement {
         <div class="section active" id="doc-syntax">${syntax}</div>
         <div class="section" id="doc-stdlib">${stdlib}</div>
         <div class="section" id="doc-layers">${layers}</div>
+        <div class="section" id="doc-pathBlocks">${pathBlocks}</div>
         <div class="section" id="doc-debug">${debug}</div>
         <div class="section" id="doc-cli">${cli}</div>
       </div>

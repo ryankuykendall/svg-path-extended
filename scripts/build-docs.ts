@@ -84,6 +84,7 @@ const DOC_FILES: Record<string, string> = {
   'syntax.md': 'syntax',
   'stdlib.md': 'stdlib',
   'layers.md': 'layers',
+  'path-blocks.md': 'pathBlocks',
   'debug.md': 'debug',
   'cli.md': 'cli',
   'examples.md': 'examples',

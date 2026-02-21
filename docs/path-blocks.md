@@ -347,12 +347,3 @@ let m = proj.mirror(0.5pi);
 // Mirrors across vertical line through (100, 100)
 // startPoint stays at (100, 100), endPoint moves to (50, 100)
 ```
-
-## Implementation Phases
-
-Path Blocks are being implemented in phases:
-
-- **Phase 1**: Core definition, `draw()`, `project()`, basic properties
-- **Phase 2**: Parametric sampling — `get(t)`, `tangent(t)`, `normal(t)`, `partition(n)`
-- **Phase 3**: Transforms — `reverse()`, `offset(distance)`, `boundingBox()`
-- **Phase 4** (current): Affine transforms — `mirror(angle)`, `rotateAtVertexIndex(index, angle)`

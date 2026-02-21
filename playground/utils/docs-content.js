@@ -74,7 +74,7 @@ L <span class="hljs-title function_">calc</span>(<span class="hljs-number">100</
 `;
 
 export const syntax = `<h1 id="syntax-syntax-reference">Syntax Reference</h1>
-<p>svg-path-extended is a superset of SVG path syntax that adds variables, expressions, control flow, functions, and <a href="path-blocks.md">path blocks</a>.</p>
+<p>svg-path-extended is a superset of SVG path syntax that adds variables, expressions, control flow, functions, and <a href="#path-blocks-path-blocks">path blocks</a>.</p>
 <h2 id="syntax-path-commands">Path Commands</h2>
 <p>All standard SVG path commands are supported:</p>
 <table>
@@ -1438,6 +1438,258 @@ layer(<span class="hljs-string">&#x27;b&#x27;</span>).ctx.transform.scale.set(2,
 </ul>
 `;
 
+export const pathBlocks = `<h1 id="path-blocks-path-blocks">Path Blocks</h1>
+<p>Path Blocks let you define reusable, introspectable paths without immediately drawing them. A PathBlock captures relative path commands and exposes metadata (length, vertices, endpoints) for positioning other elements relative to the path.</p>
+<h2 id="path-blocks-syntax">Syntax</h2>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> myPath = @{
+  v <span class="hljs-number">20</span>
+  h <span class="hljs-number">30</span>
+  v -<span class="hljs-number">20</span>
+};
+</code></pre><p><code>@{</code> opens a Path Block, <code>}</code> closes it. The body contains <strong>relative</strong> path commands, control flow, variables, and function calls. The result is a <code>PathBlock</code> value — no path commands are emitted.</p>
+<h2 id="path-blocks-drawing-a-path-block">Drawing a Path Block</h2>
+<p>Use <code>.draw()</code> to emit the path&#39;s commands at the current cursor position:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> shape = @{ v <span class="hljs-number">20</span> h <span class="hljs-number">20</span> v -<span class="hljs-number">20</span> z };
+
+M <span class="hljs-number">10</span> <span class="hljs-number">10</span>
+shape.<span class="hljs-title function_">draw</span>()     <span class="hljs-comment">// emits: v 20 h 20 v -20 z</span>
+M <span class="hljs-number">50</span> <span class="hljs-number">50</span>
+shape.<span class="hljs-title function_">draw</span>()     <span class="hljs-comment">// reuse at a different position</span>
+</code></pre><p><code>draw()</code> advances the cursor to the path&#39;s endpoint and returns a <code>ProjectedPath</code> with absolute coordinates.</p>
+<h3 id="path-blocks-assigning-the-draw-result">Assigning the draw result</h3>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> shape = @{ v <span class="hljs-number">20</span> h <span class="hljs-number">20</span> };
+M <span class="hljs-number">10</span> <span class="hljs-number">10</span>
+<span class="hljs-keyword">let</span> proj = shape.<span class="hljs-title function_">draw</span>();
+<span class="hljs-comment">// proj.startPoint = Point(10, 10)</span>
+<span class="hljs-comment">// proj.endPoint = Point(30, 30)</span>
+</code></pre><h2 id="path-blocks-projecting-without-drawing">Projecting Without Drawing</h2>
+<p>Use <code>.project(x, y)</code> to compute absolute coordinates without emitting commands or moving the cursor:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> shape = @{ v <span class="hljs-number">20</span> h <span class="hljs-number">30</span> };
+<span class="hljs-keyword">let</span> proj = shape.<span class="hljs-title function_">project</span>(<span class="hljs-number">10</span>, <span class="hljs-number">10</span>);
+<span class="hljs-comment">// proj.startPoint = Point(10, 10)</span>
+<span class="hljs-comment">// proj.endPoint = Point(40, 30)</span>
+<span class="hljs-comment">// No path commands emitted, cursor unchanged</span>
+</code></pre><h2 id="path-blocks-properties">Properties</h2>
+<h3 id="path-blocks-pathblock">PathBlock</h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>length</code></td>
+<td><code>number</code></td>
+<td>Total arc-length of the path</td>
+</tr>
+<tr>
+<td><code>vertices</code></td>
+<td><code>Point[]</code></td>
+<td>Unique start/end points of each command segment</td>
+</tr>
+<tr>
+<td><code>subPathCount</code></td>
+<td><code>number</code></td>
+<td>Number of subpaths (separated by <code>m</code> commands)</td>
+</tr>
+<tr>
+<td><code>subPathCommands</code></td>
+<td><code>object[]</code></td>
+<td>Structured command list (see below)</td>
+</tr>
+<tr>
+<td><code>startPoint</code></td>
+<td><code>Point</code></td>
+<td>Always <code>Point(0, 0)</code></td>
+</tr>
+<tr>
+<td><code>endPoint</code></td>
+<td><code>Point</code></td>
+<td>Final cursor position (relative to origin)</td>
+</tr>
+</tbody></table>
+<h3 id="path-blocks-projectedpath">ProjectedPath</h3>
+<p>Same properties as PathBlock but with absolute coordinates.</p>
+<h3 id="path-blocks-subpathcommands-entries">subPathCommands entries</h3>
+<p>Each entry in <code>subPathCommands</code> is an object with:</p>
+<pre><code class="hljs">{
+  <span class="hljs-attr">command</span>: <span class="hljs-string">&quot;v&quot;</span>,           <span class="hljs-comment">// lowercase command letter</span>
+  <span class="hljs-attr">args</span>: [<span class="hljs-number">20</span>],             <span class="hljs-comment">// numeric arguments</span>
+  <span class="hljs-attr">start</span>: <span class="hljs-title class_">Point</span>(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>),     <span class="hljs-comment">// cursor before command</span>
+  <span class="hljs-attr">end</span>: <span class="hljs-title class_">Point</span>(<span class="hljs-number">0</span>, <span class="hljs-number">20</span>)       <span class="hljs-comment">// cursor after command</span>
+}
+</code></pre><h2 id="path-blocks-control-flow-inside-path-blocks">Control Flow Inside Path Blocks</h2>
+<p>Variables, <code>for</code> loops, <code>foreach</code> loops, <code>if</code> statements, and function calls all work inside path blocks:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> zigzag = @{
+  <span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.4</span>) {
+    v <span class="hljs-number">10</span>
+    h <span class="hljs-title function_">calc</span>(i % <span class="hljs-number">2</span> == <span class="hljs-number">0</span> ? <span class="hljs-number">10</span> : -<span class="hljs-number">10</span>)
+  }
+};
+</code></pre><p>Context-aware functions like <code>arcFromPolarOffset</code>, <code>tangentLine</code>, and <code>tangentArc</code> work against the block&#39;s temporary path context.</p>
+<h2 id="path-blocks-accessing-outer-variables">Accessing Outer Variables</h2>
+<p>Path blocks can read variables from enclosing scope:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> size = <span class="hljs-number">20</span>;
+<span class="hljs-keyword">let</span> box = @{ v size h size v <span class="hljs-title function_">calc</span>(-size) z };
+</code></pre><h2 id="path-blocks-first-class-values">First-Class Values</h2>
+<p>PathBlocks can be passed as function arguments and returned from functions:</p>
+<pre><code class="hljs">fn <span class="hljs-title function_">makeStep</span>(<span class="hljs-params">dx, dy</span>) {
+  <span class="hljs-keyword">return</span> @{ h dx v dy };
+}
+
+<span class="hljs-keyword">let</span> step = <span class="hljs-title function_">makeStep</span>(<span class="hljs-number">10</span>, <span class="hljs-number">5</span>);
+M <span class="hljs-number">0</span> <span class="hljs-number">0</span>
+step.<span class="hljs-title function_">draw</span>()    <span class="hljs-comment">// emits: h 10 v 5</span>
+</code></pre><h2 id="path-blocks-using-path-metadata">Using Path Metadata</h2>
+<p>Access path properties for layout calculations:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> segment = @{ v <span class="hljs-number">20</span> h <span class="hljs-number">30</span> };
+
+<span class="hljs-comment">// Use length to create a matching horizontal line</span>
+<span class="hljs-keyword">let</span> total = segment.<span class="hljs-property">length</span>;       <span class="hljs-comment">// 50</span>
+
+<span class="hljs-comment">// Use endpoint for positioning</span>
+<span class="hljs-keyword">let</span> end = segment.<span class="hljs-property">endPoint</span>;       <span class="hljs-comment">// Point(30, 20)</span>
+M end.<span class="hljs-property">x</span> end.<span class="hljs-property">y</span>                     <span class="hljs-comment">// Position at path endpoint</span>
+</code></pre><h2 id="path-blocks-restrictions">Restrictions</h2>
+<p>Path blocks enforce these rules at runtime:</p>
+<ol>
+<li><strong>Relative commands only</strong> — All path commands must be lowercase (<code>m</code>, <code>l</code>, <code>h</code>, <code>v</code>, etc.). Uppercase (absolute) commands throw an error.</li>
+<li><strong>No layer definitions</strong> — <code>define PathLayer/TextLayer</code> is not allowed</li>
+<li><strong>No layer apply blocks</strong> — <code>layer().apply { }</code> is not allowed</li>
+<li><strong>No text statements</strong> — <code>text()</code> / <code>tspan()</code> are not allowed</li>
+<li><strong>No nesting</strong> — Path blocks cannot contain other <code>@{ }</code> expressions</li>
+<li><strong>No draw/project inside blocks</strong> — Calling <code>.draw()</code> or <code>.project()</code> inside a path block throws an error</li>
+</ol>
+<h2 id="path-blocks-parametric-sampling">Parametric Sampling</h2>
+<p>Parametric sampling lets you query points, tangent directions, and normal directions at any position along a path. The parameter <code>t</code> is a fraction from 0 (start) to 1 (end) measured by arc length.</p>
+<p>These methods work on both PathBlock values and ProjectedPath values.</p>
+<h3 id="path-blocks-gett-point"><code>get(t)</code> → Point</h3>
+<p>Returns the point at arc-length fraction <code>t</code> along the path.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ v <span class="hljs-number">50</span> h <span class="hljs-number">100</span> };
+<span class="hljs-keyword">let</span> mid = p.<span class="hljs-title function_">get</span>(<span class="hljs-number">0.5</span>);       <span class="hljs-comment">// Point roughly at distance 75 along path</span>
+M mid.<span class="hljs-property">x</span> mid.<span class="hljs-property">y</span>               <span class="hljs-comment">// position at midpoint</span>
+</code></pre><h3 id="path-blocks-tangentt-point-angle"><code>tangent(t)</code> → <code>{ point, angle }</code></h3>
+<p>Returns the point and tangent angle (radians) at fraction <code>t</code>. The angle is the direction of travel.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ v <span class="hljs-number">50</span> h <span class="hljs-number">100</span> };
+<span class="hljs-keyword">let</span> tan = p.<span class="hljs-title function_">tangent</span>(<span class="hljs-number">0.0</span>);
+<span class="hljs-title function_">log</span>(tan.<span class="hljs-property">point</span>);              <span class="hljs-comment">// Point(0, 0)</span>
+<span class="hljs-title function_">log</span>(tan.<span class="hljs-property">angle</span>);              <span class="hljs-comment">// ~1.5708 (π/2, pointing down)</span>
+</code></pre><h3 id="path-blocks-normalt-point-angle"><code>normal(t)</code> → <code>{ point, angle }</code></h3>
+<p>Returns the point and left-hand normal angle at fraction <code>t</code>. The normal angle equals the tangent angle minus π/2.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">100</span> };
+<span class="hljs-keyword">let</span> n = p.<span class="hljs-title function_">normal</span>(<span class="hljs-number">0.5</span>);
+<span class="hljs-title function_">log</span>(n.<span class="hljs-property">point</span>);                <span class="hljs-comment">// Point(50, 0)</span>
+<span class="hljs-title function_">log</span>(n.<span class="hljs-property">angle</span>);                <span class="hljs-comment">// ~-1.5708 (pointing up — left-hand normal of rightward path)</span>
+</code></pre><h3 id="path-blocks-partitionn-orientedpoint"><code>partition(n)</code> → OrientedPoint[]</h3>
+<p>Divides the path into <code>n</code> equal-length segments, returning <code>n + 1</code> oriented points (endpoints inclusive). Each oriented point has <code>point</code> and <code>angle</code> properties.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">100</span> };
+<span class="hljs-keyword">let</span> pts = p.<span class="hljs-title function_">partition</span>(<span class="hljs-number">4</span>);    <span class="hljs-comment">// 5 points at x = 0, 25, 50, 75, 100</span>
+<span class="hljs-keyword">for</span> (op <span class="hljs-keyword">in</span> pts) {
+  <span class="hljs-title function_">log</span>(op.<span class="hljs-property">point</span>.<span class="hljs-property">x</span>, op.<span class="hljs-property">angle</span>);
+}
+</code></pre><h3 id="path-blocks-sampling-on-projectedpath">Sampling on ProjectedPath</h3>
+<p>Projected paths return absolute coordinates:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">100</span> };
+<span class="hljs-keyword">let</span> proj = p.<span class="hljs-title function_">project</span>(<span class="hljs-number">10</span>, <span class="hljs-number">20</span>);
+<span class="hljs-keyword">let</span> mid = proj.<span class="hljs-title function_">get</span>(<span class="hljs-number">0.5</span>);    <span class="hljs-comment">// Point(60, 20) — offset by projection origin</span>
+</code></pre><h3 id="path-blocks-curve-support">Curve Support</h3>
+<p>Sampling works on all command types including cubic/quadratic Bézier curves and arcs. Curves use arc-length parameterization so that <code>t = 0.5</code> always represents the geometric midpoint, not the parametric midpoint.</p>
+<h2 id="path-blocks-transforms">Transforms</h2>
+<p>Transforms create new paths from existing ones — reversing direction, computing bounding boxes, and constructing parallel paths. These methods work on both PathBlock values and ProjectedPath values.</p>
+<h3 id="path-blocks-reverse-pathblock-projectedpath"><code>reverse()</code> → PathBlock / ProjectedPath</h3>
+<p>Returns a new path with reversed direction of travel. The reversed path starts where the original ended and ends where the original started.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">50</span> v <span class="hljs-number">30</span> };
+<span class="hljs-keyword">let</span> r = p.<span class="hljs-title function_">reverse</span>();
+<span class="hljs-title function_">log</span>(r.<span class="hljs-property">endPoint</span>);             <span class="hljs-comment">// Point(-50, -30) — reversed from original</span>
+M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+r.<span class="hljs-title function_">draw</span>()                     <span class="hljs-comment">// draws the path in reverse</span>
+</code></pre><p>Smooth commands (S/T) are automatically converted to their explicit forms (C/Q) before reversal. Closed paths (ending with <code>z</code>) preserve closure.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> closed = @{ h <span class="hljs-number">30</span> v <span class="hljs-number">30</span> h -<span class="hljs-number">30</span> z };
+<span class="hljs-keyword">let</span> rev = closed.<span class="hljs-title function_">reverse</span>();  <span class="hljs-comment">// reversed, still ends with z</span>
+</code></pre><h3 id="path-blocks-boundingbox-x-y-width-height"><code>boundingBox()</code> → <code>{ x, y, width, height }</code></h3>
+<p>Returns the axis-aligned bounding box of the path. Accounts for Bézier curve extrema and arc extrema — not just endpoints.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ c <span class="hljs-number">0</span> -<span class="hljs-number">40</span> <span class="hljs-number">50</span> -<span class="hljs-number">40</span> <span class="hljs-number">50</span> <span class="hljs-number">0</span> };
+<span class="hljs-keyword">let</span> bb = p.<span class="hljs-title function_">boundingBox</span>();
+<span class="hljs-title function_">log</span>(bb.<span class="hljs-property">y</span>);                    <span class="hljs-comment">// negative — curve extends above endpoints</span>
+<span class="hljs-title function_">log</span>(bb.<span class="hljs-property">width</span>, bb.<span class="hljs-property">height</span>);    <span class="hljs-comment">// full extent of the curve</span>
+</code></pre><p>For a straight-line path the bounding box matches the endpoint coordinates:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> line = @{ h <span class="hljs-number">100</span> };
+<span class="hljs-keyword">let</span> bb = line.<span class="hljs-title function_">boundingBox</span>();
+<span class="hljs-comment">// bb = { x: 0, y: 0, width: 100, height: 0 }</span>
+</code></pre><h3 id="path-blocks-offsetdistance-pathblock-projectedpath"><code>offset(distance)</code> → PathBlock / ProjectedPath</h3>
+<p>Creates a parallel path offset by <code>distance</code> units. Positive values offset to the left of the travel direction, negative to the right.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">60</span> v <span class="hljs-number">40</span> };
+<span class="hljs-keyword">let</span> outer = p.<span class="hljs-title function_">offset</span>(<span class="hljs-number">5</span>);     <span class="hljs-comment">// 5 units left of travel</span>
+<span class="hljs-keyword">let</span> inner = p.<span class="hljs-title function_">offset</span>(-<span class="hljs-number">5</span>);    <span class="hljs-comment">// 5 units right of travel</span>
+</code></pre><p>Offset preserves curve types — cubic Béziers produce offset cubics, arcs produce offset arcs with adjusted radii. Segment joins use miter joins with a limit of 4× the offset distance.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> curve = @{ c <span class="hljs-number">0</span> -<span class="hljs-number">40</span> <span class="hljs-number">50</span> -<span class="hljs-number">40</span> <span class="hljs-number">50</span> <span class="hljs-number">0</span> };
+<span class="hljs-keyword">let</span> parallel = curve.<span class="hljs-title function_">offset</span>(<span class="hljs-number">3</span>);
+M <span class="hljs-number">0</span> <span class="hljs-number">50</span>
+curve.<span class="hljs-title function_">draw</span>()
+M <span class="hljs-number">0</span> <span class="hljs-number">50</span>
+parallel.<span class="hljs-title function_">draw</span>()              <span class="hljs-comment">// parallel curve 3 units to the left</span>
+</code></pre><h3 id="path-blocks-mirrorangle-pathblock-projectedpath"><code>mirror(angle)</code> → PathBlock / ProjectedPath</h3>
+<p>Reflects the path across a line through the start point at the given angle. The angle uses standard language units (radians).</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">60</span> v <span class="hljs-number">40</span> };
+<span class="hljs-keyword">let</span> m = p.<span class="hljs-title function_">mirror</span>(<span class="hljs-number">0.</span>5pi);       <span class="hljs-comment">// reflect across vertical axis → goes left</span>
+M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+m.<span class="hljs-title function_">draw</span>()
+</code></pre><p>Common angles:</p>
+<ul>
+<li><code>mirror(0)</code> — horizontal axis (y → -y)</li>
+<li><code>mirror(0.5pi)</code> — vertical axis (x → -x)</li>
+<li><code>mirror(0.25pi)</code> — diagonal (swaps x and y)</li>
+</ul>
+<p>Mirror preserves path length and curve types. Arc commands have their sweep flag flipped (reflection reverses chirality) and their rotation parameter adjusted.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> curve = @{ c <span class="hljs-number">0</span> -<span class="hljs-number">40</span> <span class="hljs-number">50</span> -<span class="hljs-number">40</span> <span class="hljs-number">50</span> <span class="hljs-number">0</span> };
+<span class="hljs-keyword">let</span> flipped = curve.<span class="hljs-title function_">mirror</span>(<span class="hljs-number">0</span>);
+M <span class="hljs-number">0</span> <span class="hljs-number">50</span>
+curve.<span class="hljs-title function_">draw</span>()
+M <span class="hljs-number">0</span> <span class="hljs-number">50</span>
+flipped.<span class="hljs-title function_">draw</span>()               <span class="hljs-comment">// curve reflected below the axis</span>
+</code></pre><h3 id="path-blocks-rotateatvertexindexindex-angle-pathblock-projectedpath"><code>rotateAtVertexIndex(index, angle)</code> → PathBlock / ProjectedPath</h3>
+<p>Rotates the path around the vertex at <code>index</code> (from the <code>.vertices</code> array) by <code>angle</code> radians. PathBlockValue results are normalized to <code>(0, 0)</code> start.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">50</span> v <span class="hljs-number">50</span> };
+<span class="hljs-comment">// p.vertices = [Point(0,0), Point(50,0), Point(50,50)]</span>
+<span class="hljs-keyword">let</span> r = p.<span class="hljs-title function_">rotateAtVertexIndex</span>(<span class="hljs-number">1</span>, <span class="hljs-number">0.</span>5pi);  <span class="hljs-comment">// rotate around corner</span>
+M <span class="hljs-number">10</span> <span class="hljs-number">10</span>
+r.<span class="hljs-title function_">draw</span>()
+</code></pre><p>The index must be a non-negative integer within range. The rotation preserves path length and curve types. Arc commands have their rotation parameter adjusted.</p>
+<pre><code class="hljs"><span class="hljs-comment">// Create a radial pattern by rotating around the first vertex</span>
+<span class="hljs-keyword">let</span> arm = @{ h <span class="hljs-number">50</span> v <span class="hljs-number">10</span> };
+<span class="hljs-keyword">for</span> (i <span class="hljs-keyword">in</span> <span class="hljs-number">0.</span><span class="hljs-number">.5</span>) {
+  <span class="hljs-keyword">let</span> angle = <span class="hljs-title function_">calc</span>(i * <span class="hljs-number">2</span> * <span class="hljs-number">3.14159265358979</span> / <span class="hljs-number">6</span>);
+  <span class="hljs-keyword">let</span> r = arm.<span class="hljs-title function_">rotateAtVertexIndex</span>(<span class="hljs-number">0</span>, angle);
+  M <span class="hljs-number">100</span> <span class="hljs-number">100</span>
+  r.<span class="hljs-title function_">draw</span>()
+}
+</code></pre><h3 id="path-blocks-transforms-on-projectedpath">Transforms on ProjectedPath</h3>
+<p>Projected paths return results in absolute coordinates:</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">100</span> };
+<span class="hljs-keyword">let</span> proj = p.<span class="hljs-title function_">project</span>(<span class="hljs-number">10</span>, <span class="hljs-number">20</span>);
+<span class="hljs-keyword">let</span> bb = proj.<span class="hljs-title function_">boundingBox</span>();
+<span class="hljs-comment">// bb.x = 10, bb.y = 20 — absolute coordinates</span>
+
+<span class="hljs-keyword">let</span> rev = proj.<span class="hljs-title function_">reverse</span>();
+<span class="hljs-title function_">log</span>(rev.<span class="hljs-property">startPoint</span>);         <span class="hljs-comment">// Point(110, 20) — starts at original end</span>
+</code></pre><p>For <code>mirror()</code> on a ProjectedPath, the mirror line passes through the projection&#39;s start point. For <code>rotateAtVertexIndex()</code>, the rotation center is the absolute vertex position.</p>
+<pre><code class="hljs"><span class="hljs-keyword">let</span> p = @{ h <span class="hljs-number">50</span> };
+<span class="hljs-keyword">let</span> proj = p.<span class="hljs-title function_">project</span>(<span class="hljs-number">100</span>, <span class="hljs-number">100</span>);
+<span class="hljs-keyword">let</span> m = proj.<span class="hljs-title function_">mirror</span>(<span class="hljs-number">0.</span>5pi);
+<span class="hljs-comment">// Mirrors across vertical line through (100, 100)</span>
+<span class="hljs-comment">// startPoint stays at (100, 100), endPoint moves to (50, 100)</span>
+</code></pre><h2 id="path-blocks-implementation-phases">Implementation Phases</h2>
+<p>Path Blocks are being implemented in phases:</p>
+<ul>
+<li><strong>Phase 1</strong>: Core definition, <code>draw()</code>, <code>project()</code>, basic properties</li>
+<li><strong>Phase 2</strong>: Parametric sampling — <code>get(t)</code>, <code>tangent(t)</code>, <code>normal(t)</code>, <code>partition(n)</code></li>
+<li><strong>Phase 3</strong>: Transforms — <code>reverse()</code>, <code>offset(distance)</code>, <code>boundingBox()</code></li>
+<li><strong>Phase 4</strong> (current): Affine transforms — <code>mirror(angle)</code>, <code>rotateAtVertexIndex(index, angle)</code></li>
+</ul>
+`;
+
 export const debug = `<h1 id="debug-debug-console">Debug &amp; Console</h1>
 <p>The playground includes debugging tools to help you understand how your code executes and inspect values during evaluation.</p>
 <h2 id="debug-console-output">Console Output</h2>
@@ -1920,6 +2172,7 @@ export const sections = {
   syntax,
   stdlib,
   layers,
+  pathBlocks,
   debug,
   cli,
   examples,
@@ -2647,6 +2900,152 @@ export const tocData = JSON.parse(`[
       {
         "id": "layers-limitations",
         "title": "Limitations",
+        "level": 2
+      }
+    ]
+  },
+  {
+    "key": "pathBlocks",
+    "title": "Path Blocks",
+    "headings": [
+      {
+        "id": "path-blocks-syntax",
+        "title": "Syntax",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-drawing-a-path-block",
+        "title": "Drawing a Path Block",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-assigning-the-draw-result",
+        "title": "Assigning the draw result",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-projecting-without-drawing",
+        "title": "Projecting Without Drawing",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-properties",
+        "title": "Properties",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-pathblock",
+        "title": "PathBlock",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-projectedpath",
+        "title": "ProjectedPath",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-subpathcommands-entries",
+        "title": "subPathCommands entries",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-control-flow-inside-path-blocks",
+        "title": "Control Flow Inside Path Blocks",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-accessing-outer-variables",
+        "title": "Accessing Outer Variables",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-first-class-values",
+        "title": "First-Class Values",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-using-path-metadata",
+        "title": "Using Path Metadata",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-restrictions",
+        "title": "Restrictions",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-parametric-sampling",
+        "title": "Parametric Sampling",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-gett-point",
+        "title": "get(t) → Point",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-tangentt-point-angle",
+        "title": "tangent(t) → { point, angle }",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-normalt-point-angle",
+        "title": "normal(t) → { point, angle }",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-partitionn-orientedpoint",
+        "title": "partition(n) → OrientedPoint[]",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-sampling-on-projectedpath",
+        "title": "Sampling on ProjectedPath",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-curve-support",
+        "title": "Curve Support",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-transforms",
+        "title": "Transforms",
+        "level": 2
+      },
+      {
+        "id": "path-blocks-reverse-pathblock-projectedpath",
+        "title": "reverse() → PathBlock / ProjectedPath",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-boundingbox-x-y-width-height",
+        "title": "boundingBox() → { x, y, width, height }",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-offsetdistance-pathblock-projectedpath",
+        "title": "offset(distance) → PathBlock / ProjectedPath",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-mirrorangle-pathblock-projectedpath",
+        "title": "mirror(angle) → PathBlock / ProjectedPath",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-rotateatvertexindexindex-angle-pathblock-projectedpath",
+        "title": "rotateAtVertexIndex(index, angle) → PathBlock / ProjectedPath",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-transforms-on-projectedpath",
+        "title": "Transforms on ProjectedPath",
+        "level": 3
+      },
+      {
+        "id": "path-blocks-implementation-phases",
+        "title": "Implementation Phases",
         "level": 2
       }
     ]
