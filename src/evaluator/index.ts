@@ -43,7 +43,7 @@ import { formatNum, setNumberFormat, resetNumberFormat } from './format';
 import { calculateCommandLength, calculatePathLength, samplePathAtFraction, partitionPath } from './sampling';
 import { reverseCommands, computeBoundingBox, offsetCommands, commandToPathString, mirrorCommands, rotateAtVertexCommands, scaleCommands, concatenateCommands } from './path-transforms';
 
-export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference | ObjectValue | ObjectNamespace | PathBlockValue | ProjectedPathValue;
+export type Value = number | string | null | PathSegment | UserFunction | ContextObject | PathWithResult | LayerReference | StyleBlockValue | ArrayValue | PointValue | TransformReference | TransformPropertyReference | ObjectValue | ObjectNamespace | PathBlockValue | ProjectedPathValue | CyclerValue;
 
 /**
  * Represents an array value (reference semantics)
@@ -68,6 +68,19 @@ export interface PointValue {
 
 export function isPointValue(value: Value): value is PointValue {
   return typeof value === 'object' && value !== null && 'type' in value && value.type === 'PointValue';
+}
+
+/**
+ * Represents a cycler that cycles through a list sequentially
+ */
+export interface CyclerValue {
+  type: 'CyclerValue';
+  elements: Value[];
+  index: number;
+}
+
+export function isCyclerValue(value: Value): value is CyclerValue {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'CyclerValue';
 }
 
 /**
@@ -1336,6 +1349,20 @@ function evaluateMethodCall(expr: MethodCallExpression, scope: Scope): Value {
     }
   }
 
+  // Cycler methods
+  if (isCyclerValue(obj)) {
+    switch (expr.method) {
+      case 'pick': {
+        if (expr.args.length !== 0) throw new Error('pick() expects 0 arguments');
+        const value = obj.elements[obj.index];
+        obj.index = (obj.index + 1) % obj.elements.length;
+        return value;
+      }
+      default:
+        throw new Error(`Unknown Cycler method: ${expr.method}`);
+    }
+  }
+
   // ObjectNamespace methods (Object.keys, Object.values, Object.entries, Object.delete)
   if (typeof obj === 'object' && obj !== null && 'type' in obj && obj.type === 'ObjectNamespace') {
     const args = expr.args.map(a => evaluateExpression(a, scope));
@@ -1477,6 +1504,9 @@ function formatValueForDisplay(val: Value): string {
     const entries = Array.from(val.properties.entries())
       .map(([k, v]) => `${k}: ${formatValueForDisplay(v)}`);
     return '{' + entries.join(', ') + '}';
+  }
+  if (isCyclerValue(val)) {
+    return `Cycler(${val.elements.length} items, index ${val.index})`;
   }
   if (isArrayValue(val)) {
     return '[' + val.elements.map(formatValueForDisplay).join(', ') + ']';
@@ -1655,6 +1685,12 @@ function evaluateMemberExpression(expr: MemberExpression, scope: Scope): Value {
     return obj.properties.get(expr.property) ?? null;
   }
 
+  // Handle CyclerValue property access
+  if (isCyclerValue(obj)) {
+    if (expr.property === 'length') return obj.elements.length;
+    throw new Error(`Property '${expr.property}' does not exist on Cycler`);
+  }
+
   // Handle ArrayValue property access
   if (isArrayValue(obj)) {
     if (expr.property === 'length') {
@@ -1736,6 +1772,8 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
           stringValue = formatValueForDisplay(value);
         } else if (isProjectedPathValue(value)) {
           stringValue = formatValueForDisplay(value);
+        } else if (isCyclerValue(value)) {
+          stringValue = formatValueForDisplay(value);
         } else if (typeof value === 'object' && value !== null && 'type' in value) {
           const typed = value as { type: string; value?: unknown };
           if (typed.type === 'ContextObject' && typed.value) {
@@ -1791,6 +1829,31 @@ function evaluateFunctionCall(call: FunctionCall, scope: Scope): Value {
     if (typeof x !== 'number') throw new Error('Point() x must be a number');
     if (typeof y !== 'number') throw new Error('Point() y must be a number');
     return { type: 'PointValue' as const, x, y };
+  }
+
+  // Handle Cycler() constructor
+  if (call.name === 'Cycler') {
+    if (call.args.length < 1 || call.args.length > 2) {
+      throw new Error(`Cycler() expects 1-2 arguments, got ${call.args.length}`);
+    }
+    const list = evaluateExpression(call.args[0], scope);
+    if (!isArrayValue(list)) throw new Error('Cycler() first argument must be an array');
+    if (list.elements.length === 0) throw new Error('Cycler() array must not be empty');
+
+    let elements = [...list.elements]; // shallow copy
+
+    if (call.args.length === 2) {
+      const shuffle = evaluateExpression(call.args[1], scope);
+      if (shuffle) {
+        // Fisher-Yates shuffle
+        for (let i = elements.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [elements[i], elements[j]] = [elements[j], elements[i]];
+        }
+      }
+    }
+
+    return { type: 'CyclerValue' as const, elements, index: 0 };
   }
 
   // Check if it's a context-aware function

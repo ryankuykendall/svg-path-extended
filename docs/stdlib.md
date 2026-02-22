@@ -112,6 +112,40 @@ for (i in 0..20) {
 
 **Note**: Random functions are not deterministic. Each call produces a different value.
 
+### Cycler
+
+A `Cycler` wraps an array and cycles through it sequentially via `.pick()`, returning to the beginning after reaching the end. Useful for deterministic round-robin assignment of colors, layer names, styles, etc.
+
+#### Cycler(array, shuffle?)
+
+Creates a cycler from an array. If the optional `shuffle` argument is truthy, the array is shuffled once at construction (the shuffled order is stable across all cycles).
+
+```
+let c = Cycler(['red', 'green', 'blue']);
+c.pick()  // 'red'
+c.pick()  // 'green'
+c.pick()  // 'blue'
+c.pick()  // 'red' (wraps around)
+```
+
+```
+// Shuffled cycler — stable order across wraps
+let r = Cycler(['a', 'b', 'c'], true);
+```
+
+#### .pick()
+
+Returns the next element in the cycle, advancing the internal index. Wraps around to the beginning after the last element.
+
+#### .length
+
+Returns the number of items in the cycler.
+
+```
+let c = Cycler([1, 2, 3]);
+log(c.length);  // 3
+```
+
 ---
 
 ## Path Functions

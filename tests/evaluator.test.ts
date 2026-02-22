@@ -1274,6 +1274,94 @@ describe('Evaluator', () => {
     });
   });
 
+  describe('cycler', () => {
+    it('cycles through elements sequentially', () => {
+      const result = compile(`
+        let c = Cycler(['a', 'b', 'c']);
+        log(c.pick());
+        log(c.pick());
+        log(c.pick());
+      `);
+      expect(result.logs[0].parts[0].value).toBe('a');
+      expect(result.logs[1].parts[0].value).toBe('b');
+      expect(result.logs[2].parts[0].value).toBe('c');
+    });
+
+    it('wraps around after reaching the end', () => {
+      const result = compile(`
+        let c = Cycler(['x', 'y']);
+        log(c.pick());
+        log(c.pick());
+        log(c.pick());
+        log(c.pick());
+      `);
+      expect(result.logs[0].parts[0].value).toBe('x');
+      expect(result.logs[1].parts[0].value).toBe('y');
+      expect(result.logs[2].parts[0].value).toBe('x');
+      expect(result.logs[3].parts[0].value).toBe('y');
+    });
+
+    it('has .length property', () => {
+      expect(compilePath('let c = Cycler([1, 2, 3]); M calc(c.length) 0')).toBe('M 3 0');
+    });
+
+    it('shuffled mode produces stable order across cycles', () => {
+      const result = compile(`
+        let c = Cycler(['a', 'b', 'c', 'd', 'e'], 1);
+        let first = c.pick();
+        let second = c.pick();
+        let third = c.pick();
+        let fourth = c.pick();
+        let fifth = c.pick();
+        // Second cycle should repeat the same order
+        log(first == c.pick());
+        log(second == c.pick());
+        log(third == c.pick());
+        log(fourth == c.pick());
+        log(fifth == c.pick());
+      `);
+      // All comparisons should be truthy (1)
+      for (const log of result.logs) {
+        expect(log.parts[0].value).toBe('1');
+      }
+    });
+
+    it('throws on empty array', () => {
+      expect(() => compile('let c = Cycler([]);')).toThrow('must not be empty');
+    });
+
+    it('throws on non-array argument', () => {
+      expect(() => compile('let c = Cycler(42);')).toThrow('must be an array');
+    });
+
+    it('log() displays cycler info', () => {
+      const result = compile('let c = Cycler([1, 2, 3]); log(c);');
+      expect(result.logs[0].parts[0].value).toBe('Cycler(3 items, index 0)');
+    });
+
+    it('log() displays updated index after picks', () => {
+      const result = compile('let c = Cycler([1, 2, 3]); c.pick(); c.pick(); log(c);');
+      expect(result.logs[0].parts[0].value).toBe('Cycler(3 items, index 2)');
+    });
+
+    it('works with mixed value types', () => {
+      const result = compile(`
+        let c = Cycler([42, 'hello']);
+        log(c.pick());
+        log(c.pick());
+      `);
+      expect(result.logs[0].parts[0].value).toBe('42');
+      expect(result.logs[1].parts[0].value).toBe('hello');
+    });
+
+    it('works with numbers in path context', () => {
+      expect(compilePath(`
+        let c = Cycler([10, 20, 30]);
+        M calc(c.pick()) calc(c.pick())
+      `)).toBe('M 10 20');
+    });
+  });
+
   describe('style blocks', () => {
     it('creates a style block value', () => {
       const result = compile(`
